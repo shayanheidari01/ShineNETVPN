@@ -1,21 +1,36 @@
-<a href="#">
-  <img src="https://github.com/user-attachments/assets/f03afd6f-630b-4fa8-af58-42c7fc6feda2" width="200" height="200">
-</a>
+<div align="center">
+<a href="#">  
+  <img src="https://github.com/user-attachments/assets/f03afd6f-630b-4fa8-af58-42c7fc6feda2" width="200" height="200">  
+</a>  
+</div>
 
 
-# 📱 Begzar Android App
+# 📱 اپلیکیشن **بگذر**  
 
-Internet freedom solution for iranian people.
+🚀 **راهکاری برای آزادی اینترنت در ایران!** 🚀  
 
-based on free configs from Telegram, MahsaNG, Donated Servers.
+✨ مبتنی بر کانفیگ‌های رایگان از **تلگرام، MahsaNG و سرورهای اهدایی** ✨  
 
-## Getting Started
+## 🌟 ویژگی‌های بگذر  
+✅ اتصال سریع و پایدار به اینترنت آزاد  
+✅ استفاده آسان بدون نیاز به تنظیمات پیچیده  
+✅ پشتیبانی از جدیدترین کانفیگ‌ها  
+✅ امنیت و حفظ حریم خصوصی کاربران  
 
-Downlaod and install **Begzar App** from releases or this link:
+## 🎯 شروع کنید!  
 
-[`Download Begzar App`](https://github.com/Begzar/BegzarApp/releases/download/v5.5.0/begzar-v8a-5.5.0.apk)
+📥 **دانلود و نصب بگذر** از بخش **ریلیزها** یا لینک زیر:  
 
-Want to know us?
+🔗 [`دانلود بگذر`](https://github.com/Begzar/BegzarApp/releases/latest)  
 
-- [`@PsrkGrmez`](https://github.com/PsrkGrmez)
-- [`@MotadDev`](https://github.com/motad-dev)
+## 💡 راهنمای نصب  
+۱️⃣ فایل APK را دانلود کنید.  
+۲️⃣ در تنظیمات گوشی، اجازه نصب از منابع ناشناس را فعال کنید.  
+۳️⃣ برنامه را نصب کرده و اجرا کنید.  
+۴️⃣ از اینترنت آزاد لذت ببرید!  
+
+### 👥 درباره‌ی ما بیشتر بدانید:  
+- 🎭 [`@PsrkGrmez`](https://github.com/PsrkGrmez)  
+- 🛠️ [`@MotadDev`](https://github.com/motad-dev)  
+
+📢 **منتظر نظرات و پیشنهادات شما هستیم!**
