@@ -1,27 +1,29 @@
+import 'package:shinenet_vpn/common/theme.dart';
 import 'package:dio/dio.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:lottie/lottie.dart';
+import 'package:flutter/services.dart';
+import 'package:loading_animation_widget/loading_animation_widget.dart';
 
 class VpnCard extends StatefulWidget {
   final int downloadSpeed;
   final int uploadSpeed;
   final String selectedServer;
-  final String selectedServerLogo;
+  final String selectedServerType;
   final String duration;
-
   final int download;
   final int upload;
 
-  const VpnCard(
-      {super.key,
-      required this.downloadSpeed,
-      required this.uploadSpeed,
-      required this.download,
-      required this.upload,
-      required this.selectedServer,
-      required this.selectedServerLogo,
-      required this.duration});
+  const VpnCard({
+    super.key,
+    required this.downloadSpeed,
+    required this.uploadSpeed,
+    required this.download,
+    required this.upload,
+    required this.selectedServer,
+    required this.selectedServerType,
+    required this.duration,
+  });
 
   @override
   State<VpnCard> createState() => _VpnCardState();
@@ -33,110 +35,133 @@ class _VpnCardState extends State<VpnCard> {
   bool isLoading = false;
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      alignment: Alignment.center,
+    return Column(
       children: [
-        Positioned(
-          top: -30,
-          child: Container(
-            width: 200,
-            height: 50,
-            decoration: BoxDecoration(
-              color: const Color(0xFF2A2A2A),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: Colors.grey.withOpacity(0.1),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
-                  blurRadius: 8,
-                  offset: Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: Text(
-                  widget.duration,
-                  style: TextStyle(
-                    color: Colors.grey[300],
-                    fontFamily: 'GM',
-                    fontSize: 18,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
+        // Duration timer at the top
         Container(
-          width: 350,
-          padding: EdgeInsets.all(16),
+          margin: EdgeInsets.only(bottom: ThemeColor.mediumSpacing),
+          padding: EdgeInsets.symmetric(
+            horizontal: ThemeColor.mediumSpacing,
+            vertical: ThemeColor.smallSpacing,
+          ),
           decoration: BoxDecoration(
-            color: const Color(0xFF2A2A2A),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: Colors.grey.withOpacity(0.1),
-            ),
+            gradient: ThemeColor.primaryGradient,
+            borderRadius: BorderRadius.circular(ThemeColor.largeRadius),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.2),
-                blurRadius: 10,
+                color: ThemeColor.primaryColor.withOpacity(0.3),
+                blurRadius: 12,
                 offset: Offset(0, 4),
               ),
             ],
           ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.access_time_rounded,
+                color: Colors.white,
+                size: 16,
+              ),
+              SizedBox(width: ThemeColor.smallSpacing),
+              Text(
+                widget.duration,
+                style: ThemeColor.bodyStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Main content card
+        AnimatedContainer(
+          duration: ThemeColor.mediumAnimation,
+          width: double.infinity,
+          constraints: BoxConstraints(maxWidth: 400),
+          padding: EdgeInsets.all(ThemeColor.largeSpacing),
+          decoration: ThemeColor.cardDecoration(),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.start,
                 children: [
-                  Lottie.asset(
-                    widget.selectedServerLogo,
-                    width: 40,
-                  ),
-                  SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.selectedServer,
-                        style: TextStyle(
-                          color: Colors.grey[300],
-                          fontFamily: 'GM',
-                          fontSize: 16,
-                        ),
+                  Container(
+                    padding: EdgeInsets.all(ThemeColor.smallSpacing),
+                    decoration: BoxDecoration(
+                      color: ThemeColor.primaryColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
+                      border: Border.all(
+                        color: ThemeColor.primaryColor.withOpacity(0.3),
+                        width: 1,
                       ),
-                      SizedBox(height: 8),
-                      _buildIpButton(),
-                    ],
+                    ),
+                    child: ThemeColor.buildServerIcon(
+                      serverType: widget.selectedServerType,
+                      size: 24,
+                      isSelected: true,
+                    ),
+                  ),
+                  SizedBox(width: ThemeColor.mediumSpacing),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.selectedServer,
+                          style: ThemeColor.bodyStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: ThemeColor.primaryText,
+                          ),
+                        ),
+                        SizedBox(height: ThemeColor.smallSpacing),
+                        _buildIpButton(),
+                      ],
+                    ),
                   ),
                 ],
               ),
-              Divider(color: Colors.grey.withOpacity(0.1)),
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 25, vertical: 10),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _buildStatColumn(
-                      icon: Icons.data_usage_rounded,
+              SizedBox(height: ThemeColor.largeSpacing),
+              Container(
+                height: 1,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.transparent,
+                      ThemeColor.dividerColor,
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+              SizedBox(height: ThemeColor.largeSpacing),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildStatColumn(
+                      icon: Icons.speed_rounded,
                       download: formatBytes(widget.downloadSpeed),
                       upload: formatBytes(widget.uploadSpeed),
                       status: context.tr('realtime_usage'),
+                      color: ThemeColor.successColor,
                     ),
-                    _buildStatColumn(
-                      icon: Icons.wifi_rounded,
+                  ),
+                  Container(
+                    width: 1,
+                    height: 60,
+                    color: ThemeColor.dividerColor,
+                  ),
+                  Expanded(
+                    child: _buildStatColumn(
+                      icon: Icons.data_usage_rounded,
                       download: formatSpeedBytes(widget.download),
                       upload: formatSpeedBytes(widget.upload),
                       status: context.tr('total_usage'),
+                      color: ThemeColor.primaryColor,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -174,50 +199,69 @@ class _VpnCardState extends State<VpnCard> {
   Widget _buildIpButton() {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF353535),
-        borderRadius: BorderRadius.circular(12),
+        color: ThemeColor.surfaceColor,
+        borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
         border: Border.all(
-          color: Colors.white.withOpacity(0.1),
+          color: ThemeColor.borderColor.withOpacity(0.3),
+          width: 1,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: ThemeColor.shadowColor.withOpacity(0.1),
+            blurRadius: 4,
+            offset: Offset(0, 2),
+          ),
+        ],
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
           onTap: () async {
+            HapticFeedback.lightImpact();
             setState(() => isLoading = true);
-            final ipInfo = await getIpApi();
-            setState(() {
-              ipflag = countryCodeToFlagEmoji(ipInfo['countryCode']!);
-              ipText = ipInfo['ip'];
-              isLoading = false;
-            });
+            try {
+              final ipInfo = await getIpApi();
+              setState(() {
+                ipflag = countryCodeToFlagEmoji(ipInfo['countryCode']!);
+                ipText = ipInfo['ip'];
+                isLoading = false;
+              });
+            } catch (e) {
+              setState(() {
+                isLoading = false;
+              });
+            }
           },
           child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: EdgeInsets.symmetric(
+              horizontal: ThemeColor.mediumSpacing,
+              vertical: ThemeColor.smallSpacing,
+            ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (isLoading)
-                  SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation(Colors.grey[400]),
-                    ),
+                  LoadingAnimationWidget.threeArchedCircle(
+                    color: ThemeColor.primaryColor,
+                    size: 16,
                   )
                 else ...[
+                  Icon(
+                    ipText != null ? Icons.language_rounded : Icons.visibility_rounded,
+                    color: ThemeColor.primaryColor,
+                    size: 16,
+                  ),
+                  SizedBox(width: ThemeColor.smallSpacing),
                   Text(
                     ipText ?? context.tr('show_ip'),
-                    style: TextStyle(
-                      color: Colors.grey[300],
-                      fontFamily: 'GM',
-                      fontSize: 13,
+                    style: ThemeColor.captionStyle(
+                      color: ThemeColor.secondaryText,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                   if (ipflag != null) ...[
-                    SizedBox(width: 6),
+                    SizedBox(width: ThemeColor.smallSpacing),
                     Text(
                       ipflag!,
                       style: TextStyle(
@@ -239,37 +283,69 @@ class _VpnCardState extends State<VpnCard> {
     required String download,
     required String upload,
     required String status,
+    required Color color,
   }) {
-    return Row(
+    return Column(
       children: [
-        Icon(
-          icon,
-          color: Colors.green[400],
-          size: 20,
-        ),
-        SizedBox(width: 8),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              status,
-              style: TextStyle(fontSize: 12),
+        Container(
+          padding: EdgeInsets.all(ThemeColor.smallSpacing),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
+            border: Border.all(
+              color: color.withOpacity(0.3),
+              width: 1,
             ),
-            SizedBox(height: 4),
+          ),
+          child: Icon(
+            icon,
+            color: color,
+            size: 24,
+          ),
+        ),
+        SizedBox(height: ThemeColor.smallSpacing),
+        Text(
+          status,
+          style: ThemeColor.captionStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        SizedBox(height: 4),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.download_rounded,
+              color: ThemeColor.successColor,
+              size: 12,
+            ),
+            SizedBox(width: 4),
             Text(
-              "⬇️ $download",
-              style: TextStyle(
-                color: Colors.grey[300],
-                fontFamily: 'GM',
-                fontSize: 13,
+              download,
+              style: ThemeColor.captionStyle(
+                color: ThemeColor.primaryText,
+                fontWeight: FontWeight.w600,
               ),
             ),
+          ],
+        ),
+        SizedBox(height: 2),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.upload_rounded,
+              color: ThemeColor.warningColor,
+              size: 12,
+            ),
+            SizedBox(width: 4),
             Text(
-              "⬆️ $upload",
-              style: TextStyle(
-                color: Colors.grey[300],
-                fontFamily: 'GM',
-                fontSize: 13,
+              upload,
+              style: ThemeColor.captionStyle(
+                color: ThemeColor.primaryText,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],

@@ -1,89 +1,243 @@
-# Privacy Policy
+# ShineNET VPN Privacy Policy
 
-## Begzar VPN Privacy Policy
-
-Begzar Server only facilitates the provision and sharing of free VPN servers and does not collect any personal information or sensitive data except the ones mentioned in Section 1.2.
-
-> **Note 1:** Please always make sure to use official apps and follow this guide to verify the legitimacy and security of the website you are visiting while using Begzar VPN.
-
-> **Note 2:** We strongly advise against using Begzar for sensitive tasks, such as banking or any activities that may be deemed illegal in your country, unless you are using a VPN configuration that you trust.
-
----
-
-## 1. Data Collection
-
-### 1.1 Data Not Collected
-We do **not** collect the following information:
-
-- Names (including subscriber names, usernames, and screen names)
-- Addresses (residential and business)
-- Telephone numbers
-- Payment details (credit card numbers, bank account info, billing records)
-
-### 1.2 Data Collected
-Limited anonymous data is collected to provide the best possible VPN configurations using the Mahsa Server:
-
-- IP Address of the Client (**first 3 octets only**)
-- Timezone of the Client
-- Android Version
-- App Version
-- Connection Status (Connected/Not Connected, Ping Value)
+<div align="center">
+  <img src="https://raw.githubusercontent.com/shayanheidari01/ShineNETVPN/main/assets/images/logo.png" width="80" height="80" alt="ShineNET VPN Logo">
+  
+  **Protecting Your Privacy, Securing Your Freedom**
+  
+  *Last Updated: December 2024*
+  
+</div>
 
 ---
 
-## 2. Data Usage
+## Our Commitment to Privacy
 
-Collected data is used for:
+At **ShineNET VPN**, we are committed to protecting your privacy and ensuring your digital freedom. This Privacy Policy explains how we handle your data when you use our free, open-source VPN application.
 
-- Maintaining a list of healthy and working donated VPN configurations.
-- A regional distribution algorithm that helps clients receive the best configurations based on their region and ISP.
+> **🔒 Core Principle:** We believe in true privacy. We do not collect, store, or share your personal information or browsing activities.
 
----
-
-## 3. Data Sharing and Transfer
-We **do not** share any data with any third parties.
+> **⚠️ Important Notice:** While ShineNET VPN provides secure connections, we recommend exercising caution when accessing sensitive services such as banking or conducting activities that may be restricted in your jurisdiction.
 
 ---
 
-## 4. Security Measures
-We implement strong security measures to protect collected data. Staff access is strictly limited.
+## 1. Information We Do NOT Collect
+
+### 1.1 Personal Information
+We **absolutely do not** collect:
+
+- ❌ **Personal Identity**: Names, usernames, email addresses
+- ❌ **Contact Information**: Phone numbers, addresses, postal codes
+- ❌ **Financial Data**: Credit card details, payment information, billing records
+- ❌ **Browsing Activities**: Websites visited, content accessed, search queries
+- ❌ **Communication Data**: Messages, calls, or any communication content
+- ❌ **Device Identifiers**: Unique device IDs, advertising IDs
+
+### 1.2 Connection Logs
+We **do not** log:
+
+- ❌ Your real IP address
+- ❌ VPN server IP addresses you connect to
+- ❌ Connection timestamps
+- ❌ Session duration
+- ❌ Bandwidth usage per user
+- ❌ DNS queries
 
 ---
 
-## 5. Data Retention
-Data is retained for legitimate business needs and is securely deleted when no longer needed.
+## 2. Limited Technical Data We Collect
+
+To provide optimal service quality and server recommendations, we collect minimal, **anonymized technical data**:
+
+### 2.1 Anonymous Analytics
+- 📊 **Anonymized IP Region** (first 3 octets only, e.g., 192.168.1.xxx becomes 192.168.1.***)
+- 🌍 **General Geographic Region** (country/timezone for server optimization)
+- 📱 **Device Information**: Android version, app version
+- 🔄 **Connection Status**: Connected/disconnected state, ping times
+- 📈 **Server Performance**: Aggregated server health metrics
+
+### 2.2 Purpose of Data Collection
+This limited data helps us:
+
+- ✅ Maintain healthy and functional server configurations
+- ✅ Optimize server selection based on your region
+- ✅ Improve app performance and stability
+- ✅ Detect and resolve connectivity issues
 
 ---
 
-## 6. Right to Be Forgotten
-Data will be erased when:
+## 3. Data Usage and Processing
 
-- It is no longer necessary for the purposes collected.
-- Consent is withdrawn (**via data removal request**).
+### 3.1 How We Use Collected Data
+- **Server Optimization**: Regional algorithms to provide best-performing servers
+- **Quality Assurance**: Monitoring server health and connection reliability
+- **App Improvement**: Anonymous usage patterns to enhance user experience
+- **Security**: Detecting and preventing abuse of our services
 
----
-
-## 7. Third-Party Services
-Using third-party services while connected to Begzar VPN is subject to their privacy policies.
-
----
-
-## 8. Advertising
-- We **do not** receive any payment for the VPN configurations we provide.
-- We **do not** collect any data for advertisement purposes.
+### 3.2 Data Processing Principles
+- 🔒 **Minimization**: We collect only what's absolutely necessary
+- ⏰ **Retention Limits**: Data is automatically deleted after 30 days
+- 🔐 **Encryption**: All collected data is encrypted in transit and at rest
+- 🚫 **No Profiling**: We do not create user profiles or track individual behavior
 
 ---
 
-## 9. Children's Privacy
-We encourage parents to educate children about online privacy and responsible internet use.
+## 4. Data Sharing and Third Parties
+
+### 4.1 No Data Sharing
+We **never** share, sell, or transfer your data to:
+
+- ❌ Advertisers or marketing companies
+- ❌ Data brokers or analytics companies
+- ❌ Government agencies (unless legally compelled)
+- ❌ Third-party service providers
+- ❌ Any commercial entities
+
+### 4.2 Legal Compliance
+ShineNET VPN may only disclose information if:
+
+- 📋 Required by valid legal process
+- 🛡️ Necessary to protect our users' safety
+- ⚖️ Mandated by applicable law
+
+**Note**: Due to our no-logs policy, we have minimal data to disclose even if legally required.
 
 ---
 
-## 10. Data Deletion Request
-You can request data deletion by contacting our support via the following Telegram link:
+## 5. Security Measures
 
-**[Data Deletion Request](#)**
+### 5.1 Data Protection
+- 🔐 **End-to-End Encryption**: All data transmission is encrypted
+- 🏰 **Secure Infrastructure**: Hardened servers with regular security updates
+- 👥 **Limited Access**: Strict employee access controls
+- 🔍 **Regular Audits**: Periodic security assessments
+- 🗑️ **Automatic Deletion**: Data is automatically purged after retention period
+
+### 5.2 Open Source Transparency
+- 📖 **Code Transparency**: Our source code is publicly available
+- 🔍 **Community Audits**: Independent security researchers can verify our claims
+- 🔄 **Regular Updates**: Continuous security improvements
 
 ---
 
-© 2025 Begzar VPN. All rights reserved.
+## 6. Your Rights and Controls
+
+### 6.1 User Rights
+You have the right to:
+
+- 📋 **Access**: Request information about data we hold (minimal as it is)
+- 🗑️ **Deletion**: Request immediate deletion of your data
+- 🔄 **Correction**: Correct any inaccurate information
+- 🚫 **Opt-Out**: Discontinue use of our services at any time
+
+### 6.2 Data Deletion
+To request data deletion:
+
+1. **Email**: Send a request to [support@shinenetvpn.com](mailto:support@shinenetvpn.com)
+2. **Telegram**: Contact us at [@ShineNETVPN](https://t.me/ShineNETVPN)
+3. **GitHub**: Open an issue at our [repository](https://github.com/shayanheidari01/ShineNETVPN/issues)
+
+---
+
+## 7. Third-Party Services and Websites
+
+### 7.1 External Services
+While using ShineNET VPN:
+
+- 🌐 **Websites**: Each website you visit has its own privacy policy
+- 📱 **Apps**: Third-party apps may collect their own data
+- 🔗 **Links**: External links are subject to their respective privacy policies
+
+### 7.2 Our Responsibility
+ShineNET VPN is **not responsible** for the privacy practices of:
+
+- Websites accessed through our VPN
+- Third-party applications
+- External services or platforms
+
+---
+
+## 8. Children's Privacy
+
+### 8.1 Age Requirements
+- 👶 **Under 13**: Services not intended for children under 13
+- 👨‍👩‍👧‍👦 **Parental Guidance**: We encourage parental supervision for minors
+- 📚 **Education**: We support digital literacy and online safety education
+
+### 8.2 Data from Minors
+We do not knowingly collect data from children under 13. If we become aware of such collection, we will delete it immediately.
+
+---
+
+## 9. Advertising and Monetization
+
+### 9.1 No Advertising
+- 🚫 **Ad-Free**: ShineNET VPN contains no advertisements
+- 💰 **No Revenue**: We do not generate revenue from user data
+- 🎁 **Truly Free**: Our service is completely free with no hidden costs
+
+### 9.2 Funding Model
+- 💝 **Community Driven**: Supported by community donations
+- 🔓 **Open Source**: Transparent development and funding
+- 🤝 **Volunteer Basis**: Maintained by privacy advocates
+
+---
+
+## 10. International Users
+
+### 10.1 Global Privacy
+- 🌍 **Worldwide**: This policy applies to all users globally
+- 📊 **Data Residency**: Data is processed in secure, privacy-friendly jurisdictions
+- ⚖️ **Compliance**: We adhere to international privacy standards
+
+### 10.2 Regional Considerations
+- 🇪🇺 **GDPR**: Compliant with European privacy regulations
+- 🇺🇸 **CCPA**: Respects California privacy rights
+- 🌐 **Global Standards**: Follows best practices worldwide
+
+---
+
+## 11. Changes to This Policy
+
+### 11.1 Policy Updates
+- 📢 **Notifications**: Users will be notified of significant changes
+- 📅 **Version Control**: All changes are tracked and dated
+- 💬 **Community Input**: We welcome feedback on policy changes
+
+### 11.2 Staying Informed
+- 🔔 **App Notifications**: Important updates delivered via app
+- 📧 **Email Updates**: If you've provided contact information
+- 📱 **Telegram Channel**: Follow [@ShineNETVPN](https://t.me/ShineNETVPN) for updates
+
+---
+
+## 12. Contact Information
+
+### 12.1 Privacy Questions
+For privacy-related inquiries, contact us:
+
+- **📧 Email**: [support@shinenetvpn.com](mailto:support@shinenetvpn.com)
+- **💬 Telegram**: [@ShineNETVPN](https://t.me/ShineNETVPN)
+- **🐙 GitHub**: [ShineNET VPN Repository](https://github.com/shayanheidari01/ShineNETVPN)
+- **🗂️ Issues**: [Report Privacy Concerns](https://github.com/shayanheidari01/ShineNETVPN/issues)
+
+### 12.2 Response Time
+We aim to respond to privacy inquiries within **48 hours**.
+
+---
+
+<div align="center">
+  
+  ### 🛡️ Your Privacy is Our Priority
+  
+  **ShineNET VPN is committed to transparency, security, and your digital rights.**
+  
+  *This privacy policy reflects our core values: privacy by design, transparency by default.*
+  
+  ---
+  
+  **© 2024 ShineNET VPN. All rights reserved.**
+  
+  *Made with ❤️ for digital freedom and privacy*
+  
+</div>

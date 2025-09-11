@@ -1,9 +1,9 @@
+import 'package:shinenet_vpn/common/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:iconsax/iconsax.dart';
 
 class AboutScreen extends StatefulWidget {
   AboutScreen({super.key});
@@ -31,239 +31,562 @@ class _AboutScreenState extends State<AboutScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xff192028),
-      appBar: AppBar(
-        backgroundColor: const Color(0xff192028),
-        elevation: 0,
-        title: Text(
-          context.tr('about'),
-          style: const TextStyle(
-            fontFamily: 'sb',
-            fontSize: 18,
-          ),
-        ),
-        centerTitle: true,
-      ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0),
-          child: Column(
-            children: [
-              const SizedBox(height: 40),
-              // Logo Container with Animation
-              TweenAnimationBuilder(
-                duration: const Duration(seconds: 1),
-                tween: Tween<double>(begin: 0, end: 1),
-                builder: (context, double value, child) {
-                  return Transform.scale(
-                    scale: value,
-                    child: Container(
-                      width: 120,
-                      height: 120,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF2A2A2A),
-                        borderRadius: BorderRadius.circular(30),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
-                            blurRadius: 15,
-                            offset: const Offset(0, 5),
-                          ),
-                        ],
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Image.asset(
-                          'assets/images/logo.png',
-                          width: 80,
-                          height: 80,
-                        ),
-                      ),
-                    ),
-                  );
-                },
+      backgroundColor: ThemeColor.backgroundColor,
+      body: SafeArea(
+        child: CustomScrollView(
+          slivers: [
+            // Modern app bar consistent with home screen
+            SliverAppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              floating: true,
+              pinned: false,
+              expandedHeight: 80,
+              automaticallyImplyLeading: true,
+              leading: Container(
+                margin: EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: ThemeColor.surfaceColor,
+                  borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
+                ),
+                child: IconButton(
+                  icon: Icon(
+                    Icons.arrow_back_rounded,
+                    color: ThemeColor.secondaryText,
+                    size: 20,
+                  ),
+                  onPressed: () => Navigator.pop(context),
+                ),
               ),
-              const SizedBox(height: 24),
-
-              // App Name with Animation
-              TweenAnimationBuilder(
-                duration: const Duration(milliseconds: 800),
-                tween: Tween<double>(begin: 0, end: 1),
-                builder: (context, double value, child) {
-                  return Opacity(
-                    opacity: value,
-                    child: Text(
-                      context.tr('app_title'),
-                      style: const TextStyle(
-                        fontSize: 32,
-                        fontFamily: 'sb',
-                        color: Colors.white,
-                      ),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: 10),
-              if (version != null)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+              flexibleSpace: FlexibleSpaceBar(
+                titlePadding: EdgeInsets.symmetric(
+                  horizontal: ThemeColor.mediumSpacing,
+                  vertical: ThemeColor.smallSpacing,
+                ),
+                title: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
+                    SizedBox(width: 48), // Space for back button
                     Text(
-                      context.tr('version_title'),
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey[400],
+                      context.tr('about'),
+                      style: ThemeColor.headingStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
-                    Text(
-                      ' : $version',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontFamily: 'GM',
-                        color: Colors.grey[400],
+                    Container(
+                      padding: EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: ThemeColor.surfaceColor,
+                        borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
+                      ),
+                      child: Icon(
+                        Icons.info_rounded,
+                        color: ThemeColor.primaryColor,
+                        size: 20,
                       ),
                     ),
                   ],
                 ),
-              const SizedBox(height: 30),
-
-              // Contact Cards
-              _buildContactCard(
-                icon: Iconsax.wallet,
-                title: 'TON Wallet',
-                onTap: () {
-                  Clipboard.setData(const ClipboardData(text: "UQDrQ59AyNvwH96R7wHl8-VqVFhWqoliujMpelbs2aR-LWr1"))
-                      .then(
-                    (_) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            context.tr('wallet_address_copied'),
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                },
               ),
-              _buildContactCard(
-                icon: Iconsax.message,
-                title: context.tr('email'),
-                onTap: () async {
-                  final Uri emailLaunchUri = Uri(
-                    scheme: 'mailto',
-                    path: 'info@begzar.xyz',
-                  );
-                  await launchUrl(emailLaunchUri);
-                },
-              ),
-              _buildContactCard(
-                icon: Iconsax.message_programming,
-                title: 'Github',
-                onTap: () async {
-                  await launchUrl(
-                      Uri.parse('https://github.com/Begzar/BegzarApp'),
-                      mode: LaunchMode.externalApplication);
-                },
-              ),
-              _buildContactCard(
-                icon: Iconsax.message_circle,
-                title: context.tr('telegram_channel'),
-                onTap: () async {
-                  await launchUrl(Uri.parse('https://t.me/BegzarVPN'),
-                      mode: LaunchMode.externalApplication);
-                },
-              ),
-
-              const SizedBox(height: 40),
-
-              // Description
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2A2A2A),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.grey.withOpacity(0.1)),
-                ),
-                child: Text(
-                  context.tr('about_description'),
-                  style: TextStyle(
-                    fontSize: 14,
-                    height: 1.5,
-                    fontFamily: 'sm',
-                    color: Colors.grey[300],
+            ),
+            
+            // Main content
+            SliverPadding(
+              padding: EdgeInsets.all(ThemeColor.mediumSpacing),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+                  // App logo and title card
+                  _buildAppHeaderCard(),
+                  SizedBox(height: ThemeColor.largeSpacing),
+                  
+                  // App features card
+                  _buildFeaturesCard(),
+                  SizedBox(height: ThemeColor.largeSpacing),
+                  
+                  // Connect with us section
+                  _buildModernSection(
+                    title: 'Connect with Us',
+                    icon: Icons.connect_without_contact_rounded,
+                    children: [
+                      _buildModernContactCard(
+                        icon: Icons.email_rounded,
+                        title: 'Email Support',
+                        subtitle: 'support@shinenetvpn.com',
+                        color: ThemeColor.primaryColor,
+                        onTap: () async {
+                          HapticFeedback.lightImpact();
+                          final Uri emailLaunchUri = Uri(
+                            scheme: 'mailto',
+                            path: 'support@shinenetvpn.com',
+                            queryParameters: {
+                              'subject': 'ShineNET VPN Support Request'
+                            },
+                          );
+                          await launchUrl(emailLaunchUri);
+                        },
+                      ),
+                      SizedBox(height: ThemeColor.smallSpacing),
+                      _buildModernContactCard(
+                        icon: Icons.chat_rounded,
+                        title: context.tr('telegram_channel'),
+                        subtitle: 'Join our community for updates',
+                        color: ThemeColor.successColor,
+                        onTap: () async {
+                          HapticFeedback.lightImpact();
+                          await launchUrl(
+                            Uri.parse('https://t.me/ShineNETVPN'),
+                            mode: LaunchMode.externalApplication,
+                          );
+                        },
+                      ),
+                      SizedBox(height: ThemeColor.smallSpacing),
+                      _buildModernContactCard(
+                        icon: Icons.code_rounded,
+                        title: 'Open Source',
+                        subtitle: 'View code on GitHub',
+                        color: ThemeColor.secondaryText,
+                        onTap: () async {
+                          HapticFeedback.lightImpact();
+                          await launchUrl(
+                            Uri.parse('https://github.com/ShineNET/ShineNET-VPN'),
+                            mode: LaunchMode.externalApplication,
+                          );
+                        },
+                      ),
+                    ],
                   ),
-                  textAlign: TextAlign.center,
-                ),
+                  SizedBox(height: ThemeColor.largeSpacing),
+                  
+                  // App Information section
+                  _buildModernSection(
+                    title: 'App Information',
+                    icon: Icons.info_rounded,
+                    children: [
+                      _buildModernInfoCard(
+                        icon: Icons.update_rounded,
+                        title: 'App Version',
+                        subtitle: version ?? '1.0.0',
+                        color: ThemeColor.primaryColor,
+                      ),
+                      SizedBox(height: ThemeColor.smallSpacing),
+                      _buildModernInfoCard(
+                        icon: Icons.code_rounded,
+                        title: 'License',
+                        subtitle: 'Open Source (MIT)',
+                        color: ThemeColor.successColor,
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: ThemeColor.largeSpacing),
+                  
+                  // Copyright info card
+                  _buildCopyrightCard(),
+                ]),
               ),
-
-              const SizedBox(height: 24),
-              Text(
-                context.tr('copyright'),
-                style: TextStyle(
-                  fontSize: 12,
-                  fontFamily: 'GM',
-                  color: Colors.grey[600],
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildContactCard({
+  // Modern app header card
+  Widget _buildAppHeaderCard() {
+    return AnimatedContainer(
+      duration: ThemeColor.mediumAnimation,
+      padding: EdgeInsets.all(ThemeColor.largeSpacing),
+      decoration: ThemeColor.cardDecoration(
+        withGradient: true,
+        withShadow: true,
+      ),
+      child: Column(
+        children: [
+          // App logo with modern design
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(ThemeColor.largeRadius),
+              boxShadow: [
+                BoxShadow(
+                  color: ThemeColor.primaryColor.withOpacity(0.3),
+                  blurRadius: 12,
+                  offset: Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: EdgeInsets.all(ThemeColor.mediumSpacing),
+              child: Icon(
+                Icons.vpn_lock_rounded,
+                color: ThemeColor.primaryColor,
+                size: 40,
+              ),
+            ),
+          ),
+          SizedBox(height: ThemeColor.mediumSpacing),
+          Text(
+            context.tr('app_title'),
+            style: ThemeColor.headingStyle(
+              fontSize: 28,
+              color: Colors.white,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          SizedBox(height: ThemeColor.smallSpacing),
+          if (version != null)
+            Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: ThemeColor.mediumSpacing,
+                vertical: ThemeColor.smallSpacing,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(ThemeColor.largeRadius),
+              ),
+              child: Text(
+                '${context.tr('version_title')}: $version',
+                style: ThemeColor.captionStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // Modern features card
+  Widget _buildFeaturesCard() {
+    return AnimatedContainer(
+      duration: ThemeColor.mediumAnimation,
+      padding: EdgeInsets.all(ThemeColor.largeSpacing),
+      decoration: ThemeColor.cardDecoration(
+        withShadow: true,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.star_rounded,
+                color: ThemeColor.warningColor,
+                size: 20,
+              ),
+              SizedBox(width: ThemeColor.smallSpacing),
+              Text(
+                'Key Features',
+                style: ThemeColor.bodyStyle(
+                  fontWeight: FontWeight.w600,
+                  color: ThemeColor.primaryText,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: ThemeColor.mediumSpacing),
+          Row(
+            children: [
+              Expanded(
+                child: _buildModernFeatureItem(
+                  icon: Icons.security_rounded,
+                  title: 'Secure',
+                  description: 'Military-grade\nencryption',
+                  color: ThemeColor.successColor,
+                ),
+              ),
+              Expanded(
+                child: _buildModernFeatureItem(
+                  icon: Icons.speed_rounded,
+                  title: 'Fast',
+                  description: 'High-speed\nservers',
+                  color: ThemeColor.primaryColor,
+                ),
+              ),
+              Expanded(
+                child: _buildModernFeatureItem(
+                  icon: Icons.code_rounded,
+                  title: 'Open Source',
+                  description: 'Transparent\n& trustworthy',
+                  color: ThemeColor.warningColor,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: ThemeColor.largeSpacing),
+          Divider(
+            color: ThemeColor.dividerColor,
+            height: 1,
+          ),
+          SizedBox(height: ThemeColor.largeSpacing),
+          Text(
+            context.tr('about_description'),
+            style: ThemeColor.bodyStyle(
+              color: ThemeColor.secondaryText,
+            ).copyWith(height: 1.6),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Modern section builder consistent with settings and home
+  Widget _buildModernSection({
+    required String title,
+    required IconData icon,
+    required List<Widget> children,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: ThemeColor.mediumSpacing,
+            vertical: ThemeColor.smallSpacing,
+          ),
+          decoration: BoxDecoration(
+            color: ThemeColor.surfaceColor,
+            borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
+            border: Border.all(
+              color: ThemeColor.borderColor.withOpacity(0.3),
+              width: 1,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                color: ThemeColor.primaryColor,
+                size: 18,
+              ),
+              SizedBox(width: ThemeColor.smallSpacing),
+              Text(
+                title,
+                style: ThemeColor.bodyStyle(
+                  fontWeight: FontWeight.w600,
+                  color: ThemeColor.primaryText,
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: ThemeColor.mediumSpacing),
+        ...children,
+      ],
+    );
+  }
+
+  // Modern contact card
+  Widget _buildModernContactCard({
     required IconData icon,
     required String title,
+    required String subtitle,
+    required Color color,
     required VoidCallback onTap,
   }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+    return AnimatedContainer(
+      duration: ThemeColor.mediumAnimation,
+      decoration: ThemeColor.cardDecoration(
+        withShadow: true,
+      ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-            decoration: BoxDecoration(
-              color: const Color(0xFF2A2A2A),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey.withOpacity(0.1)),
-            ),
+          borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
+          child: Padding(
+            padding: EdgeInsets.all(ThemeColor.mediumSpacing),
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: EdgeInsets.all(ThemeColor.smallSpacing),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF353535),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(icon, color: Colors.grey[400], size: 24),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontFamily: 'sm',
-                      color: Colors.grey[300],
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
+                    border: Border.all(
+                      color: color.withOpacity(0.3),
+                      width: 1,
                     ),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: color,
+                    size: 24,
+                  ),
+                ),
+                SizedBox(width: ThemeColor.mediumSpacing),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: ThemeColor.bodyStyle(
+                          fontWeight: FontWeight.w600,
+                          color: ThemeColor.primaryText,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: ThemeColor.captionStyle(
+                          color: ThemeColor.mutedText,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 Icon(
-                  Icons.arrow_forward_ios,
-                  color: Colors.grey[600],
+                  Icons.arrow_forward_ios_rounded,
+                  color: color,
                   size: 16,
                 ),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  // Modern info card for non-interactive items
+  Widget _buildModernInfoCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+  }) {
+    return AnimatedContainer(
+      duration: ThemeColor.mediumAnimation,
+      padding: EdgeInsets.all(ThemeColor.mediumSpacing),
+      decoration: ThemeColor.cardDecoration(
+        withShadow: true,
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: EdgeInsets.all(ThemeColor.smallSpacing),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
+              border: Border.all(
+                color: color.withOpacity(0.3),
+                width: 1,
+              ),
+            ),
+            child: Icon(
+              icon,
+              color: color,
+              size: 24,
+            ),
+          ),
+          SizedBox(width: ThemeColor.mediumSpacing),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: ThemeColor.bodyStyle(
+                    fontWeight: FontWeight.w600,
+                    color: ThemeColor.primaryText,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: ThemeColor.captionStyle(
+                    color: ThemeColor.mutedText,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Modern feature item
+  Widget _buildModernFeatureItem({
+    required IconData icon,
+    required String title,
+    required String description,
+    required Color color,
+  }) {
+    return Container(
+      padding: EdgeInsets.all(ThemeColor.smallSpacing),
+      child: Column(
+        children: [
+          Container(
+            padding: EdgeInsets.all(ThemeColor.smallSpacing),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
+              border: Border.all(
+                color: color.withOpacity(0.3),
+                width: 1,
+              ),
+            ),
+            child: Icon(
+              icon,
+              color: color,
+              size: 28,
+            ),
+          ),
+          SizedBox(height: ThemeColor.smallSpacing),
+          Text(
+            title,
+            style: ThemeColor.bodyStyle(
+              fontWeight: FontWeight.w600,
+              color: ThemeColor.primaryText,
+              fontSize: 14,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          SizedBox(height: 4),
+          Text(
+            description,
+            style: ThemeColor.captionStyle(
+              color: ThemeColor.mutedText,
+              fontSize: 12,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Copyright card
+  Widget _buildCopyrightCard() {
+    return AnimatedContainer(
+      duration: ThemeColor.mediumAnimation,
+      padding: EdgeInsets.all(ThemeColor.mediumSpacing),
+      decoration: ThemeColor.cardDecoration(
+        withShadow: true,
+      ),
+      child: Column(
+        children: [
+          Icon(
+            Icons.copyright_rounded,
+            color: ThemeColor.mutedText,
+            size: 20,
+          ),
+          SizedBox(height: ThemeColor.smallSpacing),
+          Text(
+            context.tr('copyright'),
+            style: ThemeColor.captionStyle(
+              color: ThemeColor.mutedText,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
     );
   }

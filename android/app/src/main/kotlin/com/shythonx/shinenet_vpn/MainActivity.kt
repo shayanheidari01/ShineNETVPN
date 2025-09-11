@@ -1,4 +1,4 @@
-package cloud.begzar.begzar
+package com.shythonx.shinenet_vpn
 
 import io.flutter.embedding.android.FlutterActivity
 

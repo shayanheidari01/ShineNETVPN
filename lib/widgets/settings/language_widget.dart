@@ -1,7 +1,8 @@
-import 'package:begzar/common/theme.dart';
+import 'package:shinenet_vpn/common/theme.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:easy_localization/easy_localization.dart'; // اضافه کردن پکیج easy_localization
+import 'package:easy_localization/easy_localization.dart';
 
 class LanguageWidget extends StatefulWidget {
   final String selectedLanguage;
@@ -31,44 +32,108 @@ class _LanguageWidgetState extends State<LanguageWidget> {
   // تغییر زبان با استفاده از easy_localization
   void _changeLocale(BuildContext context, String language) {
     if (language == 'English') {
-      setState(() {});
       context.setLocale(Locale('en', 'US'));
-      setState(() {});
     } else if (language == 'فارسی') {
-      setState(() {});
       context.setLocale(Locale('fa', 'IR'));
-      setState(() {});
     } else if (language == '中文') {
-      setState(() {});
       context.setLocale(Locale('zh', 'CN'));
-      setState(() {});
     } else if (language == 'русский') {
-      setState(() {});
       context.setLocale(Locale('ru', 'RU'));
-      setState(() {});
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: ThemeColor.backgroundColor,
       appBar: AppBar(
-        title: Text(context.tr('select_language')),
+        title: Text(
+          context.tr('select_language'),
+          style: ThemeColor.headingStyle(fontSize: 20),
+        ),
         backgroundColor: ThemeColor.backgroundColor,
+        elevation: 0,
       ),
       body: Padding(
-        padding: EdgeInsets.all(16.0),
+        padding: EdgeInsets.all(ThemeColor.mediumSpacing),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: ListView(
+            Container(
+              padding: EdgeInsets.all(ThemeColor.mediumSpacing),
+              decoration: ThemeColor.cardDecoration(),
+              child: Row(
                 children: [
-                  _buildLanguageTile(context, 'English'),
-                  _buildLanguageTile(context, 'فارسی'),
-                  _buildLanguageTile(context, '中文'),
-                  _buildLanguageTile(context, 'русский'),
+                  Container(
+                    padding: EdgeInsets.all(ThemeColor.smallSpacing),
+                    decoration: BoxDecoration(
+                      gradient: ThemeColor.primaryGradient,
+                      borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
+                    ),
+                    child: Icon(
+                      Icons.language_rounded,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                  SizedBox(width: ThemeColor.mediumSpacing),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Language Selection',
+                          style: ThemeColor.bodyStyle(
+                            fontWeight: FontWeight.w600,
+                            color: ThemeColor.primaryText,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Choose your preferred language',
+                          style: ThemeColor.captionStyle(),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
+              ),
+            ),
+            SizedBox(height: ThemeColor.largeSpacing),
+            Expanded(
+              child: Container(
+                decoration: ThemeColor.cardDecoration(),
+                child: ListView(
+                  padding: EdgeInsets.zero,
+                  children: [
+                    _buildLanguageTile(
+                      context,
+                      'English',
+                      '🇺🇸',
+                      'English',
+                    ),
+                    _buildDivider(),
+                    _buildLanguageTile(
+                      context,
+                      'فارسی',
+                      '🇮🇷',
+                      'Persian',
+                    ),
+                    _buildDivider(),
+                    _buildLanguageTile(
+                      context,
+                      '中文',
+                      '🇨🇳',
+                      'Chinese',
+                    ),
+                    _buildDivider(),
+                    _buildLanguageTile(
+                      context,
+                      'русский',
+                      '🇷🇺',
+                      'Russian',
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -77,27 +142,94 @@ class _LanguageWidgetState extends State<LanguageWidget> {
     );
   }
 
-  Widget _buildLanguageTile(BuildContext context, String language) {
-    return ListTile(
-      title: Text(language, textAlign: TextAlign.left),
-      leading: Radio<String>(
-        value: language,
-        groupValue: _selectedLanguage,
-        onChanged: (String? value) {
+  Widget _buildDivider() {
+    return Divider(
+      height: 1,
+      color: ThemeColor.dividerColor,
+      indent: ThemeColor.mediumSpacing,
+      endIndent: ThemeColor.mediumSpacing,
+    );
+  }
+
+  Widget _buildLanguageTile(
+    BuildContext context,
+    String language,
+    String flag,
+    String englishName,
+  ) {
+    final isSelected = _selectedLanguage == language;
+    
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.selectionClick();
           setState(() {
-            _selectedLanguage = value!;
-            _saveSelectedLanguage(value); // ذخیره زبان انتخاب شده
-            _changeLocale(context, value); // تغییر زبان برنامه
+            _selectedLanguage = language;
+            _saveSelectedLanguage(language);
+            _changeLocale(context, language);
           });
         },
+        child: Padding(
+          padding: EdgeInsets.all(ThemeColor.mediumSpacing),
+          child: Row(
+            children: [
+              Text(
+                flag,
+                style: TextStyle(fontSize: 28),
+              ),
+              SizedBox(width: ThemeColor.mediumSpacing),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      language,
+                      style: ThemeColor.bodyStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: isSelected
+                            ? ThemeColor.primaryColor
+                            : ThemeColor.primaryText,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      englishName,
+                      style: ThemeColor.captionStyle(
+                        color: isSelected
+                            ? ThemeColor.primaryColor.withOpacity(0.8)
+                            : ThemeColor.mutedText,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              AnimatedContainer(
+                duration: ThemeColor.fastAnimation,
+                padding: EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? ThemeColor.primaryColor
+                      : Colors.transparent,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isSelected
+                        ? ThemeColor.primaryColor
+                        : ThemeColor.borderColor,
+                    width: 2,
+                  ),
+                ),
+                child: Icon(
+                  Icons.check_rounded,
+                  color: isSelected ? Colors.white : Colors.transparent,
+                  size: 16,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
-      onTap: () {
-        setState(() {
-          _selectedLanguage = language;
-          _saveSelectedLanguage(language); // ذخیره زبان انتخاب شده
-          _changeLocale(context, language); // تغییر زبان برنامه
-        });
-      },
     );
   }
 }

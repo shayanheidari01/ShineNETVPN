@@ -1,0 +1,2 @@
+C:/Users/ASUS/Downloads/gits/BegzarApp/android/app/.cxx/Debug/1h5u1ez7/armeabi-v7a/CMakeFiles/edit_cache.dir
+C:/Users/ASUS/Downloads/gits/BegzarApp/android/app/.cxx/Debug/1h5u1ez7/armeabi-v7a/CMakeFiles/rebuild_cache.dir
