@@ -178,7 +178,7 @@ class _SettingsWidgetState extends State<SettingsWidget> {
                       _buildModernInfoCard(
                         icon: Icons.update_rounded,
                         title: 'App Version',
-                        subtitle: '1.0.0',
+                        subtitle: '1.0.1',
                         color: ThemeColor.secondaryColor,
                       ),
                       SizedBox(height: ThemeColor.smallSpacing),

@@ -825,21 +825,31 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<List<String>> _fetchServersWithFallback() async {
-    // Try AllOrigins proxy first (recommended for better reliability)
+    // Try direct connection first (primary method)
     try {
-      return await _fetchServersFromAllOrigins();
+      return await _fetchServersDirect();
     } catch (e) {
-      print('AllOrigins failed: $e, trying direct connection');
+      print('Direct connection failed: $e, trying alternative endpoint');
       setState(() {
         loadingStatus = 'Trying alternative endpoint...';
       });
 
-      // Fallback to direct connection
+      // Try alternative direct endpoint
       try {
-        return await _fetchServersDirect();
+        return await _fetchServersFromAlternative();
       } catch (e2) {
-        print('Direct connection failed: $e2');
-        throw Exception('All endpoints failed. AllOrigins: $e, Direct: $e2');
+        print('Alternative endpoint failed: $e2, trying AllOrigins proxy');
+        setState(() {
+          loadingStatus = 'Trying proxy endpoint...';
+        });
+
+        // Fallback to AllOrigins proxy
+        try {
+          return await _fetchServersFromAllOrigins();
+        } catch (e3) {
+          print('AllOrigins proxy failed: $e3');
+          throw Exception('All endpoints failed. Direct: $e, Alternative: $e2, AllOrigins: $e3');
+        }
       }
     }
   }
@@ -940,6 +950,36 @@ class _HomePageState extends State<HomePage> {
     String base64Data = response.data;
     if (base64Data.isEmpty) {
       throw Exception('Empty response from direct connection');
+    }
+
+    return _processServerData(base64Data);
+  }
+
+  Future<List<String>> _fetchServersFromAlternative() async {
+    print('Fetching server list from alternative endpoint');
+    setState(() {
+      loadingStatus = 'Fetching from alternative endpoint...';
+    });
+
+    final response = await httpClient
+        .get(
+      'https://far-sheep-86.shayanheidari01.deno.net/',
+      options: Options(
+        headers: {
+          'X-Content-Type-Options': 'nosniff',
+        },
+      ),
+    )
+        .timeout(
+      Duration(seconds: 8),
+      onTimeout: () {
+        throw TimeoutException('Alternative endpoint timeout');
+      },
+    );
+
+    String base64Data = response.data;
+    if (base64Data.isEmpty) {
+      throw Exception('Empty response from alternative endpoint');
     }
 
     return _processServerData(base64Data);

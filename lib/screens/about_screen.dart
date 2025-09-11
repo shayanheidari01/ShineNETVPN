@@ -112,13 +112,13 @@ class _AboutScreenState extends State<AboutScreen> {
                       _buildModernContactCard(
                         icon: Icons.email_rounded,
                         title: 'Email Support',
-                        subtitle: 'support@shinenetvpn.com',
+                        subtitle: 'shinenetvpn@gmail.com',
                         color: ThemeColor.primaryColor,
                         onTap: () async {
                           HapticFeedback.lightImpact();
                           final Uri emailLaunchUri = Uri(
                             scheme: 'mailto',
-                            path: 'support@shinenetvpn.com',
+                            path: 'shinenetvpn@gmail.com',
                             queryParameters: {
                               'subject': 'ShineNET VPN Support Request'
                             },
@@ -149,7 +149,7 @@ class _AboutScreenState extends State<AboutScreen> {
                         onTap: () async {
                           HapticFeedback.lightImpact();
                           await launchUrl(
-                            Uri.parse('https://github.com/ShineNET/ShineNET-VPN'),
+                            Uri.parse('https://github.com/shayanheidari01/ShineNETVPN'),
                             mode: LaunchMode.externalApplication,
                           );
                         },
@@ -166,7 +166,7 @@ class _AboutScreenState extends State<AboutScreen> {
                       _buildModernInfoCard(
                         icon: Icons.update_rounded,
                         title: 'App Version',
-                        subtitle: version ?? '1.0.0',
+                        subtitle: version ?? '1.0.1',
                         color: ThemeColor.primaryColor,
                       ),
                       SizedBox(height: ThemeColor.smallSpacing),
