@@ -6,14 +6,14 @@
     [
       "C:\\Users\\ASUS\\AppData\\Local\\Android\\Sdk\\cmake\\3.22.1\\bin\\ninja.exe",
       "-C",
-      "C:\\Users\\ASUS\\Downloads\\gits\\BegzarApp\\android\\app\\.cxx\\Debug\\1h5u1ez7\\x86_64",
+      "C:\\Users\\ASUS\\Downloads\\gits\\ShineNETVPN\\android\\app\\.cxx\\Debug\\1h5u1ez7\\x86_64",
       "clean"
     ]
   ],
   "buildTargetsCommandComponents": [
     "C:\\Users\\ASUS\\AppData\\Local\\Android\\Sdk\\cmake\\3.22.1\\bin\\ninja.exe",
     "-C",
-    "C:\\Users\\ASUS\\Downloads\\gits\\BegzarApp\\android\\app\\.cxx\\Debug\\1h5u1ez7\\x86_64",
+    "C:\\Users\\ASUS\\Downloads\\gits\\ShineNETVPN\\android\\app\\.cxx\\Debug\\1h5u1ez7\\x86_64",
     "{LIST_OF_TARGETS_TO_BUILD}"
   ],
   "libraries": {},

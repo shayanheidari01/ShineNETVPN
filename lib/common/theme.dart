@@ -82,14 +82,14 @@ class ThemeColor {
       borderRadius: BorderRadius.circular(radius ?? mediumRadius),
       border: withBorder
           ? Border.all(
-              color: borderColor.withOpacity(0.3),
+              color: borderColor.withValues(alpha: 0.3),
               width: 0.5,
             )
           : null,
       boxShadow: withShadow
           ? [
               BoxShadow(
-                color: shadowColor.withOpacity(0.1),
+                color: shadowColor.withValues(alpha: 0.1),
                 blurRadius: 12,
                 offset: Offset(0, 4),
               ),
@@ -104,17 +104,17 @@ class ThemeColor {
     bool withBorder = true,
   }) {
     return BoxDecoration(
-      color: foregroundColor.withOpacity(opacity),
+      color: foregroundColor.withValues(alpha: opacity),
       borderRadius: BorderRadius.circular(radius ?? mediumRadius),
       border: withBorder
           ? Border.all(
-              color: foregroundColor.withOpacity(0.2),
+              color: foregroundColor.withValues(alpha: 0.2),
               width: 0.5,
             )
           : null,
       boxShadow: [
         BoxShadow(
-          color: shadowColor.withOpacity(0.05),
+          color: shadowColor.withValues(alpha: 0.05),
           blurRadius: 10,
           spreadRadius: -5,
         ),
@@ -193,11 +193,11 @@ class ThemeColor {
       height: size + 16,
       decoration: BoxDecoration(
         color: isSelected 
-            ? primaryColor.withOpacity(0.15) 
-            : surfaceColor.withOpacity(0.7),
+            ? primaryColor.withValues(alpha: 0.15) 
+            : surfaceColor.withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(smallRadius),
         border: isSelected 
-            ? Border.all(color: primaryColor.withOpacity(0.3), width: 1)
+            ? Border.all(color: primaryColor.withValues(alpha: 0.3), width: 1)
             : null,
       ),
       child: Icon(
@@ -233,7 +233,7 @@ class ThemeColor {
         shape: BoxShape.circle,
         boxShadow: [
           BoxShadow(
-            color: indicatorColor.withOpacity(0.4),
+            color: indicatorColor.withValues(alpha: 0.4),
             blurRadius: 4,
             spreadRadius: 1,
           ),

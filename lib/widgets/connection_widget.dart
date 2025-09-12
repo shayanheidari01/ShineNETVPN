@@ -1,10 +1,9 @@
 import 'package:shinenet_vpn/common/theme.dart';
-import 'package:shinenet_vpn/common/animations.dart';
 import 'package:easy_localization/easy_localization.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
+import 'package:iconsax/iconsax.dart';
 
 class ConnectionWidget extends StatefulWidget {
   ConnectionWidget({
@@ -92,19 +91,8 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
     super.dispose();
   }
 
-  @override
-  void didUpdateWidget(ConnectionWidget oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.status != widget.status) {
-      _rotationController.forward().then((_) {
-        _rotationController.reset();
-      });
-      _updateAnimationState();
-    }
-  }
-
   void _updateAnimationState() {
-    if (widget.status == "CONNECTED") {
+    if (widget.status.toUpperCase() == "CONNECTED") {
       _waveController.repeat(reverse: true);
     } else {
       _waveController.stop();
@@ -115,28 +103,40 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
   Color _getShadowColor() {
     if (widget.isLoading) {
       return ThemeColor.connectingColor;
-    } else if (widget.status == "CONNECTED") {
+    } else if (widget.status.toUpperCase() == "CONNECTED") {
       return ThemeColor.connectedColor;
     } else {
       return ThemeColor.disconnectedColor;
     }
   }
-
+  
   Color _getButtonColor() {
     if (widget.isLoading) {
-      return ThemeColor.connectingColor.withOpacity(0.2);
-    } else if (widget.status == "CONNECTED") {
-      return ThemeColor.connectedColor.withOpacity(0.2);
+      return ThemeColor.connectingColor.withValues(alpha: 0.2);
+    } else if (widget.status.toUpperCase() == "CONNECTED") {
+      return ThemeColor.connectedColor.withValues(alpha: 0.2);
     } else {
-      return ThemeColor.errorColor.withOpacity(0.2);
+      return ThemeColor.errorColor.withValues(alpha: 0.2);
     }
   }
-
+  
   IconData _getStatusIcon() {
-    if (widget.status == "CONNECTED") {
-      return CupertinoIcons.checkmark_shield_fill;
+    if (widget.status.toUpperCase() == "CONNECTED") {
+      return Icons.shield_rounded;
     } else {
-      return CupertinoIcons.power;
+      return Icons.power_settings_new_rounded;
+    }
+  }
+  
+  @override
+  void didUpdateWidget(ConnectionWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.status != widget.status) {
+      print('Status changed from ${oldWidget.status} to ${widget.status}');
+      _rotationController.forward().then((_) {
+        _rotationController.reset();
+      });
+      _updateAnimationState();
     }
   }
 
@@ -171,7 +171,7 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
                     alignment: Alignment.center,
                     children: [
                       // Outer wave effect for connected state
-                      if (widget.status == "CONNECTED")
+                      if (widget.status.toUpperCase() == "CONNECTED")
                         ...List.generate(3, (index) {
                           final delay = index * 0.3;
                           final animValue =
@@ -200,14 +200,20 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: _getShadowColor().withOpacity(0.4),
+                              color: _getShadowColor().withValues(alpha: 0.4),
                               blurRadius: 40 + (20 * _pulseController.value),
                               spreadRadius: 4 + (4 * _pulseController.value),
                             ),
                             BoxShadow(
-                              color: _getShadowColor().withOpacity(0.2),
+                              color: _getShadowColor().withValues(alpha: 0.2),
                               blurRadius: 80 + (40 * _pulseController.value),
                               spreadRadius: 8 + (8 * _pulseController.value),
+                            ),
+                            // Add inner glow effect
+                            BoxShadow(
+                              color: _getShadowColor().withValues(alpha: 0.1),
+                              blurRadius: 20,
+                              spreadRadius: -10,
                             ),
                           ],
                         ),
@@ -228,12 +234,12 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
                                 shape: BoxShape.circle,
                                 gradient: RadialGradient(
                                   colors: [
-                                    _getButtonColor().withOpacity(0.8),
-                                    _getButtonColor().withOpacity(0.1),
+                                    _getButtonColor().withValues(alpha: 0.8),
+                                    _getButtonColor().withValues(alpha: 0.1),
                                   ],
                                 ),
                                 border: Border.all(
-                                  color: _getShadowColor().withOpacity(0.4),
+                                  color: _getShadowColor().withValues(alpha: 0.4),
                                   width: 3,
                                 ),
                               ),
@@ -293,15 +299,17 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
             children: [
               Text(
                 widget.isLoading
-                    ? context.tr('connecting')
-                    : widget.status == "DISCONNECTED"
-                        ? context.tr('disconnected')
-                        : context.tr('connected'),
+                    ? 'connecting'.tr()
+                    : widget.status.toUpperCase() == "DISCONNECTED"
+                        ? 'disconnected'.tr()
+                        : 'connected'.tr(),
                 style: ThemeColor.headingStyle(
-                  fontSize: 20,
+                  fontSize: 18,
                   color: _getShadowColor(),
                 ),
                 textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
               ),
               SizedBox(height: ThemeColor.smallSpacing),
               Container(
@@ -310,10 +318,10 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
                   vertical: ThemeColor.smallSpacing,
                 ),
                 decoration: BoxDecoration(
-                  color: _getShadowColor().withOpacity(0.1),
+                  color: _getShadowColor().withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(ThemeColor.largeRadius),
                   border: Border.all(
-                    color: _getShadowColor().withOpacity(0.3),
+                    color: _getShadowColor().withValues(alpha: 0.3),
                     width: 1,
                   ),
                 ),
@@ -323,6 +331,9 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
                     color: _getShadowColor(),
                     fontWeight: FontWeight.w500,
                   ),
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
                 ),
               ),
             ],
@@ -334,11 +345,11 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
 
   String _getStatusDescription() {
     if (widget.isLoading) {
-      return 'Establishing secure connection...';
-    } else if (widget.status == "CONNECTED") {
-      return 'Your connection is secure and private';
+      return 'establishing_secure_connection'.tr();
+    } else if (widget.status.toUpperCase() == "CONNECTED") {
+      return 'connection_secure_private'.tr();
     } else {
-      return 'Tap to connect to VPN';
+      return 'tap_connect_vpn'.tr();
     }
   }
 }

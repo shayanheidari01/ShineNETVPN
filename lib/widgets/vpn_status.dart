@@ -29,51 +29,33 @@ class VpnCard extends StatefulWidget {
   State<VpnCard> createState() => _VpnCardState();
 }
 
-class _VpnCardState extends State<VpnCard> {
+class _VpnCardState extends State<VpnCard> with TickerProviderStateMixin {
   String? ipText;
   String? ipflag;
   bool isLoading = false;
+  late AnimationController _pulseController;
+  
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: Duration(seconds: 2),
+    )..repeat();
+  }
+  
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+  
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Duration timer at the top
-        Container(
-          margin: EdgeInsets.only(bottom: ThemeColor.mediumSpacing),
-          padding: EdgeInsets.symmetric(
-            horizontal: ThemeColor.mediumSpacing,
-            vertical: ThemeColor.smallSpacing,
-          ),
-          decoration: BoxDecoration(
-            gradient: ThemeColor.primaryGradient,
-            borderRadius: BorderRadius.circular(ThemeColor.largeRadius),
-            boxShadow: [
-              BoxShadow(
-                color: ThemeColor.primaryColor.withOpacity(0.3),
-                blurRadius: 12,
-                offset: Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.access_time_rounded,
-                color: Colors.white,
-                size: 16,
-              ),
-              SizedBox(width: ThemeColor.smallSpacing),
-              Text(
-                widget.duration,
-                style: ThemeColor.bodyStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
+        // Improved Duration timer at the top
+        _buildEnhancedTimerDisplay(),
         // Main content card
         AnimatedContainer(
           duration: ThemeColor.mediumAnimation,
@@ -89,10 +71,10 @@ class _VpnCardState extends State<VpnCard> {
                   Container(
                     padding: EdgeInsets.all(ThemeColor.smallSpacing),
                     decoration: BoxDecoration(
-                      color: ThemeColor.primaryColor.withOpacity(0.1),
+                      color: ThemeColor.primaryColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
                       border: Border.all(
-                        color: ThemeColor.primaryColor.withOpacity(0.3),
+                        color: ThemeColor.primaryColor.withValues(alpha: 0.3),
                         width: 1,
                       ),
                     ),
@@ -143,7 +125,7 @@ class _VpnCardState extends State<VpnCard> {
                       icon: Icons.speed_rounded,
                       download: formatBytes(widget.downloadSpeed),
                       upload: formatBytes(widget.uploadSpeed),
-                      status: context.tr('realtime_usage'),
+                      status: 'realtime_usage'.tr(),
                       color: ThemeColor.successColor,
                     ),
                   ),
@@ -157,7 +139,7 @@ class _VpnCardState extends State<VpnCard> {
                       icon: Icons.data_usage_rounded,
                       download: formatSpeedBytes(widget.download),
                       upload: formatSpeedBytes(widget.upload),
-                      status: context.tr('total_usage'),
+                      status: 'total_usage'.tr(),
                       color: ThemeColor.primaryColor,
                     ),
                   ),
@@ -168,6 +150,132 @@ class _VpnCardState extends State<VpnCard> {
         ),
       ],
     );
+  }
+
+  // Enhanced timer display with better visual design
+  Widget _buildEnhancedTimerDisplay() {
+    return Container(
+      margin: EdgeInsets.only(bottom: ThemeColor.mediumSpacing),
+      padding: EdgeInsets.symmetric(
+        horizontal: ThemeColor.largeSpacing,
+        vertical: ThemeColor.mediumSpacing,
+      ),
+      decoration: BoxDecoration(
+        color: ThemeColor.cardColor,
+        borderRadius: BorderRadius.circular(ThemeColor.xlRadius),
+        border: Border.all(
+          color: ThemeColor.primaryColor.withValues(alpha: 0.3),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: ThemeColor.shadowColor.withValues(alpha: 0.2),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: AnimatedBuilder(
+        animation: _pulseController,
+        builder: (context, child) {
+          return Tooltip(
+            message: 'Connected for ${widget.duration}',
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: ThemeColor.primaryColor.withValues(alpha: 0.1 + 0.1 * _pulseController.value),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.timer_rounded,
+                    color: ThemeColor.primaryColor,
+                    size: 20,
+                  ),
+                ),
+                SizedBox(width: ThemeColor.mediumSpacing),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'connection_time'.tr(),
+                      style: ThemeColor.captionStyle(
+                        color: ThemeColor.secondaryText,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    Text(
+                      _formatDuration(widget.duration),
+                      style: ThemeColor.headingStyle(
+                        color: ThemeColor.primaryText,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+  
+  // Format duration for better readability
+  String _formatDuration(String duration) {
+    // If the duration is already in a good format, return it as is
+    if (duration.contains(':') && duration.length >= 5) {
+      // Handle HH:MM:SS format
+      final parts = duration.split(':');
+      if (parts.length == 3) {
+        final hours = int.tryParse(parts[0]) ?? 0;
+        final minutes = int.tryParse(parts[1]) ?? 0;
+        // final seconds = int.tryParse(parts[2]) ?? 0;
+        
+        if (hours > 0) {
+          return '${hours}h ${minutes}m';
+        } else if (minutes > 0) {
+          return '${minutes}m';
+        } else {
+          return '< 1m';
+        }
+      }
+      return duration;
+    }
+    
+    // Handle other formats (like seconds only)
+    if (duration.contains('s') || duration.contains('sec')) {
+      return duration;
+    }
+    
+    // Try to parse as seconds
+    try {
+      final seconds = int.tryParse(duration) ?? 0;
+      if (seconds >= 3600) {
+        final hours = seconds ~/ 3600;
+        final minutes = (seconds % 3600) ~/ 60;
+        if (minutes > 0) {
+          return '${hours}h ${minutes}m';
+        } else {
+          return '${hours}h';
+        }
+      } else if (seconds >= 60) {
+        final minutes = seconds ~/ 60;
+        return '${minutes}m';
+      } else {
+        return '${seconds}s';
+      }
+    } catch (e) {
+      // If parsing fails, return the original duration
+      print('Error formatting duration: $e');
+    }
+    
+    // Return original duration if we can't format it better
+    return duration;
   }
 
   String formatBytes(int bytes) {
@@ -202,12 +310,12 @@ class _VpnCardState extends State<VpnCard> {
         color: ThemeColor.surfaceColor,
         borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
         border: Border.all(
-          color: ThemeColor.borderColor.withOpacity(0.3),
+          color: ThemeColor.borderColor.withValues(alpha: 0.3),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: ThemeColor.shadowColor.withOpacity(0.1),
+            color: ThemeColor.shadowColor.withValues(alpha: 0.1),
             blurRadius: 4,
             offset: Offset(0, 2),
           ),
@@ -254,7 +362,7 @@ class _VpnCardState extends State<VpnCard> {
                   ),
                   SizedBox(width: ThemeColor.smallSpacing),
                   Text(
-                    ipText ?? context.tr('show_ip'),
+                    ipText ?? 'show_ip'.tr(),
                     style: ThemeColor.captionStyle(
                       color: ThemeColor.secondaryText,
                       fontWeight: FontWeight.w500,
@@ -290,10 +398,10 @@ class _VpnCardState extends State<VpnCard> {
         Container(
           padding: EdgeInsets.all(ThemeColor.smallSpacing),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
             border: Border.all(
-              color: color.withOpacity(0.3),
+              color: color.withValues(alpha: 0.3),
               width: 1,
             ),
           ),

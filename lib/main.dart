@@ -2,7 +2,7 @@ import 'package:shinenet_vpn/common/theme.dart';
 import 'package:shinenet_vpn/screens/about_screen.dart';
 import 'package:shinenet_vpn/screens/home_screen.dart';
 import 'package:shinenet_vpn/screens/settings_screen.dart';
-import 'package:shinenet_vpn/widgets/navigation_rail_widget.dart';
+import 'package:shinenet_vpn/widgets/modern_navigation.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -179,7 +179,7 @@ void _runMainApp() {
           name: 'localization',
         );
         return Text(
-          'Translation Error',
+          'translation_error'.tr(),
           style: TextStyle(color: Colors.red),
         );
       },
@@ -221,7 +221,7 @@ Widget _buildErrorApp(String error) {
               ),
               SizedBox(height: 24),
               Text(
-                'Application Error',
+                'application_error'.tr(),
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
@@ -231,7 +231,7 @@ Widget _buildErrorApp(String error) {
               ),
               SizedBox(height: 16),
               Text(
-                'The application encountered an error during initialization. Please restart the app.',
+                'error_initialization'.tr(),
                 style: TextStyle(
                   fontSize: 16,
                   color: Colors.grey[300],
@@ -243,9 +243,9 @@ Widget _buildErrorApp(String error) {
                 Container(
                   padding: EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
+                    color: Colors.red.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.red.withOpacity(0.3)),
+                    border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
                   ),
                   child: Text(
                     'Debug Info: $error',
@@ -267,7 +267,7 @@ Widget _buildErrorApp(String error) {
                   backgroundColor: Colors.red,
                   foregroundColor: Colors.white,
                 ),
-                child: Text('Restart App'),
+                child: Text('restart_app'.tr()),
               ),
             ],
           ),
@@ -300,7 +300,7 @@ Widget _buildSecurityErrorApp() {
               ),
               SizedBox(height: 24),
               Text(
-                'Security Check Failed',
+                'security_check_failed'.tr(),
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
@@ -310,7 +310,7 @@ Widget _buildSecurityErrorApp() {
               ),
               SizedBox(height: 16),
               Text(
-                'This application cannot run on modified or jailbroken devices for security reasons.',
+                'security_message'.tr(),
                 style: TextStyle(
                   fontSize: 16,
                   color: Colors.grey[300],
@@ -478,152 +478,37 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
       return MaterialApp(
         title: 'ShineNET VPN',
-        debugShowCheckedModeBanner: false,
         theme: ThemeData(
-          textTheme: TextTheme(
-            titleLarge: defaultTextStyle.copyWith(fontSize: 22, fontWeight: FontWeight.bold),
-            titleMedium: defaultTextStyle.copyWith(fontSize: 18, fontWeight: FontWeight.w600),
-            titleSmall: defaultTextStyle.copyWith(fontSize: 16, fontWeight: FontWeight.w500),
-            bodyLarge: defaultTextStyle.copyWith(fontSize: 16),
-            bodyMedium: defaultTextStyle.copyWith(fontSize: 14),
-            bodySmall: defaultTextStyle.copyWith(fontSize: 12),
-            labelLarge: defaultTextStyle.copyWith(fontSize: 14, fontWeight: FontWeight.w500),
-            labelMedium: defaultTextStyle.copyWith(fontSize: 12, fontWeight: FontWeight.w500),
-            labelSmall: defaultTextStyle.copyWith(fontSize: 10, fontWeight: FontWeight.w500),
-          ),
           useMaterial3: true,
-          scaffoldBackgroundColor: ThemeColor.backgroundColor,
-          cardColor: ThemeColor.cardColor,
-          primaryColor: ThemeColor.primaryColor,
-          brightness: Brightness.dark,
-          colorScheme: ColorScheme.dark(
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: ThemeColor.primaryColor,
+            brightness: Brightness.dark,
             primary: ThemeColor.primaryColor,
-            secondary: ThemeColor.secondaryColor,
-            surface: ThemeColor.surfaceColor,
-            background: ThemeColor.backgroundColor,
-            error: ThemeColor.errorColor,
             onPrimary: Colors.white,
+            secondary: ThemeColor.secondaryColor,
             onSecondary: Colors.white,
-            onSurface: ThemeColor.primaryText,
-            onBackground: ThemeColor.primaryText,
+            error: ThemeColor.errorColor,
             onError: Colors.white,
+            surface: ThemeColor.backgroundColor, // Changed from background
+            onSurface: ThemeColor.foregroundColor, // Changed from onBackground
           ),
+          scaffoldBackgroundColor: ThemeColor.backgroundColor,
           appBarTheme: AppBarTheme(
             backgroundColor: ThemeColor.backgroundColor,
             foregroundColor: ThemeColor.foregroundColor,
             elevation: 0,
-            centerTitle: true,
-            titleTextStyle: ThemeColor.headingStyle(
-              fontSize: 20,
-            ),
-            systemOverlayStyle: SystemUiOverlayStyle(
-              statusBarColor: Colors.transparent,
-              statusBarIconBrightness: Brightness.light,
-              systemNavigationBarColor: ThemeColor.backgroundColor,
-              systemNavigationBarIconBrightness: Brightness.light,
-            ),
-          ),
-          cardTheme: CardTheme(
-            color: ThemeColor.cardColor,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
-            ),
-            margin: EdgeInsets.symmetric(
-              horizontal: ThemeColor.mediumSpacing,
-              vertical: ThemeColor.smallSpacing,
-            ),
-          ),
-          inputDecorationTheme: InputDecorationTheme(
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
-              borderSide: BorderSide(color: ThemeColor.borderColor),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
-              borderSide: BorderSide(color: ThemeColor.borderColor.withOpacity(0.3)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
-              borderSide: BorderSide(color: ThemeColor.primaryColor, width: 2),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
-              borderSide: BorderSide(color: ThemeColor.errorColor),
-            ),
-            filled: true,
-            fillColor: ThemeColor.surfaceColor,
-            contentPadding: EdgeInsets.symmetric(
-              horizontal: ThemeColor.mediumSpacing,
-              vertical: ThemeColor.mediumSpacing,
-            ),
-          ),
-          elevatedButtonTheme: ElevatedButtonThemeData(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: ThemeColor.primaryColor,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shadowColor: ThemeColor.primaryColor.withOpacity(0.3),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
-              ),
-              padding: EdgeInsets.symmetric(
-                horizontal: ThemeColor.largeSpacing,
-                vertical: ThemeColor.mediumSpacing,
-              ),
-              textStyle: ThemeColor.bodyStyle(
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
-            ),
-          ),
-          textButtonTheme: TextButtonThemeData(
-            style: TextButton.styleFrom(
-              foregroundColor: ThemeColor.primaryColor,
-              padding: EdgeInsets.symmetric(
-                horizontal: ThemeColor.mediumSpacing,
-                vertical: ThemeColor.smallSpacing,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
-              ),
-            ),
-          ),
-          snackBarTheme: SnackBarThemeData(
-            backgroundColor: ThemeColor.surfaceColor,
-            contentTextStyle: ThemeColor.bodyStyle(),
-            actionTextColor: ThemeColor.primaryColor,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
-            ),
-            behavior: SnackBarBehavior.floating,
           ),
           bottomSheetTheme: BottomSheetThemeData(
-            backgroundColor: ThemeColor.backgroundColor,
-            modalBackgroundColor: ThemeColor.backgroundColor,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.vertical(
-                top: Radius.circular(ThemeColor.xlRadius),
-              ),
-            ),
-            elevation: 0,
+            backgroundColor: Colors.transparent,
           ),
-          dialogTheme: DialogTheme(
-            backgroundColor: ThemeColor.surfaceColor,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(ThemeColor.largeRadius),
-            ),
-            elevation: 0,
-            titleTextStyle: ThemeColor.headingStyle(
-              fontSize: 18,
-            ),
-            contentTextStyle: ThemeColor.bodyStyle(),
-          ),
-          pageTransitionsTheme: PageTransitionsTheme(
-            builders: {
-              TargetPlatform.android: CupertinoPageTransitionsBuilder(),
-              TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-            },
+          dialogBackgroundColor: ThemeColor.surfaceColor,
+          textTheme: TextTheme(
+            bodyMedium: ThemeColor.bodyStyle(),
+            bodyLarge: ThemeColor.bodyStyle(fontSize: 18),
+            bodySmall: ThemeColor.captionStyle(),
+            headlineMedium: ThemeColor.headingStyle(),
+            headlineSmall: ThemeColor.headingStyle(fontSize: 20),
+            titleMedium: ThemeColor.bodyStyle(fontWeight: FontWeight.w600),
           ),
         ),
         // Null-safe localization handling
@@ -735,7 +620,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
               ),
               SizedBox(height: 8),
               Text(
-                'Widget Error',
+                'widget_error'.tr(),
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -786,7 +671,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             ),
             SizedBox(height: 16),
             Text(
-              'Fallback Mode',
+              'fallback_mode'.tr(),
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -795,7 +680,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             ),
             SizedBox(height: 8),
             Text(
-              'App is running in safe mode',
+              'app_safe_mode'.tr(),
               style: TextStyle(
                 fontSize: 16,
                 color: Colors.grey[300],
@@ -911,7 +796,7 @@ class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
                 });
                 _initializePages();
               },
-              child: Text('Retry'),
+              child: Text('retry'.tr()),
             ),
           ],
         ),
@@ -999,20 +884,42 @@ class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
     return LayoutBuilder(
       builder: (context, constraints) {
         try {
-          final isWideScreen = constraints.maxWidth > 600;
+          final isWideScreen = constraints.maxWidth > 800;
           
           return Scaffold(
             body: SafeArea(
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _buildIndexedStack(),
-                  ),
-                  _buildNavigationRail(isWideScreen),
-                ],
-              ),
+              child: isWideScreen
+                  ? Row(
+                      children: [
+                        Expanded(
+                          child: _buildIndexedStack(),
+                        ),
+                        ModernNavigation(
+                          selectedIndex: _selectedIndex,
+                          v2rayStatus: v2rayStatus,
+                          onDestinationSelected: (index) {
+                            if (mounted && index >= 0 && index < _pages.length) {
+                              setState(() => _selectedIndex = index);
+                            }
+                          },
+                          isWideScreen: true,
+                        ),
+                      ],
+                    )
+                  : _buildIndexedStack(),
             ),
-            bottomNavigationBar: _buildBottomNavigation(isWideScreen),
+            bottomNavigationBar: isWideScreen 
+                ? null 
+                : ModernNavigation(
+                    selectedIndex: _selectedIndex,
+                    v2rayStatus: v2rayStatus,
+                    onDestinationSelected: (index) {
+                      if (mounted && index >= 0 && index < _pages.length) {
+                        setState(() => _selectedIndex = index);
+                      }
+                    },
+                    isWideScreen: false,
+                  ),
           );
         } catch (e, stackTrace) {
           developer.log(
@@ -1043,86 +950,5 @@ class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
     }
   }
 
-  Widget _buildNavigationRail(bool isWideScreen) {
-    if (!isWideScreen) return SizedBox.shrink();
-    
-    try {
-      return AnimatedSlide(
-        duration: Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-        offset: Offset.zero,
-        child: AnimatedOpacity(
-          duration: Duration(milliseconds: 200),
-          opacity: 1,
-          child: NavigationRailWidget(
-            selectedIndex: _selectedIndex,
-            singStatus: v2rayStatus,
-            onDestinationSelected: (index) {
-              if (mounted && index >= 0 && index < _pages.length) {
-                setState(() => _selectedIndex = index);
-              }
-            },
-          ),
-        ),
-      );
-    } catch (e) {
-      developer.log(
-        'Error building navigation rail',
-        error: e,
-        name: 'navigation_rail',
-      );
-      return SizedBox.shrink();
-    }
-  }
 
-  Widget? _buildBottomNavigation(bool isWideScreen) {
-    if (isWideScreen) return null;
-    
-    try {
-      return Container(
-        decoration: BoxDecoration(
-          color: Color(0xff192028),
-          border: Border(
-            top: BorderSide(
-              color: Colors.grey.withOpacity(0.1),
-              width: 1,
-            ),
-          ),
-        ),
-        child: NavigationBar(
-          backgroundColor: Color(0xff192028),
-          selectedIndex: _selectedIndex.clamp(0, 2),
-          onDestinationSelected: (index) {
-            if (mounted && index >= 0 && index < _pages.length) {
-              setState(() => _selectedIndex = index);
-            }
-          },
-          destinations: [
-            NavigationDestination(
-              icon: Icon(Iconsax.setting, color: Colors.grey),
-              selectedIcon: Icon(Iconsax.setting, color: Colors.white),
-              label: '',
-            ),
-            NavigationDestination(
-              icon: Icon(Iconsax.home, color: Colors.grey),
-              selectedIcon: Icon(Iconsax.home, color: Colors.white),
-              label: '',
-            ),
-            NavigationDestination(
-              icon: Icon(Iconsax.info_circle, color: Colors.grey),
-              selectedIcon: Icon(Iconsax.info_circle, color: Colors.white),
-              label: '',
-            ),
-          ],
-        ),
-      );
-    } catch (e) {
-      developer.log(
-        'Error building bottom navigation',
-        error: e,
-        name: 'bottom_navigation',
-      );
-      return null;
-    }
-  }
 }

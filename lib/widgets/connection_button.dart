@@ -54,14 +54,14 @@ class ConnectionButton extends StatelessWidget {
   }
 
   Color _getBorderColor() {
-    if (isConnecting) return ThemeColor.warningColor.withOpacity(0.5);
-    if (isConnected) return ThemeColor.primaryColor.withOpacity(0.5);
-    return ThemeColor.foregroundColor.withOpacity(0.1);
+    if (isConnecting) return ThemeColor.warningColor.withValues(alpha: 0.5);
+    if (isConnected) return ThemeColor.primaryColor.withValues(alpha: 0.5);
+    return ThemeColor.foregroundColor.withValues(alpha: 0.1);
   }
 
   Color _getBackgroundColor() {
-    if (isConnecting) return ThemeColor.warningColor.withOpacity(0.1);
-    if (isConnected) return ThemeColor.primaryColor.withOpacity(0.1);
+    if (isConnecting) return ThemeColor.warningColor.withValues(alpha: 0.1);
+    if (isConnected) return ThemeColor.primaryColor.withValues(alpha: 0.1);
     return ThemeColor.cardColor;
   }
 
