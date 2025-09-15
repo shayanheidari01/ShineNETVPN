@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:math';
 import 'package:flutter_v2ray/flutter_v2ray.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -35,7 +34,6 @@ class ConnectionOptimizationService {
   // Connection monitoring
   Timer? _connectionMonitor;
   DateTime? _lastSuccessfulConnection;
-  int _consecutiveFailures = 0;
 
   /// Initialize the service
   Future<void> initialize() async {
@@ -52,16 +50,13 @@ class ConnectionOptimizationService {
   void _handleV2RayStatusChange(V2RayStatus status) {
     if (status.state == 'CONNECTED') {
       _lastSuccessfulConnection = DateTime.now();
-      _consecutiveFailures = 0;
-    } else if (status.state == 'DISCONNECTED') {
-      _consecutiveFailures++;
     }
   }
   
   /// Start connection monitoring
   void _startConnectionMonitoring() {
     _connectionMonitor?.cancel();
-    _connectionMonitor = Timer.periodic(Duration(seconds: 30), (timer) {
+    _connectionMonitor = Timer.periodic(Duration(minutes: 2), (timer) {
       _checkConnectionHealth();
     });
   }
@@ -192,7 +187,7 @@ class ConnectionOptimizationService {
           
           // Small delay between batches to prevent resource exhaustion
           if (batches.indexOf(batch) < batches.length - 1) {
-            await Future.delayed(const Duration(milliseconds: 500));
+            await Future.delayed(const Duration(milliseconds: 200));
           }
           
         } catch (e) {

@@ -1,7 +1,8 @@
-import 'package:shinenet_vpn/common/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:shinenet_vpn/common/theme.dart';
+import 'package:shinenet_vpn/widgets/simple_server_list_widget.dart';
 
 class ServerInfo {
   final String name;
@@ -34,46 +35,10 @@ class ServerSelectionModal extends StatefulWidget {
   _ServerSelectionModalState createState() => _ServerSelectionModalState();
 }
 
-class _ServerSelectionModalState extends State<ServerSelectionModal>
-    with TickerProviderStateMixin {
-  late AnimationController _animationController;
-  late List<AnimationController> _itemControllers;
-
+class _ServerSelectionModalState extends State<ServerSelectionModal> {
   @override
   void initState() {
     super.initState();
-    _animationController = AnimationController(
-      duration: ThemeColor.mediumAnimation,
-      vsync: this,
-    );
-    
-    _itemControllers = List.generate(
-      3 + widget.healthyServers.length,
-      (index) => AnimationController(
-        duration: Duration(milliseconds: 300 + (index * 100)),
-        vsync: this,
-      ),
-    );
-    
-    _animationController.forward();
-    
-    // Stagger the item animations
-    for (int i = 0; i < _itemControllers.length; i++) {
-      Future.delayed(Duration(milliseconds: i * 100), () {
-        if (mounted) {
-          _itemControllers[i].forward();
-        }
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    _animationController.dispose();
-    for (var controller in _itemControllers) {
-      controller.dispose();
-    }
-    super.dispose();
   }
 
   @override
@@ -95,92 +60,42 @@ class _ServerSelectionModalState extends State<ServerSelectionModal>
       ),
       child: Column(
         children: [
-          // Modern handle bar with gradient
+          // Simple handle bar
           Container(
             margin: EdgeInsets.only(top: ThemeColor.smallSpacing),
             width: 50,
             height: 4,
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  ThemeColor.primaryColor.withValues(alpha: 0.3),
-                  ThemeColor.secondaryColor.withValues(alpha: 0.3),
-                ],
-              ),
+              color: ThemeColor.borderColor,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
           
-          // Header with gradient background
+          // Simplified header
           Container(
             width: double.infinity,
-            padding: EdgeInsets.all(ThemeColor.largeSpacing),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  ThemeColor.primaryColor.withValues(alpha: 0.05),
-                  ThemeColor.secondaryColor.withValues(alpha: 0.02),
-                ],
-              ),
+            padding: EdgeInsets.symmetric(
+              horizontal: ThemeColor.largeSpacing,
+              vertical: ThemeColor.mediumSpacing,
             ),
-            child: Row(
-              children: [
-                Container(
-                  padding: EdgeInsets.all(ThemeColor.mediumSpacing),
-                  decoration: BoxDecoration(
-                    gradient: ThemeColor.primaryGradient,
-                    borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
-                    boxShadow: [
-                      BoxShadow(
-                        color: ThemeColor.primaryColor.withValues(alpha: 0.3),
-                        blurRadius: 12,
-                        offset: Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Icon(
-                    Icons.dns_rounded,
-                    color: Colors.white,
-                    size: 28,
-                  ),
-                ),
-                SizedBox(width: ThemeColor.largeSpacing),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'select_server_title'.tr(),
-                        style: ThemeColor.headingStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        'choose_server_location'.tr(),
-                        style: ThemeColor.captionStyle(
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+            child: Text(
+              'select_server_title'.tr(),
+              style: ThemeColor.headingStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+              textAlign: TextAlign.center,
             ),
           ),
           
           // Content
           Expanded(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.all(ThemeColor.largeSpacing),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Automatic server option
-                  _buildModernServerCard(
+            child: Column(
+              children: [
+                // Automatic server option
+                Container(
+                  margin: EdgeInsets.symmetric(horizontal: ThemeColor.largeSpacing),
+                  child: _buildModernServerCard(
                     title: 'automatic'.tr(),
                     subtitle: 'best_server_auto'.tr(),
                     icon: Icons.auto_awesome_rounded,
@@ -188,70 +103,26 @@ class _ServerSelectionModalState extends State<ServerSelectionModal>
                     isSelected: widget.selectedServer == 'server_automatic'.tr(),
                     onTap: () => _selectServer(context, 'server_automatic'.tr()),
                   ),
-                  
-                  // Healthy servers section
-                  if (widget.healthyServers.isNotEmpty) ...[
-                    SizedBox(height: ThemeColor.largeSpacing),
-                    Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: ThemeColor.mediumSpacing,
-                        vertical: ThemeColor.smallSpacing,
-                      ),
-                      decoration: BoxDecoration(
-                        color: ThemeColor.surfaceColor,
-                        borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
-                        border: Border.all(
-                          color: ThemeColor.borderColor,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.health_and_safety_rounded,
-                            color: ThemeColor.successColor,
-                            size: 20,
-                          ),
-                          SizedBox(width: ThemeColor.smallSpacing),
-                          Text(
-                            'healthy_servers'.tr(),
-                            style: ThemeColor.bodyStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: ThemeColor.successColor,
-                            ),
-                          ),
-                          Spacer(),
-                          Container(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: ThemeColor.smallSpacing,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: ThemeColor.successColor.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              '${widget.healthyServers.length}',
-                              style: ThemeColor.captionStyle(
-                                fontSize: 12,
-                                color: ThemeColor.successColor,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                ),
+                
+                // Simple server list
+                if (widget.healthyServers.isNotEmpty) ...[
+                  SizedBox(height: ThemeColor.mediumSpacing),
+                  Expanded(
+                    child: SimpleServerListWidget(
+                      servers: widget.healthyServers.map((server) => {
+                        'name': server.name,
+                        'config': server.config,
+                        'ip': server.ip ?? '',
+                        'countryCode': server.countryCode ?? '',
+                        'ping': server.ping ?? -1,
+                      }).toList(),
+                      selectedServer: widget.selectedServer,
+                      onServerSelected: (config) => _selectServer(context, config),
                     ),
-                    SizedBox(height: ThemeColor.mediumSpacing),
-                    ...widget.healthyServers.map((server) => 
-                      Padding(
-                        padding: EdgeInsets.only(bottom: ThemeColor.mediumSpacing),
-                        child: _buildHealthyServerCard(server),
-                      ),
-                    ).toList(),
-                  ],
+                  ),
                 ],
-              ),
+              ],
             ),
           ),
         ],
@@ -446,38 +317,13 @@ class _ServerSelectionModalState extends State<ServerSelectionModal>
       ),
     );
   }
-  
+
   void _selectServer(BuildContext context, String server) {
     HapticFeedback.lightImpact();
     widget.onServerSelected(server);
   }
   
-  String _countryCodeToFlagEmoji(String countryCode) {
-    if (countryCode.isEmpty) return '🏳️';
-    
-    try {
-      // Validate country code format
-      if (countryCode.length != 2) return '🏳️';
-      
-      // Convert to uppercase
-      countryCode = countryCode.toUpperCase();
-      
-      // Check if it's a valid ISO 3166-1 alpha-2 code
-      final validLetters = RegExp(r'^[A-Z]{2}$');
-      if (!validLetters.hasMatch(countryCode)) return '🏳️';
-      
-      // Convert to flag emoji
-      final flag = countryCode.codeUnits
-          .map((codeUnit) => String.fromCharCode(0x1F1E6 + codeUnit - 0x41))
-          .join();
-      return flag;
-    } catch (e) {
-      print('Error converting country code to flag emoji: $e');
-      return '🏳️';
-    }
-  }
-  
-  // Enhanced healthy server card
+  // Enhanced healthy server card (unused - kept for compatibility)
   Widget _buildHealthyServerCard(ServerInfo server) {
     final isSelected = widget.selectedServer == server.config;
     final pingColor = server.ping != null

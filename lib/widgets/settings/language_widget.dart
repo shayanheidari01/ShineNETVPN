@@ -46,173 +46,86 @@ class _LanguageWidgetState extends State<LanguageWidget> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: ThemeColor.backgroundColor,
-      body: CustomScrollView(
-        slivers: [
-          // Modern app bar
-          SliverAppBar(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            floating: true,
-            pinned: false,
-            expandedHeight: 120,
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      ThemeColor.primaryColor.withValues(alpha: 0.1),
-                      ThemeColor.secondaryColor.withValues(alpha: 0.05),
-                    ],
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: Text(
+          'select_language'.tr(),
+          style: ThemeColor.headingStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        centerTitle: true,
+      ),
+      body: Padding(
+        padding: EdgeInsets.all(ThemeColor.mediumSpacing),
+        child: Column(
+          children: [
+            // Simple description
+            Text(
+              'choose_preferred_language'.tr(),
+              style: ThemeColor.captionStyle(
+                fontSize: 16,
+                color: ThemeColor.mutedText,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: ThemeColor.largeSpacing),
+            
+            // Language options
+            Expanded(
+              child: ListView(
+                children: [
+                  _buildSimpleLanguageCard(
+                    context,
+                    'language_english'.tr(),
+                    '🇺🇸',
+                    'English',
                   ),
-                ),
-                child: SafeArea(
-                  child: Padding(
-                    padding: EdgeInsets.all(ThemeColor.mediumSpacing),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: EdgeInsets.all(ThemeColor.mediumSpacing),
-                          decoration: BoxDecoration(
-                            gradient: ThemeColor.primaryGradient,
-                            borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
-                            boxShadow: [
-                              BoxShadow(
-                                color: ThemeColor.primaryColor.withValues(alpha: 0.3),
-                                blurRadius: 12,
-                                offset: Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Icon(
-                            Icons.language_rounded,
-                            color: Colors.white,
-                            size: 28,
-                          ),
-                        ),
-                        SizedBox(width: ThemeColor.mediumSpacing),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                'select_language'.tr(),
-                                style: ThemeColor.headingStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              SizedBox(height: 4),
-                              Text(
-                                'choose_preferred_language'.tr(),
-                                style: ThemeColor.captionStyle(
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
+                  SizedBox(height: ThemeColor.smallSpacing),
+                  _buildSimpleLanguageCard(
+                    context,
+                    'language_persian'.tr(),
+                    '🇮🇷',
+                    'فارسی',
                   ),
-                ),
+                  SizedBox(height: ThemeColor.smallSpacing),
+                  _buildSimpleLanguageCard(
+                    context,
+                    'language_chinese'.tr(),
+                    '🇨🇳',
+                    '中文',
+                  ),
+                  SizedBox(height: ThemeColor.smallSpacing),
+                  _buildSimpleLanguageCard(
+                    context,
+                    'language_russian'.tr(),
+                    '🇷🇺',
+                    'Русский',
+                  ),
+                ],
               ),
             ),
-          ),
-          
-          // Language options
-          SliverPadding(
-            padding: EdgeInsets.all(ThemeColor.mediumSpacing),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                _buildLanguageCard(
-                  context,
-                  'language_english'.tr(),
-                  '🇺🇸',
-                  'language_english'.tr(),
-                  'country_united_states'.tr(),
-                ),
-                SizedBox(height: ThemeColor.mediumSpacing),
-                _buildLanguageCard(
-                  context,
-                  'language_persian'.tr(),
-                  '🇮🇷',
-                  'language_persian'.tr(),
-                  'country_iran'.tr(),
-                ),
-                SizedBox(height: ThemeColor.mediumSpacing),
-                _buildLanguageCard(
-                  context,
-                  'language_chinese'.tr(),
-                  '🇨🇳',
-                  'language_chinese'.tr(),
-                  'country_china'.tr(),
-                ),
-                SizedBox(height: ThemeColor.mediumSpacing),
-                _buildLanguageCard(
-                  context,
-                  'language_russian'.tr(),
-                  '🇷🇺',
-                  'language_russian'.tr(),
-                  'country_russia'.tr(),
-                ),
-              ]),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildDivider() {
-    return Divider(
-      height: 1,
-      color: ThemeColor.dividerColor,
-      indent: ThemeColor.mediumSpacing,
-      endIndent: ThemeColor.mediumSpacing,
-    );
-  }
 
-  Widget _buildLanguageCard(
+  Widget _buildSimpleLanguageCard(
     BuildContext context,
     String language,
     String flag,
-    String englishName,
-    String country,
+    String nativeName,
   ) {
     final isSelected = _selectedLanguage == language;
     
-    return AnimatedContainer(
-      duration: ThemeColor.mediumAnimation,
-      decoration: BoxDecoration(
-        gradient: isSelected
-            ? LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  ThemeColor.primaryColor.withValues(alpha: 0.1),
-                  ThemeColor.secondaryColor.withValues(alpha: 0.05),
-                ],
-              )
-            : null,
-        borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
-        border: Border.all(
-          color: isSelected
-              ? ThemeColor.primaryColor
-              : ThemeColor.borderColor,
-          width: isSelected ? 2 : 1,
-        ),
-        boxShadow: isSelected
-            ? [
-                BoxShadow(
-                  color: ThemeColor.primaryColor.withValues(alpha: 0.2),
-                  blurRadius: 8,
-                  offset: Offset(0, 2),
-                ),
-              ]
-            : null,
+    return Container(
+      decoration: ThemeColor.cardDecoration(
+        withBorder: true,
+        withShadow: false,
       ),
       child: Material(
         color: Colors.transparent,
@@ -227,31 +140,20 @@ class _LanguageWidgetState extends State<LanguageWidget> {
             });
           },
           child: Padding(
-            padding: EdgeInsets.all(ThemeColor.largeSpacing),
+            padding: EdgeInsets.symmetric(
+              horizontal: ThemeColor.mediumSpacing,
+              vertical: ThemeColor.largeSpacing,
+            ),
             child: Row(
               children: [
-                // Flag container
-                Container(
-                  padding: EdgeInsets.all(ThemeColor.mediumSpacing),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? ThemeColor.primaryColor.withValues(alpha: 0.1)
-                        : ThemeColor.surfaceColor,
-                    borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
-                    border: Border.all(
-                      color: isSelected
-                          ? ThemeColor.primaryColor
-                          : ThemeColor.borderColor,
-                    ),
-                  ),
-                  child: Text(
-                    flag,
-                    style: TextStyle(fontSize: 32),
-                  ),
+                // Flag
+                Text(
+                  flag,
+                  style: TextStyle(fontSize: 24),
                 ),
-                SizedBox(width: ThemeColor.largeSpacing),
+                SizedBox(width: ThemeColor.mediumSpacing),
                 
-                // Language info
+                // Language name
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -259,49 +161,37 @@ class _LanguageWidgetState extends State<LanguageWidget> {
                       Text(
                         language,
                         style: ThemeColor.bodyStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: isSelected
-                              ? ThemeColor.primaryColor
-                              : ThemeColor.primaryText,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
-                      SizedBox(height: 4),
-                      Text(
-                        '$englishName • $country',
-                        style: ThemeColor.captionStyle(
-                          fontSize: 14,
-                          color: isSelected
-                              ? ThemeColor.primaryColor.withValues(alpha: 0.8)
-                              : ThemeColor.mutedText,
+                      if (nativeName != language) ...[
+                        SizedBox(height: 2),
+                        Text(
+                          nativeName,
+                          style: ThemeColor.captionStyle(
+                            fontSize: 14,
+                            color: ThemeColor.mutedText,
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
                 
                 // Selection indicator
-                AnimatedContainer(
-                  duration: ThemeColor.fastAnimation,
-                  padding: EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? ThemeColor.primaryColor
-                        : Colors.transparent,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isSelected
-                          ? ThemeColor.primaryColor
-                          : ThemeColor.borderColor,
-                      width: 2,
-                    ),
+                if (isSelected)
+                  Icon(
+                    Icons.check_circle,
+                    color: ThemeColor.primaryColor,
+                    size: 24,
+                  )
+                else
+                  Icon(
+                    Icons.radio_button_unchecked,
+                    color: ThemeColor.borderColor,
+                    size: 24,
                   ),
-                  child: Icon(
-                    Icons.check_rounded,
-                    color: isSelected ? Colors.white : Colors.transparent,
-                    size: 20,
-                  ),
-                ),
               ],
             ),
           ),

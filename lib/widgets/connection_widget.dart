@@ -3,7 +3,6 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
-import 'package:iconsax/iconsax.dart';
 
 class ConnectionWidget extends StatefulWidget {
   ConnectionWidget({
@@ -92,7 +91,7 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
   }
 
   void _updateAnimationState() {
-    if (widget.status.toUpperCase() == "CONNECTED") {
+    if (widget.status.toUpperCase() == "connected_status".tr()) {
       _waveController.repeat(reverse: true);
     } else {
       _waveController.stop();
@@ -103,7 +102,7 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
   Color _getShadowColor() {
     if (widget.isLoading) {
       return ThemeColor.connectingColor;
-    } else if (widget.status.toUpperCase() == "CONNECTED") {
+    } else if (widget.status.toUpperCase() == "connected_status".tr()) {
       return ThemeColor.connectedColor;
     } else {
       return ThemeColor.disconnectedColor;
@@ -113,7 +112,7 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
   Color _getButtonColor() {
     if (widget.isLoading) {
       return ThemeColor.connectingColor.withValues(alpha: 0.2);
-    } else if (widget.status.toUpperCase() == "CONNECTED") {
+    } else if (widget.status.toUpperCase() == "connected_status".tr()) {
       return ThemeColor.connectedColor.withValues(alpha: 0.2);
     } else {
       return ThemeColor.errorColor.withValues(alpha: 0.2);
@@ -121,7 +120,7 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
   }
   
   IconData _getStatusIcon() {
-    if (widget.status.toUpperCase() == "CONNECTED") {
+    if (widget.status.toUpperCase() == "connected_status".tr()) {
       return Icons.shield_rounded;
     } else {
       return Icons.power_settings_new_rounded;
@@ -171,7 +170,7 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
                     alignment: Alignment.center,
                     children: [
                       // Outer wave effect for connected state
-                      if (widget.status.toUpperCase() == "CONNECTED")
+                      if (widget.status.toUpperCase() == "connected_status".tr())
                         ...List.generate(3, (index) {
                           final delay = index * 0.3;
                           final animValue =
@@ -300,7 +299,7 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
               Text(
                 widget.isLoading
                     ? 'connecting'.tr()
-                    : widget.status.toUpperCase() == "DISCONNECTED"
+                    : widget.status.toUpperCase() == "disconnected_status".tr()
                         ? 'disconnected'.tr()
                         : 'connected'.tr(),
                 style: ThemeColor.headingStyle(
@@ -346,7 +345,7 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
   String _getStatusDescription() {
     if (widget.isLoading) {
       return 'establishing_secure_connection'.tr();
-    } else if (widget.status.toUpperCase() == "CONNECTED") {
+    } else if (widget.status.toUpperCase() == "connected_status".tr()) {
       return 'connection_secure_private'.tr();
     } else {
       return 'tap_connect_vpn'.tr();

@@ -510,13 +510,13 @@ Future<Map<String, String>> getIpApi() async {
           }
         }
 
-        return {'countryCode': data['countryCode'] ?? 'Unknown', 'ip': ip};
+        return {'countryCode': data['countryCode'] ?? 'unknown'.tr(), 'ip': ip};
       }
     }
 
-    return {'countryCode': 'Unknown', 'ip': 'Unknown IP'};
+    return {'countryCode': 'unknown'.tr(), 'ip': 'unknown_ip'.tr()};
   } catch (e) {
     print('Error getting IP info: $e');
-    return {'countryCode': 'Error', 'ip': 'Error'};
+    return {'countryCode': 'error'.tr(), 'ip': 'error'.tr()};
   }
 }

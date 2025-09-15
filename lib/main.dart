@@ -2,13 +2,14 @@ import 'package:shinenet_vpn/common/theme.dart';
 import 'package:shinenet_vpn/screens/about_screen.dart';
 import 'package:shinenet_vpn/screens/home_screen.dart';
 import 'package:shinenet_vpn/screens/settings_screen.dart';
+import 'package:shinenet_vpn/services/update_checker_service.dart';
 import 'package:shinenet_vpn/widgets/modern_navigation.dart';
+import 'package:shinenet_vpn/widgets/update_dialog_widget.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_v2ray/model/v2ray_status.dart';
-import 'package:iconsax/iconsax.dart';
 import 'package:safe_device/safe_device.dart';
 import 'dart:async';
 import 'dart:developer' as developer;
@@ -89,7 +90,7 @@ Future<void> _initializeDeviceSecurity() async {
     for (int attempt = 0; attempt < 3; attempt++) {
       try {
         isJailBroken = await SafeDevice.isJailBroken
-            .timeout(Duration(seconds: 3));
+            .timeout(Duration(seconds: 1));
         break; // Success, exit retry loop
       } catch (e) {
         developer.log(
@@ -492,16 +493,18 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             surface: ThemeColor.backgroundColor, // Changed from background
             onSurface: ThemeColor.foregroundColor, // Changed from onBackground
           ),
-          scaffoldBackgroundColor: ThemeColor.backgroundColor,
+          dialogTheme: DialogThemeData(
+            backgroundColor: ThemeColor.backgroundColor,
+          ),
           appBarTheme: AppBarTheme(
             backgroundColor: ThemeColor.backgroundColor,
             foregroundColor: ThemeColor.foregroundColor,
             elevation: 0,
           ),
+          scaffoldBackgroundColor: ThemeColor.backgroundColor,
           bottomSheetTheme: BottomSheetThemeData(
             backgroundColor: Colors.transparent,
           ),
-          dialogBackgroundColor: ThemeColor.surfaceColor,
           textTheme: TextTheme(
             bodyMedium: ThemeColor.bodyStyle(),
             bodyLarge: ThemeColor.bodyStyle(fontSize: 18),
@@ -730,6 +733,8 @@ class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
       setState(() {
         _isInitialized = true;
       });
+      // Check for updates after pages are initialized
+      _checkForUpdates();
     } catch (e, stackTrace) {
       developer.log(
         'Error initializing pages',
@@ -934,21 +939,46 @@ class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
     );
   }
 
+  /// Check for app updates on startup
+  Future<void> _checkForUpdates() async {
+    try {
+      developer.log('🔍 Checking for app updates...', name: 'update_checker');
+      
+      final updateChecker = UpdateCheckerService();
+      final updateInfo = await updateChecker.checkForUpdates();
+      
+      if (updateInfo != null && updateInfo.needsUpdate && mounted) {
+        developer.log('📱 Update required: ${updateInfo.currentVersion} -> ${updateInfo.latestVersion}', name: 'update_checker');
+        
+        // Show mandatory update dialog
+        showDialog(
+          context: context,
+          barrierDismissible: false, // Prevent dismissing
+          builder: (context) => UpdateDialogWidget(updateInfo: updateInfo),
+        );
+      } else {
+        developer.log('✅ App is up to date', name: 'update_checker');
+      }
+    } catch (e) {
+      developer.log('❌ Error checking for updates: $e', name: 'update_checker');
+      // Continue silently if update check fails
+    }
+  }
+
   Widget _buildIndexedStack() {
     try {
       return IndexedStack(
         index: _selectedIndex.clamp(0, _pages.length - 1),
         children: _pages,
       );
-    } catch (e) {
+    } catch (e, stackTrace) {
       developer.log(
         'Error building indexed stack',
         error: e,
+        stackTrace: stackTrace,
         name: 'indexed_stack',
       );
-      return _buildErrorPage('Content Error');
+      return _buildErrorPage('Navigation Error');
     }
   }
-
-
 }

@@ -274,7 +274,7 @@ class _AboutScreenState extends State<AboutScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-                    children: [
+              children: [
                 Icon(
                   Icons.connect_without_contact_rounded,
                   color: ThemeColor.primaryColor,
@@ -292,52 +292,52 @@ class _AboutScreenState extends State<AboutScreen> {
             ),
             SizedBox(height: ThemeColor.mediumSpacing),
             _buildContactButton(
-                        icon: Icons.email_rounded,
+              icon: Icons.email_rounded,
               title: 'email_support'.tr(),
-                        subtitle: 'support_email'.tr(),
-                        color: ThemeColor.primaryColor,
-                        onTap: () async {
-                          HapticFeedback.lightImpact();
-                          final Uri emailLaunchUri = Uri(
-                            scheme: 'mailto',
-                            path: 'support_email'.tr(),
-                            queryParameters: {
-                              'subject': 'support_email_subject'.tr()
-                            },
-                          );
-                          await launchUrl(emailLaunchUri);
-                        },
-                      ),
-                      SizedBox(height: ThemeColor.smallSpacing),
+              subtitle: 'support_email'.tr(),
+              color: ThemeColor.primaryColor,
+              onTap: () async {
+                HapticFeedback.lightImpact();
+                final Uri emailLaunchUri = Uri(
+                  scheme: 'mailto',
+                  path: 'support_email'.tr(),
+                  queryParameters: {
+                    'subject': 'support_email_subject'.tr()
+                  },
+                );
+                await launchUrl(emailLaunchUri);
+              },
+            ),
+            SizedBox(height: ThemeColor.smallSpacing),
             _buildContactButton(
-                        icon: Icons.chat_rounded,
-                        title: 'telegram_channel'.tr(),
+              icon: Icons.chat_rounded,
+              title: 'telegram_channel'.tr(),
               subtitle: 'join_community'.tr(),
-                        color: ThemeColor.successColor,
-                        onTap: () async {
-                          HapticFeedback.lightImpact();
-                          await launchUrl(
-                            Uri.parse('https://t.me/ShineNETVPN'),
-                            mode: LaunchMode.externalApplication,
-                          );
-                        },
-                      ),
-                      SizedBox(height: ThemeColor.smallSpacing),
+              color: ThemeColor.successColor,
+              onTap: () async {
+                HapticFeedback.lightImpact();
+                await launchUrl(
+                  Uri.parse('https://t.me/ShineNETVPN'),
+                  mode: LaunchMode.externalApplication,
+                );
+              },
+            ),
+            SizedBox(height: ThemeColor.smallSpacing),
             _buildContactButton(
-                        icon: Icons.code_rounded,
+              icon: Icons.code_rounded,
               title: 'open_source'.tr(),
               subtitle: 'view_on_github'.tr(),
-                        color: ThemeColor.secondaryText,
-                        onTap: () async {
-                          HapticFeedback.lightImpact();
-                          await launchUrl(
-                            Uri.parse('https://github.com/shayanheidari01/ShineNETVPN'),
-                            mode: LaunchMode.externalApplication,
-                          );
-                        },
-                      ),
-                    ],
-                  ),
+              color: ThemeColor.secondaryText,
+              onTap: () async {
+                HapticFeedback.lightImpact();
+                await launchUrl(
+                  Uri.parse('https://github.com/shayanheidari01/ShineNETVPN'),
+                  mode: LaunchMode.externalApplication,
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -438,26 +438,26 @@ class _AboutScreenState extends State<AboutScreen> {
             ),
             SizedBox(height: ThemeColor.mediumSpacing),
             Row(
-                    children: [
+              children: [
                 Expanded(
                   child: _buildInfoItem(
-                        icon: Icons.update_rounded,
+                    icon: Icons.update_rounded,
                     title: 'version'.tr(),
                     value: version ?? '1.0.3',
-                        color: ThemeColor.primaryColor,
-                      ),
+                    color: ThemeColor.primaryColor,
+                  ),
                 ),
                 Expanded(
                   child: _buildInfoItem(
-                        icon: Icons.code_rounded,
+                    icon: Icons.code_rounded,
                     title: 'license'.tr(),
                     value: 'mit_license'.tr(),
-                        color: ThemeColor.successColor,
+                    color: ThemeColor.successColor,
                   ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: ThemeColor.largeSpacing),
+                ),
+              ],
+            ),
+            SizedBox(height: ThemeColor.largeSpacing),
             Text(
               'copyright'.tr(),
               style: ThemeColor.captionStyle(
@@ -510,403 +510,4 @@ class _AboutScreenState extends State<AboutScreen> {
     );
   }
 
-  // Modern app header card
-  Widget _buildAppHeaderCard() {
-    return AnimatedContainer(
-      duration: ThemeColor.mediumAnimation,
-      padding: EdgeInsets.all(ThemeColor.largeSpacing),
-      decoration: ThemeColor.cardDecoration(
-        withGradient: true,
-        withShadow: true,
-      ),
-      child: Column(
-        children: [
-          // App logo with modern design
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(ThemeColor.largeRadius),
-              boxShadow: [
-                BoxShadow(
-                  color: ThemeColor.primaryColor.withValues(alpha: 0.3),
-                  blurRadius: 12,
-                  offset: Offset(0, 6),
-                ),
-              ],
-            ),
-            child: Padding(
-              padding: EdgeInsets.all(ThemeColor.mediumSpacing),
-              child: Icon(
-                Icons.vpn_lock_rounded,
-                color: ThemeColor.primaryColor,
-                size: 40,
-              ),
-            ),
-          ),
-          SizedBox(height: ThemeColor.mediumSpacing),
-          Text(
-            'app_title'.tr(),
-            style: ThemeColor.headingStyle(
-              fontSize: 28,
-              color: Colors.white,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          SizedBox(height: ThemeColor.smallSpacing),
-          if (version != null)
-            Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: ThemeColor.mediumSpacing,
-                vertical: ThemeColor.smallSpacing,
-              ),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(ThemeColor.largeRadius),
-              ),
-              child: Text(
-                '${'version_title'.tr()}: $version',
-                style: ThemeColor.captionStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  // Modern features card
-  Widget _buildFeaturesCard() {
-    return AnimatedContainer(
-      duration: ThemeColor.mediumAnimation,
-      padding: EdgeInsets.all(ThemeColor.largeSpacing),
-      decoration: ThemeColor.cardDecoration(
-        withShadow: true,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.star_rounded,
-                color: ThemeColor.warningColor,
-                size: 20,
-              ),
-              SizedBox(width: ThemeColor.smallSpacing),
-              Text(
-                'Key Features',
-                style: ThemeColor.bodyStyle(
-                  fontWeight: FontWeight.w600,
-                  color: ThemeColor.primaryText,
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: ThemeColor.mediumSpacing),
-          Row(
-            children: [
-              Expanded(
-                child: _buildModernFeatureItem(
-                  icon: Icons.security_rounded,
-                  title: 'Secure',
-                  description: 'Military-grade\nencryption',
-                  color: ThemeColor.successColor,
-                ),
-              ),
-              Expanded(
-                child: _buildModernFeatureItem(
-                  icon: Icons.speed_rounded,
-                  title: 'Fast',
-                  description: 'High-speed\nservers',
-                  color: ThemeColor.primaryColor,
-                ),
-              ),
-              Expanded(
-                child: _buildModernFeatureItem(
-                  icon: Icons.code_rounded,
-                  title: 'Open Source',
-                  description: 'Transparent\n& trustworthy',
-                  color: ThemeColor.warningColor,
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: ThemeColor.largeSpacing),
-          Divider(
-            color: ThemeColor.dividerColor,
-            height: 1,
-          ),
-          SizedBox(height: ThemeColor.largeSpacing),
-          Text(
-            'about_description'.tr(),
-            style: ThemeColor.bodyStyle(
-              color: ThemeColor.secondaryText,
-            ).copyWith(height: 1.6),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Modern section builder consistent with settings and home
-  Widget _buildModernSection({
-    required String title,
-    required IconData icon,
-    required List<Widget> children,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: EdgeInsets.symmetric(
-            horizontal: ThemeColor.mediumSpacing,
-            vertical: ThemeColor.smallSpacing,
-          ),
-          decoration: BoxDecoration(
-            color: ThemeColor.surfaceColor,
-            borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
-            border: Border.all(
-              color: ThemeColor.borderColor.withValues(alpha: 0.3),
-              width: 1,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                color: ThemeColor.primaryColor,
-                size: 18,
-              ),
-              SizedBox(width: ThemeColor.smallSpacing),
-              Text(
-                title,
-                style: ThemeColor.bodyStyle(
-                  fontWeight: FontWeight.w600,
-                  color: ThemeColor.primaryText,
-                ),
-              ),
-            ],
-          ),
-        ),
-        SizedBox(height: ThemeColor.mediumSpacing),
-        ...children,
-      ],
-    );
-  }
-
-  // Modern contact card
-  Widget _buildModernContactCard({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return AnimatedContainer(
-      duration: ThemeColor.mediumAnimation,
-      decoration: ThemeColor.cardDecoration(
-        withShadow: true,
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
-          child: Padding(
-            padding: EdgeInsets.all(ThemeColor.mediumSpacing),
-            child: Row(
-              children: [
-                Container(
-                  padding: EdgeInsets.all(ThemeColor.smallSpacing),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
-                    border: Border.all(
-                      color: color.withValues(alpha: 0.3),
-                      width: 1,
-                    ),
-                  ),
-                  child: Icon(
-                    icon,
-                    color: color,
-                    size: 24,
-                  ),
-                ),
-                SizedBox(width: ThemeColor.mediumSpacing),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: ThemeColor.bodyStyle(
-                          fontWeight: FontWeight.w600,
-                          color: ThemeColor.primaryText,
-                        ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        subtitle,
-                        style: ThemeColor.captionStyle(
-                          color: ThemeColor.mutedText,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  color: color,
-                  size: 16,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Modern info card for non-interactive items
-  Widget _buildModernInfoCard({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color color,
-  }) {
-    return AnimatedContainer(
-      duration: ThemeColor.mediumAnimation,
-      padding: EdgeInsets.all(ThemeColor.mediumSpacing),
-      decoration: ThemeColor.cardDecoration(
-        withShadow: true,
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: EdgeInsets.all(ThemeColor.smallSpacing),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
-              border: Border.all(
-                color: color.withValues(alpha: 0.3),
-                width: 1,
-              ),
-            ),
-            child: Icon(
-              icon,
-              color: color,
-              size: 24,
-            ),
-          ),
-          SizedBox(width: ThemeColor.mediumSpacing),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: ThemeColor.bodyStyle(
-                    fontWeight: FontWeight.w600,
-                    color: ThemeColor.primaryText,
-                  ),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: ThemeColor.captionStyle(
-                    color: ThemeColor.mutedText,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Modern feature item
-  Widget _buildModernFeatureItem({
-    required IconData icon,
-    required String title,
-    required String description,
-    required Color color,
-  }) {
-    return Container(
-      padding: EdgeInsets.all(ThemeColor.smallSpacing),
-      child: Column(
-        children: [
-          Container(
-            padding: EdgeInsets.all(ThemeColor.smallSpacing),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
-              border: Border.all(
-                color: color.withValues(alpha: 0.3),
-                width: 1,
-              ),
-            ),
-            child: Icon(
-              icon,
-              color: color,
-              size: 28,
-            ),
-          ),
-          SizedBox(height: ThemeColor.smallSpacing),
-          Text(
-            title,
-            style: ThemeColor.bodyStyle(
-              fontWeight: FontWeight.w600,
-              color: ThemeColor.primaryText,
-              fontSize: 14,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          SizedBox(height: 4),
-          Text(
-            description,
-            style: ThemeColor.captionStyle(
-              color: ThemeColor.mutedText,
-              fontSize: 12,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Copyright card
-  Widget _buildCopyrightCard() {
-    return AnimatedContainer(
-      duration: ThemeColor.mediumAnimation,
-      padding: EdgeInsets.all(ThemeColor.mediumSpacing),
-      decoration: ThemeColor.cardDecoration(
-        withShadow: true,
-      ),
-      child: Column(
-        children: [
-          Icon(
-            Icons.copyright_rounded,
-            color: ThemeColor.mutedText,
-            size: 20,
-          ),
-          SizedBox(height: ThemeColor.smallSpacing),
-          Text(
-            'copyright'.tr(),
-            style: ThemeColor.captionStyle(
-              color: ThemeColor.mutedText,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
 }

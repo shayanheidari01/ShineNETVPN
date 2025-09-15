@@ -117,8 +117,7 @@ class _ModernNavigationState extends State<ModernNavigation>
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: _buildMobileNavigationItems(),
           ),
         ),
@@ -187,8 +186,8 @@ class _ModernNavigationState extends State<ModernNavigation>
     );
   }
 
-  Widget _buildNavigationItems() {
-    final navItems = [
+  List<_NavigationItem> _getNavigationItems() {
+    return [
       _NavigationItem(
         icon: Iconsax.setting_2,
         label: 'settings'.tr(),
@@ -205,7 +204,10 @@ class _ModernNavigationState extends State<ModernNavigation>
         index: 2,
       ),
     ];
+  }
 
+  Widget _buildNavigationItems() {
+    final navItems = _getNavigationItems();
     return Column(
       children: navItems.map((item) => _buildNavigationItem(item)).toList(),
     );
@@ -322,31 +324,14 @@ class _ModernNavigationState extends State<ModernNavigation>
   }
 
   List<Widget> _buildMobileNavigationItems() {
-    final navItems = [
-      _NavigationItem(
-        icon: Iconsax.setting_2,
-        label: 'settings'.tr(),
-        index: 0,
-      ),
-      _NavigationItem(
-        icon: Iconsax.home_2,
-        label: 'home'.tr(),
-        index: 1,
-      ),
-      _NavigationItem(
-        icon: Iconsax.info_circle,
-        label: 'about'.tr(),
-        index: 2,
-      ),
-    ];
-
+    final navItems = _getNavigationItems();
     return navItems.map((item) => _buildMobileNavigationItem(item)).toList();
   }
 
   Widget _buildMobileNavigationItem(_NavigationItem item) {
     final isSelected = widget.selectedIndex == item.index;
 
-    return Flexible(
+    return Expanded(
       child: AnimatedBuilder(
         animation: _scaleAnimation,
         builder: (context, child) {
@@ -363,8 +348,9 @@ class _ModernNavigationState extends State<ModernNavigation>
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
                   curve: Curves.easeInOut,
+                  width: double.infinity,
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
+                    horizontal: 8,
                     vertical: 12,
                   ),
                   decoration: BoxDecoration(

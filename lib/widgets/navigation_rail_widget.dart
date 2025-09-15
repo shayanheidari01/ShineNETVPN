@@ -70,9 +70,9 @@ class _NavigationRailWidgetState extends State<NavigationRailWidget> {
           return {'countryCode': data['countryCode'] ?? 'Unknown', 'ip': ip};
         }
       }
-      return {'countryCode': 'IR', 'ip': 'Unknown'};
+      return {'countryCode': 'IR', 'ip': 'unknown'.tr()};
     } catch (e) {
-      return {'countryCode': 'IR', 'ip': 'Error'};
+      return {'countryCode': 'IR', 'ip': 'error'.tr()};
     }
   }
 

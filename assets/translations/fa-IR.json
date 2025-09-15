@@ -129,5 +129,21 @@
     "app_safe_mode": "برنامه در حالت امن اجرا می‌شود",
     "error_initialization": "برنامه در هنگام راه‌اندازی با خطا مواجه شد. لطفاً برنامه را مجدداً راه‌اندازی کنید.",
     "security_message": "این برنامه به دلایل امنیتی نمی‌تواند روی دستگاه‌های تغییر یافته یا جیل‌بریک اجرا شود.",
-    "translation_error": "خطای ترجمه"
+    "translation_error": "خطای ترجمه",
+    "update_available": "آپدیت موجود است",
+    "update_message": "نسخه جدید ShineNET VPN موجود است. لطفاً برای ادامه استفاده از برنامه آپدیت کنید.",
+    "current_version": "نسخه فعلی",
+    "latest_version": "آخرین نسخه",
+    "update_required_message": "این آپدیت برای ادامه استفاده از برنامه ضروری است.",
+    "download_update": "دانلود آپدیت",
+    "cannot_open_link": "امکان باز کردن لینک دانلود وجود ندارد",
+    "error_opening_link": "خطا در باز کردن لینک دانلود",
+    "not_available_short": "ناموجود",
+    "connected_status": "CONNECTED",
+    "disconnected_status": "DISCONNECTED",
+    "notification_icon_type": "mipmap",
+    "notification_icon_name": "launcher_icon",
+    "error": "خطا",
+    "unknown": "نامشخص",
+    "unknown_ip": "IP نامشخص"
 }
