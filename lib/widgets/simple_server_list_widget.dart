@@ -48,23 +48,86 @@ class _SimpleServerListWidgetState extends State<SimpleServerListWidget> {
       itemCount: widget.servers.length,
       itemBuilder: (context, index) {
         final server = widget.servers[index];
-        return _buildServerCard(server);
+        return FutureBuilder<Widget>(
+          future: _buildServerCard(server),
+          builder: (context, snapshot) {
+            if (snapshot.hasData) {
+              return snapshot.data!;
+            } else {
+              return _buildLoadingCard(server);
+            }
+          },
+        );
       },
     );
   }
 
-  Widget _buildServerCard(Map<String, dynamic> server) {
+  Widget _buildLoadingCard(Map<String, dynamic> server) {
+    final isSelected = widget.selectedServer == server['config'];
+    final ping = server['ping'] as int? ?? -1;
+    
+    return Container(
+      margin: EdgeInsets.only(bottom: ThemeColor.smallSpacing),
+      decoration: BoxDecoration(
+        color: isSelected ? ThemeColor.primaryColor.withValues(alpha: 0.1) : ThemeColor.cardColor,
+        borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
+        border: isSelected 
+            ? Border.all(color: ThemeColor.primaryColor, width: 2)
+            : null,
+      ),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: ThemeColor.primaryColor.withValues(alpha: 0.1),
+          child: Text('🌐', style: TextStyle(fontSize: 20)),
+        ),
+        title: Text(
+          server['name'] ?? 'Loading...',
+          style: ThemeColor.bodyStyle(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        subtitle: Text(
+          'Loading location...',
+          style: ThemeColor.bodyStyle(
+            color: ThemeColor.mutedText,
+            fontSize: 12,
+          ),
+        ),
+        trailing: Container(
+          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: _getPingColor(ping).withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: _getPingColor(ping), width: 1),
+          ),
+          child: Text(
+            ping > 0 ? (ping >= 9999 ? 'timeout'.tr() : '${ping}ms') : 'not_available_short'.tr(),
+            style: TextStyle(
+              color: _getPingColor(ping),
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        onTap: () => widget.onServerSelected(server['config']),
+      ),
+    );
+  }
+
+  Future<Widget> _buildServerCard(Map<String, dynamic> server) async {
     final isSelected = widget.selectedServer == server['config'];
     final ping = server['ping'] as int? ?? -1;
     final serverConfig = server['config'] as String? ?? '';
     
     // Parse real location from server configuration
-    final locationInfo = ServerLocationParser.parseServerLocation(serverConfig);
-    final country = locationInfo['country']?.isNotEmpty == true 
-        ? locationInfo['country']! 
+    final locationInfo = await ServerLocationParser.parseServerLocation(serverConfig);
+    final displayInfo = ServerLocationParser.getLocationDisplayInfo(locationInfo);
+    
+    final primaryLocation = displayInfo['primary']?.isNotEmpty == true 
+        ? displayInfo['primary']! 
         : (server['name'] ?? 'Unknown Server');
-    final city = locationInfo['city'] ?? '';
-    final flag = locationInfo['flag'] ?? '🏳️';
+    final secondaryInfo = displayInfo['secondary'] ?? '';
+    final flag = displayInfo['flag'] ?? '🏳️';
     
     return Container(
       margin: EdgeInsets.only(bottom: ThemeColor.smallSpacing),
@@ -85,18 +148,18 @@ class _SimpleServerListWidgetState extends State<SimpleServerListWidget> {
             padding: EdgeInsets.all(ThemeColor.mediumSpacing),
             child: Row(
               children: [
-                // Country flag
+                // Flag
                 Container(
                   width: 32,
-                  height: 24,
+                  height: 32,
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: ThemeColor.borderColor, width: 0.5),
+                    color: ThemeColor.primaryColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                   child: Center(
                     child: Text(
                       flag,
-                      style: TextStyle(fontSize: 16),
+                      style: TextStyle(fontSize: 18),
                     ),
                   ),
                 ),
@@ -109,17 +172,24 @@ class _SimpleServerListWidgetState extends State<SimpleServerListWidget> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        city.isNotEmpty ? '$city, $country' : country,
+                        primaryLocation,
                         style: ThemeColor.bodyStyle(
                           fontWeight: FontWeight.w600,
                           fontSize: 14,
                         ),
                       ),
-                      if (server['ip'] != null && server['ip'].isNotEmpty)
+                      if (secondaryInfo.isNotEmpty) ...[
+                        SizedBox(height: 2),
                         Text(
-                          server['ip'],
-                          style: ThemeColor.captionStyle(fontSize: 12),
+                          secondaryInfo,
+                          style: ThemeColor.bodyStyle(
+                            color: ThemeColor.mutedText,
+                            fontSize: 11,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
+                      ],
                     ],
                   ),
                 ),

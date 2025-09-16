@@ -111,6 +111,12 @@
     "language_persian": "فارسی",
     "language_chinese": "چینی",
     "language_russian": "روسی",
+    "language_spanish": "اسپانیایی",
+    "language_french": "فرانسوی",
+    "language_german": "آلمانی",
+    "language_hindi": "هندی",
+    "language_portuguese": "پرتغالی",
+    "choose_preferred_language": "زبان مورد نظر خود را برای رابط برنامه انتخاب کنید.",
     "country_united_states": "ایالات متحده",
     "country_iran": "ایران",
     "country_china": "چین",
@@ -121,7 +127,6 @@
     "ping_slow": "کند",
     "server_automatic": "خودکار",
     "not_available": "ناموجود",
-    "choose_preferred_language": "زبان ترجیحی خود را انتخاب کنید",
     "application_error": "خطای برنامه",
     "security_check_failed": "بررسی امنیت ناموفق",
     "widget_error": "خطای ویجت",
@@ -145,5 +150,6 @@
     "notification_icon_name": "launcher_icon",
     "error": "خطا",
     "unknown": "نامشخص",
-    "unknown_ip": "IP نامشخص"
+    "unknown_ip": "IP نامشخص",
+    "testing_server_ping": "در حال تست پینگ سرورها..."
 }

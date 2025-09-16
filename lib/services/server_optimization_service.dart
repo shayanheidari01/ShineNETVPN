@@ -29,25 +29,27 @@ class ServerOptimizationService {
     'vmess://eyJ2IjoiMiIsInBzIjoiU2hpbmVORVQgU2VydmVyIDMiLCJhZGQiOiIxNzIuNjcuMTMwLjE1NSIsInBvcnQiOiI0NDMiLCJ0eXBlIjoibm9uZSIsImlkIjoiOTVmZWRkM2QtYTc0My00OWRhLThiODYtOWYzZTczOTcyMmQ3IiwiYWlkIjoiMCIsIm5ldCI6IndzIiwicGF0aCI6Ii8iLCJob3N0IjoiIiwidGxzIjoidGxzIn0=',
   ];
   
-  // Cache configuration
+  // Cache and storage keys
   static const String _cacheKey = 'optimized_cached_servers';
   static const String _cacheTimeKey = 'optimized_cache_timestamp';
   static const String _serverHealthKey = 'server_health_data';
-  static const String _userLocationKey = 'user_location_data';
   
-  // Connection configuration
-  static const int _maxConcurrentRequests = 2;
-  static const Duration _requestTimeout = Duration(seconds: 4);
-  static const Duration _connectTimeout = Duration(seconds: 3);
-  static const Duration _pingTimeout = Duration(seconds: 2);
+  // Connection configuration - Optimized for better performance
+  static const int _maxConcurrentRequests = 4;
+  static const Duration _requestTimeout = Duration(seconds: 3);
+  static const Duration _connectTimeout = Duration(seconds: 2);
+  static const Duration _pingTimeout = Duration(milliseconds: 1500);
+  
   // Health monitoring
-  Timer? _healthCheckTimer;
+  late Timer _healthCheckTimer;
   final Map<String, ServerHealthData> _serverHealth = {};
   
+  // Server management
 
   /// Initialize the service
   Future<void> initialize() async {
     _initializeDio();
+    await SharedPreferences.getInstance();
     await _loadCachedData();
     await _getUserLocation();
     _startHealthMonitoring();
@@ -68,16 +70,62 @@ class ServerOptimizationService {
       validateStatus: (status) => status != null && status < 500,
       followRedirects: true,
       maxRedirects: 3,
+      // Enable connection pooling for better performance
+      persistentConnection: true,
     ));
     
-    // Add response compression interceptor
+    // Add interceptors for better error handling and logging
     _dio.interceptors.add(InterceptorsWrapper(
-      onRequest: (options, handler) {
-        options.headers['Cache-Control'] = 'no-cache';
+      onRequest: (options, handler) async {
+        options.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+        options.headers['Pragma'] = 'no-cache';
+        options.headers['Expires'] = '0';
+        
+        // Add request timestamp for timeout tracking
+        options.extra['request_start_time'] = DateTime.now().millisecondsSinceEpoch;
+        
         handler.next(options);
       },
-      onError: (error, handler) {
-        print('Request error: ${error.message}');
+      onResponse: (response, handler) {
+        final startTime = response.requestOptions.extra['request_start_time'] as int?;
+        if (startTime != null) {
+          final duration = DateTime.now().millisecondsSinceEpoch - startTime;
+          print('Request to ${response.requestOptions.uri} completed in ${duration}ms');
+        }
+        handler.next(response);
+      },
+      onError: (error, handler) async {
+        final errorMessage = 'Request error: ${error.message}';
+        print(errorMessage);
+        
+        // Handle specific error cases
+        if (error.type == DioExceptionType.connectionTimeout) {
+          print('Connection timeout to ${error.requestOptions.uri}');
+        } else if (error.type == DioExceptionType.receiveTimeout) {
+          print('Receive timeout from ${error.requestOptions.uri}');
+        } else if (error.response != null) {
+          print('Server responded with ${error.response?.statusCode}');
+        }
+        
+        // Implement retry logic for transient errors
+        if (_shouldRetry(error)) {
+          final requestOptions = error.requestOptions;
+          try {
+            final response = await _dio.request(
+              requestOptions.path,
+              data: requestOptions.data,
+              queryParameters: requestOptions.queryParameters,
+              options: Options(
+                method: requestOptions.method,
+                headers: requestOptions.headers,
+              ),
+            );
+            return handler.resolve(response);
+          } catch (retryError) {
+            return handler.next(error);
+          }
+        }
+        
         handler.next(error);
       },
     ));
@@ -131,60 +179,85 @@ class ServerOptimizationService {
     }
   }
 
-  /// Fetch servers using optimized parallel requests
+  /// Check if a request should be retried
+  bool _shouldRetry(DioException error) {
+    // Only retry on network issues or server errors
+    return error.type == DioExceptionType.connectionError ||
+           error.type == DioExceptionType.receiveTimeout ||
+           error.type == DioExceptionType.sendTimeout ||
+           (error.response?.statusCode ?? 0) >= 500;
+  }
+  
+  /// Check if all parallel requests have completed
+  void _checkAllRequestsCompleted(
+    int completedRequests, 
+    Completer<List<String>> completer, 
+    Map<String, dynamic> errors
+  ) {
+    if (completedRequests >= _serverEndpoints.length && !completer.isCompleted) {
+      if (errors.isNotEmpty) {
+        final errorDetails = errors.entries
+            .map((e) => '${_getEndpointName(e.key)}: ${e.value}')
+            .join('; ');
+        completer.completeError(
+          Exception('All endpoints failed: $errorDetails'),
+          StackTrace.current,
+        );
+      } else {
+        completer.complete(<String>[]);
+      }
+    }
+  }
+
+
+  /// Fetch servers using optimized parallel requests with better error handling
   Future<List<String>> _fetchServersParallel(Function(String)? onStatusUpdate) async {
     final completer = Completer<List<String>>();
     int completedRequests = 0;
-    final errors = <String>[];
+    final errors = <String, dynamic>{}; // Store errors with endpoint info
     
-    // Start all requests concurrently but return on first success
+    // Start all requests concurrently with proper error handling
     for (int i = 0; i < _serverEndpoints.length && i < _maxConcurrentRequests; i++) {
-      _fetchFromEndpoint(_serverEndpoints[i], onStatusUpdate).then((result) {
-        if (!completer.isCompleted && result.isNotEmpty) {
-          completer.complete(result);
+      final endpoint = _serverEndpoints[i];
+      final endpointName = _getEndpointName(endpoint);
+      
+      onStatusUpdate?.call('Trying $endpointName...');
+      
+      unawaited(_fetchFromEndpoint(endpoint, onStatusUpdate).then((result) {
+        if (!completer.isCompleted) {
+          if (result.isNotEmpty) {
+            if (!completer.isCompleted) {
+              completer.complete(result);
+            }
+          } else {
+            errors[endpoint] = 'No valid servers found';
+            _checkAllRequestsCompleted(++completedRequests, completer, errors);
+          }
         }
       }).catchError((error) {
-        errors.add(error.toString());
-        completedRequests++;
+        final errorMessage = error.toString();
+        errors[endpoint] = errorMessage;
+        print('Error from $endpoint: $errorMessage');
         
-        // If all requests failed, complete with error
-        if (completedRequests >= _serverEndpoints.length && !completer.isCompleted) {
-          completer.completeError(Exception('All endpoints failed: ${errors.join(', ')}'));
+        if (!completer.isCompleted) {
+          _checkAllRequestsCompleted(++completedRequests, completer, errors);
         }
-      });
+      }));
     }
     
     // Add timeout for the entire operation
     return completer.future.timeout(
-      Duration(seconds: 1),
-      onTimeout: () => throw Exception('Server fetch timeout'),
+      Duration(seconds: 8), // Increased timeout for better reliability
+      onTimeout: () {
+        if (!completer.isCompleted) {
+          completer.completeError(
+            Exception('Server fetch timed out after 8 seconds'),
+            StackTrace.current,
+          );
+        }
+        return <String>[];
+      },
     );
-  }
-
-  /// Fetch servers from a specific endpoint with optimizations
-  Future<List<String>> _fetchFromEndpoint(String endpoint, Function(String)? onStatusUpdate) async {
-    try {
-      onStatusUpdate?.call('Connecting to ${_getEndpointName(endpoint)}...');
-      
-      final response = await _dio.get(endpoint);
-
-      if (response.statusCode != 200) {
-        throw Exception('HTTP ${response.statusCode}: ${response.statusMessage}');
-      }
-
-      if (response.data == null || response.data.toString().isEmpty) {
-        throw Exception('Empty response from $endpoint');
-      }
-
-      final servers = _processServerData(response.data.toString());
-      onStatusUpdate?.call('Retrieved ${servers.length} servers from ${_getEndpointName(endpoint)}');
-      
-      return servers;
-      
-    } catch (e) {
-      print('Error fetching from $endpoint: $e');
-      rethrow;
-    }
   }
 
   /// Process server data with optimized parsing
@@ -260,7 +333,7 @@ class ServerOptimizationService {
     }
   }
 
-  /// Select optimal servers with improved performance
+  /// Select optimal servers with improved performance and smart filtering
   List<String> _selectOptimalServers(List<String> servers) {
     if (servers.isEmpty) return servers;
 
@@ -268,48 +341,77 @@ class ServerOptimizationService {
     final validServers = servers.where(_isValidServerConfig).toList();
     if (validServers.isEmpty) return servers;
 
-    // Sort servers by priority with optimized scoring
-    final sortedServers = List<String>.from(validServers);
-    
-    // Apply intelligent selection with caching
+    // Apply intelligent selection with caching and prioritization
     final serverScores = <String, double>{};
-    for (final server in sortedServers) {
+    final priorityServers = <String>[];
+    final regularServers = <String>[];
+    
+    for (final server in validServers) {
       final health = _getServerHealth(server);
-      serverScores[server] = _calculateServerScore(server, health);
+      final score = _calculateServerScore(server, health);
+      serverScores[server] = score;
+      
+      // Prioritize servers with good health data
+      if (health != null && health.successRate > 0.8 && health.avgResponseTime < 1000) {
+        priorityServers.add(server);
+      } else {
+        regularServers.add(server);
+      }
     }
     
-    sortedServers.sort((a, b) => 
-      serverScores[b]!.compareTo(serverScores[a]!)
-    );
-
-    // Return all available servers for comprehensive testing
-    return sortedServers;
+    // Sort both lists by score
+    priorityServers.sort((a, b) => serverScores[b]!.compareTo(serverScores[a]!));
+    regularServers.sort((a, b) => serverScores[b]!.compareTo(serverScores[a]!));
+    
+    // Return priority servers first, then regular servers (limit total for performance)
+    final result = <String>[];
+    result.addAll(priorityServers.take(8));
+    result.addAll(regularServers.take(12));
+    
+    return result.isEmpty ? validServers.take(10).toList() : result;
   }
 
-  /// Calculate server score based on health and location
+  /// Calculate server score based on health and location with enhanced algorithm
   double _calculateServerScore(String server, ServerHealthData? health) {
     double score = 0.0;
     
     // Base score
     score += 50.0;
     
-    // Health-based scoring
+    // Health-based scoring with improved weighting
     if (health != null) {
-      // Success rate (0-30 points)
-      score += health.successRate * 30.0;
+      // Success rate (0-40 points) - increased weight for reliability
+      score += health.successRate * 40.0;
       
-      // Response time (0-20 points, faster is better)
+      // Response time (0-30 points, faster is better) - increased weight for speed
       if (health.avgResponseTime > 0) {
-        score += (3000 - health.avgResponseTime) / 3000 * 20.0;
+        final responseScore = (2000 - health.avgResponseTime.clamp(0, 2000)) / 2000 * 30.0;
+        score += responseScore;
       }
       
-      // Recent failures penalty
-      if (health.recentFailures > 0) {
-        score -= health.recentFailures * 5.0;
+      // Recent activity bonus (servers used recently get priority)
+      final hoursSinceLastCheck = DateTime.now().difference(health.lastChecked).inHours;
+      if (hoursSinceLastCheck < 1) {
+        score += 10.0; // Recent activity bonus
+      } else if (hoursSinceLastCheck < 6) {
+        score += 5.0; // Moderate activity bonus
       }
+      
+      // Recent failures penalty (exponential penalty for consecutive failures)
+      if (health.recentFailures > 0) {
+        score -= health.recentFailures * health.recentFailures * 3.0;
+      }
+      
+      // Stability bonus for consistent performers
+      if (health.totalRequests > 10 && health.successRate > 0.9) {
+        score += 15.0;
+      }
+    } else {
+      // New servers get a moderate score to allow testing
+      score += 20.0;
     }
     
-    return score.clamp(0.0, 100.0);
+    return score.clamp(0.0, 150.0);
   }
 
   /// Get server health data
@@ -340,6 +442,60 @@ class ServerOptimizationService {
       return server.hashCode.toString();
     }
     return server.hashCode.toString();
+  }
+
+  /// Fetch servers from a specific endpoint with optimizations
+  Future<List<String>> _fetchFromEndpoint(String endpoint, Function(String)? onStatusUpdate) async {
+    final stopwatch = Stopwatch()..start();
+    final endpointName = _getEndpointName(endpoint);
+    
+    try {
+      onStatusUpdate?.call('Connecting to $endpointName...');
+      
+      final response = await _dio.get<String>(
+        endpoint,
+        options: Options(
+          responseType: ResponseType.plain,
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+          },
+          receiveTimeout: _requestTimeout,
+          sendTimeout: _requestTimeout,
+        ),
+      );
+
+      stopwatch.stop();
+      print('Fetched from $endpointName in ${stopwatch.elapsedMilliseconds}ms');
+      
+      if (response.statusCode == 200 && response.data != null) {
+        onStatusUpdate?.call('Processing response from $endpointName...');
+        final servers = _processServerData(response.data!);
+        if (servers.isNotEmpty) {
+          onStatusUpdate?.call('Found ${servers.length} valid servers from $endpointName');
+          return servers;
+        }
+        throw Exception('No valid servers found in response');
+      }
+      
+      throw Exception('Server responded with status: ${response.statusCode}');
+      
+    } on DioException catch (e) {
+      stopwatch.stop();
+      final errorMsg = 'Network error (${e.type}): ${e.message}';
+      onStatusUpdate?.call('Error: $endpointName - ${e.message}');
+      print('$errorMsg\nURL: $endpoint\nTime: ${stopwatch.elapsedMilliseconds}ms');
+      rethrow;
+      
+    } catch (e, stackTrace) {
+      stopwatch.stop();
+      onStatusUpdate?.call('Failed to process $endpointName');
+      print('Error processing $endpoint: $e\n$stackTrace');
+      rethrow;
+    } finally {
+      if (stopwatch.isRunning) stopwatch.stop();
+    }
   }
 
   /// Test server connection with optimized ping
@@ -387,27 +543,105 @@ class ServerOptimizationService {
   /// Extract server details from configuration
   Map<String, dynamic>? _extractServerDetails(String server) {
     try {
-      final decoded = base64.decode(server);
-      final decodedString = utf8.decode(decoded);
-      final jsonData = json.decode(decodedString);
-      
-      if (jsonData['outbounds'] != null && 
-          (jsonData['outbounds'] as List).isNotEmpty) {
-        final outbound = jsonData['outbounds'][0];
-        if (outbound['settings'] != null && 
-            outbound['settings']['vnext'] != null &&
-            (outbound['settings']['vnext'] as List).isNotEmpty) {
-          final vnext = outbound['settings']['vnext'][0];
-          return {
-            'address': vnext['address'],
-            'port': vnext['port'],
-          };
-        }
+      // Handle different protocol formats
+      if (server.startsWith('vless://')) {
+        return _parseVlessConfig(server);
+      } else if (server.startsWith('vmess://')) {
+        return _parseVmessConfig(server);
+      } else if (server.startsWith('trojan://')) {
+        return _parseTrojanConfig(server);
+      } else if (server.startsWith('ss://')) {
+        return _parseShadowsocksConfig(server);
       }
+      
+      // Fallback: try to decode as base64 JSON (legacy VMess)
+      try {
+        final decoded = base64.decode(server);
+        final decodedString = utf8.decode(decoded);
+        final jsonData = json.decode(decodedString);
+        
+        if (jsonData['outbounds'] != null && 
+            (jsonData['outbounds'] as List).isNotEmpty) {
+          final outbound = jsonData['outbounds'][0];
+          if (outbound['settings'] != null && 
+              outbound['settings']['vnext'] != null &&
+              (outbound['settings']['vnext'] as List).isNotEmpty) {
+            final vnext = outbound['settings']['vnext'][0];
+            return {
+              'address': vnext['address'],
+              'port': vnext['port'],
+            };
+          }
+        }
+      } catch (e) {
+        // Ignore base64 decode errors for URL-based configs
+      }
+      
     } catch (e) {
       print('Error extracting server details: $e');
     }
     return null;
+  }
+
+  /// Parse VLess configuration
+  Map<String, dynamic>? _parseVlessConfig(String config) {
+    try {
+      final uri = Uri.parse(config);
+      return {
+        'address': uri.host,
+        'port': uri.port,
+      };
+    } catch (e) {
+      print('Error parsing VLess config: $e');
+      return null;
+    }
+  }
+
+  /// Parse VMess configuration
+  Map<String, dynamic>? _parseVmessConfig(String config) {
+    try {
+      // Remove vmess:// prefix and decode base64
+      final base64Part = config.substring(8);
+      final decoded = base64.decode(base64Part);
+      final decodedString = utf8.decode(decoded);
+      final jsonData = json.decode(decodedString);
+      
+      return {
+        'address': jsonData['add'] ?? jsonData['address'],
+        'port': int.tryParse(jsonData['port']?.toString() ?? '0') ?? 0,
+      };
+    } catch (e) {
+      print('Error parsing VMess config: $e');
+      return null;
+    }
+  }
+
+  /// Parse Trojan configuration
+  Map<String, dynamic>? _parseTrojanConfig(String config) {
+    try {
+      final uri = Uri.parse(config);
+      return {
+        'address': uri.host,
+        'port': uri.port,
+      };
+    } catch (e) {
+      print('Error parsing Trojan config: $e');
+      return null;
+    }
+  }
+
+  /// Parse Shadowsocks configuration
+  Map<String, dynamic>? _parseShadowsocksConfig(String config) {
+    try {
+      final uri = Uri.parse(config);
+      return {
+        'address': uri.host,
+        'port': uri.port,
+      };
+    } catch (e) {
+      print('Error parsing Shadowsocks config: $e');
+      return null;
+    }
   }
 
   /// Optimized ping test with connection pooling
@@ -457,8 +691,8 @@ class ServerOptimizationService {
       health.recentFailures++;
     }
     
-    // Reset recent failures after some time
-    if (now.difference(health.lastFailureReset) > const Duration(hours: 1)) {
+    // Reset recent failures after some time - Reduced to 15 minutes
+    if (now.difference(health.lastFailureReset) > const Duration(minutes: 15)) {
       health.recentFailures = 0;
       health.lastFailureReset = now;
     }
@@ -469,14 +703,7 @@ class ServerOptimizationService {
   /// Get user location for intelligent server selection
   Future<void> _getUserLocation() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final locationString = prefs.getString(_userLocationKey);
-      
-      if (locationString != null) {
-        final locationData = json.decode(locationString);
-        // Location processing removed for optimization
-      }
-      
+      // Location processing removed for optimization
       // For now, we'll skip location services to avoid permission issues
       // This can be implemented later with proper permission handling
     } catch (e) {
@@ -484,10 +711,10 @@ class ServerOptimizationService {
     }
   }
 
-  /// Start background health monitoring
+  /// Start background health monitoring - Reduced to 15 minutes
   void _startHealthMonitoring() {
-    _healthCheckTimer?.cancel();
-    _healthCheckTimer = Timer.periodic(Duration(hours: 1), (timer) {
+    _healthCheckTimer.cancel();
+    _healthCheckTimer = Timer.periodic(Duration(minutes: 15), (timer) {
       _performBackgroundHealthCheck();
     });
   }
@@ -532,8 +759,8 @@ class ServerOptimizationService {
       final cacheTime = DateTime.parse(cacheTimeString);
       final age = DateTime.now().difference(cacheTime);
       
-      // Use shorter cache for better freshness
-      return age < Duration(minutes: 10);
+      // Use 15 minute cache for consistency
+      return age < Duration(minutes: 15);
     } catch (e) {
       print('Error checking cache validity: $e');
       return false;
@@ -582,8 +809,9 @@ class ServerOptimizationService {
 
   /// Cleanup resources
   void dispose() {
-    _healthCheckTimer?.cancel();
+    _healthCheckTimer.cancel();
     _dio.close();
+    _saveHealthData();
   }
 }
 

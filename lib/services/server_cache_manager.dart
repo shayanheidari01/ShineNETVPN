@@ -15,10 +15,10 @@ class ServerCacheManager {
   static const String _healthCacheKey = 'server_health_cache_v2';
   static const String _lastFetchKey = 'last_fetch_timestamp_v2';
   
-  // Cache configuration
-  static const Duration _serverCacheExpiry = Duration(hours: 2);
-  static const Duration _pingCacheExpiry = Duration(minutes: 30);
-  static const Duration _healthCacheExpiry = Duration(hours: 1);
+  // Cache configuration - Reduced to 15 minutes for faster updates
+  static const Duration _serverCacheExpiry = Duration(minutes: 15);
+  static const Duration _pingCacheExpiry = Duration(minutes: 15);
+  static const Duration _healthCacheExpiry = Duration(minutes: 15);
 
   /// Cache server list with metadata
   Future<void> cacheServers(List<String> servers, {

@@ -443,7 +443,7 @@ class _AboutScreenState extends State<AboutScreen> {
                   child: _buildInfoItem(
                     icon: Icons.update_rounded,
                     title: 'version'.tr(),
-                    value: version ?? '1.0.4',
+                    value: version ?? '1.0.5',
                     color: ThemeColor.primaryColor,
                   ),
                 ),

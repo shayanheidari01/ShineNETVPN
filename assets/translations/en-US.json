@@ -111,6 +111,12 @@
     "language_persian": "Persian",
     "language_chinese": "Chinese",
     "language_russian": "Russian",
+    "language_spanish": "Spanish",
+    "language_french": "French",
+    "language_german": "German",
+    "language_hindi": "Hindi",
+    "language_portuguese": "Portuguese",
+    "choose_preferred_language": "Choose your preferred language for the app interface.",
     "country_united_states": "United States",
     "country_iran": "Iran",
     "country_china": "China",
@@ -121,7 +127,6 @@
     "ping_slow": "Slow",
     "server_automatic": "Automatic",
     "not_available": "N/A",
-    "choose_preferred_language": "Choose your preferred language",
     "application_error": "Application Error",
     "security_check_failed": "Security Check Failed",
     "widget_error": "Widget Error",
@@ -163,5 +168,6 @@
     "notification_icon_name": "launcher_icon",
     "error": "Error",
     "unknown": "Unknown",
-    "unknown_ip": "Unknown IP"
+    "unknown_ip": "Unknown IP",
+    "testing_server_ping": "Testing server ping..."
 }

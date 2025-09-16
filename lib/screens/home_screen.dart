@@ -2228,7 +2228,7 @@ class _HomePageState extends State<HomePage> {
         final ping = serverPings[server] ?? 0;
         
         // Parse real location from server configuration
-        final locationInfo = ServerLocationParser.parseServerLocation(server);
+        final locationInfo = await ServerLocationParser.parseServerLocation(server);
         final realCountryCode = locationInfo['countryCode']?.isNotEmpty == true 
             ? locationInfo['countryCode']! 
             : countryCode;
@@ -2292,7 +2292,7 @@ class _HomePageState extends State<HomePage> {
 
       // Start V2Ray connection
       flutterV2ray.startV2Ray(
-        remark: v2rayURL.remark.isNotEmpty ? v2rayURL.remark : 'ShineNET VPN',
+        remark: 'ShineNET VPN',
         config: config,
         proxyOnly: proxyOnly,
         bypassSubnets: bypassSubnets,

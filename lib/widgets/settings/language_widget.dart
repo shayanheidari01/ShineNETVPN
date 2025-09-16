@@ -39,6 +39,16 @@ class _LanguageWidgetState extends State<LanguageWidget> {
       context.setLocale(Locale('zh', 'CN'));
     } else if (language == 'language_russian'.tr()) {
       context.setLocale(Locale('ru', 'RU'));
+    } else if (language == 'language_spanish'.tr()) {
+      context.setLocale(Locale('es', 'ES'));
+    } else if (language == 'language_french'.tr()) {
+      context.setLocale(Locale('fr', 'FR'));
+    } else if (language == 'language_german'.tr()) {
+      context.setLocale(Locale('de', 'DE'));
+    } else if (language == 'language_hindi'.tr()) {
+      context.setLocale(Locale('hi', 'IN'));
+    } else if (language == 'language_portuguese'.tr()) {
+      context.setLocale(Locale('pt', 'BR'));
     }
   }
 
@@ -103,6 +113,41 @@ class _LanguageWidgetState extends State<LanguageWidget> {
                     'language_russian'.tr(),
                     '🇷🇺',
                     'Русский',
+                  ),
+                  SizedBox(height: ThemeColor.smallSpacing),
+                  _buildSimpleLanguageCard(
+                    context,
+                    'language_spanish'.tr(),
+                    '🇪🇸',
+                    'Español',
+                  ),
+                  SizedBox(height: ThemeColor.smallSpacing),
+                  _buildSimpleLanguageCard(
+                    context,
+                    'language_french'.tr(),
+                    '🇫🇷',
+                    'Français',
+                  ),
+                  SizedBox(height: ThemeColor.smallSpacing),
+                  _buildSimpleLanguageCard(
+                    context,
+                    'language_german'.tr(),
+                    '🇩🇪',
+                    'Deutsch',
+                  ),
+                  SizedBox(height: ThemeColor.smallSpacing),
+                  _buildSimpleLanguageCard(
+                    context,
+                    'language_hindi'.tr(),
+                    '🇮🇳',
+                    'हिंदी',
+                  ),
+                  SizedBox(height: ThemeColor.smallSpacing),
+                  _buildSimpleLanguageCard(
+                    context,
+                    'language_portuguese'.tr(),
+                    '🇧🇷',
+                    'Português',
                   ),
                 ],
               ),

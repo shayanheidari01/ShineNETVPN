@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Flutter renderer configuration -->
+    <bool name="flutter_enable_impeller">false</bool>
+    <string name="flutter_renderer_backend">skia</string>
+    
+    <!-- GPU compatibility settings -->
+    <bool name="flutter_enable_vulkan">false</bool>
+    <bool name="flutter_force_software_rendering">false</bool>
+</resources>

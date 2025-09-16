@@ -14,10 +14,15 @@ import 'package:safe_device/safe_device.dart';
 import 'dart:async';
 import 'dart:developer' as developer;
 
-void main() async {
-  runZonedGuarded(
+void main() {
+  // Initialize Flutter bindings first
+  final binding = WidgetsFlutterBinding.ensureInitialized();
+  
+  // Run the app in a zone with error handling
+  runZonedGuarded<Future<void>>(
     () async {
       try {
+        // Initialize app components
         await _initializeApp();
       } catch (error, stackTrace) {
         developer.log(
@@ -26,22 +31,41 @@ void main() async {
           stackTrace: stackTrace,
           name: 'main',
         );
-        // Show fallback error app
-        runApp(_buildErrorApp(error.toString()));
+        // Ensure we're in the root zone before running the error app
+        if (Zone.current == Zone.root) {
+          runApp(_buildErrorApp(error.toString()));
+        } else {
+          Zone.root.run(() {
+            runApp(_buildErrorApp(error.toString()));
+          });
+        }
       }
     },
-    (error, stackTrace) {
+    (Object error, StackTrace stackTrace) {
       developer.log(
         'Uncaught error in app',
         error: error,
         stackTrace: stackTrace,
         name: 'main',
       );
-      // Log to crash reporting service if needed
+      // In production, you might want to send to crashlytics or similar
       if (!kDebugMode) {
-        // In production, you might want to send to crashlytics or similar
+        // Handle production error reporting here
       }
     },
+    zoneSpecification: ZoneSpecification(
+      handleUncaughtError: (Zone self, ZoneDelegate parent, Zone zone, 
+          Object error, StackTrace stackTrace) {
+        // Ensure uncaught errors are properly logged
+        developer.log(
+          'Uncaught error in zone',
+          error: error,
+          stackTrace: stackTrace,
+          name: 'zone',
+        );
+        parent.handleUncaughtError(zone, error, stackTrace);
+      },
+    ),
   );
 }
 
