@@ -34,7 +34,7 @@ ShineNET VPN is a **free, open-source** VPN application designed to provide secu
 
 ### 📥 Download
 
-**Latest Version: v1.0.5**
+**Latest Version: v1.0.6**
 
 [![Download APK](https://img.shields.io/badge/Download-APK-blue?style=for-the-badge&logo=android)](https://github.com/shayanheidari01/ShineNETVPN/releases/latest)
 
@@ -61,6 +61,19 @@ We welcome contributions! Please feel free to submit pull requests, report bugs,
 - **Telegram**: [@ShineNETVPN](https://t.me/ShineNETVPN)
 - **Issues**: [GitHub Issues](https://github.com/shayanheidari01/ShineNETVPN/issues)
 
+### 🔐 Privacy Policy
+
+See our full privacy policy here: [PRIVACY.md](PRIVACY.md)
+
+### 📝 Changelog
+
+v1.0.6
+- Improved connection state handling in `HomeScreen` and navigation badges (case-insensitive, supports RUNNING/STARTED).
+- Fixed notification DISCONNECT behavior and added a short suppression window to prevent auto-reconnect after manual disconnect.
+- Unified V2Ray instance across services and UI for reliable status updates.
+- Server selection modal improvements with live ping, full server list, and intelligent sorting.
+- Better error handling and fallbacks for server fetching and connection.
+
 ### 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
@@ -86,7 +99,7 @@ ShineNET VPN یک اپلیکیشن **رایگان و متن‌باز** است ک
 
 ### 📥 دانلود
 
-**آخرین نسخه: v1.0.5**
+**آخرین نسخه: v1.0.6**
 
 [![دانلود APK](https://img.shields.io/badge/دانلود-APK-blue?style=for-the-badge&logo=android)](https://github.com/shayanheidari01/ShineNETVPN/releases/latest)
 
@@ -124,7 +137,7 @@ ShineNET VPN 是一款**免费开源**的 VPN 应用程序，旨在提供安全�
 
 ### 📥 下载
 
-**最新版本: v1.0.5**
+**最新版本: v1.0.6**
 
 [![下载 APK](https://img.shields.io/badge/下载-APK-blue?style=for-the-badge&logo=android)](https://github.com/shayanheidari01/ShineNETVPN/releases/latest)
 
@@ -149,7 +162,7 @@ ShineNET VPN — это **бесплатное приложение с откр�
 
 ### 📥 Скачать
 
-**Последняя версия: v1.0.5**
+**Последняя версия: v1.0.6**
 
 [![Скачать APK](https://img.shields.io/badge/Скачать-APK-blue?style=for-the-badge&logo=android)](https://github.com/shayanheidari01/ShineNETVPN/releases/latest)
 

@@ -1,7 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_v2ray/flutter_v2ray.dart';
+import 'package:flutter_v2ray_client/flutter_v2ray.dart';
 import 'package:iconsax/iconsax.dart';
 import 'dart:math';
 import 'dart:io';
@@ -290,8 +290,9 @@ class _NavigationRailWidgetState extends State<NavigationRailWidget> {
     return ValueListenableBuilder<V2RayStatus>(
       valueListenable: widget.singStatus,
       builder: (context, status, _) {
-        final isConnected = status.state == 'CONNECTED';
-        final isConnecting = status.state == 'CONNECTING';
+        final normalized = status.state.toUpperCase();
+        final isConnected = normalized == 'CONNECTED';
+        final isConnecting = normalized == 'CONNECTING';
         
         Color statusColor;
         IconData statusIcon;

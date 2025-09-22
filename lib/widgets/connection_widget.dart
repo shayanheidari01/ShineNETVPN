@@ -91,7 +91,7 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
   }
 
   void _updateAnimationState() {
-    if (widget.status.toUpperCase() == "connected_status".tr()) {
+    if (widget.status.toUpperCase() == "CONNECTED") {
       _waveController.repeat(reverse: true);
     } else {
       _waveController.stop();
@@ -101,32 +101,40 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
 
   Color _getShadowColor() {
     if (widget.isLoading) {
-      return ThemeColor.connectingColor;
-    } else if (widget.status.toUpperCase() == "connected_status".tr()) {
-      return ThemeColor.connectedColor;
+      if (_isDisconnectingState()) {
+        return ThemeColor.warningColor; // Orange for disconnecting
+      }
+      return ThemeColor.connectingColor; // Blue for connecting
+    } else if (widget.status.toUpperCase() == "CONNECTED") {
+      return ThemeColor.connectedColor; // Green for connected
     } else {
-      return ThemeColor.disconnectedColor;
+      return ThemeColor.disconnectedColor; // Red for disconnected
     }
   }
-  
+
   Color _getButtonColor() {
     if (widget.isLoading) {
       return ThemeColor.connectingColor.withValues(alpha: 0.2);
-    } else if (widget.status.toUpperCase() == "connected_status".tr()) {
+    } else if (widget.status.toUpperCase() == "CONNECTED") {
       return ThemeColor.connectedColor.withValues(alpha: 0.2);
     } else {
       return ThemeColor.errorColor.withValues(alpha: 0.2);
     }
   }
-  
+
   IconData _getStatusIcon() {
-    if (widget.status.toUpperCase() == "connected_status".tr()) {
-      return Icons.shield_rounded;
+    if (widget.isLoading) {
+      if (_isDisconnectingState()) {
+        return Icons.power_off_rounded; // Power off icon for disconnecting
+      }
+      return Icons.power_settings_new_rounded; // Power icon for connecting
+    } else if (widget.status.toUpperCase() == "CONNECTED") {
+      return Icons.shield_rounded; // Shield icon for connected
     } else {
-      return Icons.power_settings_new_rounded;
+      return Icons.power_settings_new_rounded; // Power icon for disconnected
     }
   }
-  
+
   @override
   void didUpdateWidget(ConnectionWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -139,8 +147,34 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
     }
   }
 
+  /// Check if the current state indicates disconnecting process
+  bool _isDisconnectingState() {
+    // Only consider it disconnecting if we're currently connected and then start loading
+    // This prevents confusion during initial connection attempts
+    final currentStatus = widget.status.toUpperCase();
+    
+    // If already connected and now loading, it's likely disconnecting
+    if (currentStatus == "CONNECTED" && widget.isLoading) {
+      return true;
+    }
+    
+    // Check explicit disconnecting states
+    final status = widget.status.toLowerCase();
+    return status.contains('disconnect') ||
+           status == 'disconnecting' ||
+           status.contains('stopping') ||
+           status.contains('stop');
+  }
+
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    final isSmallScreen = size.width < 350 || size.height < 700;
+
+    final buttonSize = isSmallScreen ? 140.0 : 160.0;
+    final iconSize = isSmallScreen ? 70.0 : 80.0;
+    final waveSize = isSmallScreen ? 160.0 : 180.0;
+
     return Column(
       children: [
         GestureDetector(
@@ -170,7 +204,7 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
                     alignment: Alignment.center,
                     children: [
                       // Outer wave effect for connected state
-                      if (widget.status.toUpperCase() == "connected_status".tr())
+                      if (widget.status.toUpperCase() == "CONNECTED")
                         ...List.generate(3, (index) {
                           final delay = index * 0.3;
                           final animValue =
@@ -180,8 +214,8 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
                             child: Opacity(
                               opacity: (1.0 - animValue) * 0.3,
                               child: Container(
-                                width: 180,
-                                height: 180,
+                                width: waveSize,
+                                height: waveSize,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   border: Border.all(
@@ -227,8 +261,8 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
                                   },
                             customBorder: CircleBorder(),
                             child: Container(
-                              height: 160,
-                              width: 160,
+                              height: buttonSize,
+                              width: buttonSize,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 gradient: RadialGradient(
@@ -238,7 +272,8 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
                                   ],
                                 ),
                                 border: Border.all(
-                                  color: _getShadowColor().withValues(alpha: 0.4),
+                                  color:
+                                      _getShadowColor().withValues(alpha: 0.4),
                                   width: 3,
                                 ),
                               ),
@@ -246,7 +281,7 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
                                 child: widget.isLoading
                                     ? LoadingAnimationWidget.threeArchedCircle(
                                         color: ThemeColor.primaryColor,
-                                        size: 70,
+                                        size: iconSize,
                                       )
                                     : AnimatedSwitcher(
                                         duration: ThemeColor.mediumAnimation,
@@ -263,7 +298,7 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
                                           _getStatusIcon(),
                                           key: ValueKey(widget.status),
                                           color: _getShadowColor(),
-                                          size: 80,
+                                          size: iconSize,
                                         ),
                                       ),
                               ),
@@ -298,12 +333,16 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
             children: [
               Text(
                 widget.isLoading
-                    ? 'connecting'.tr()
-                    : widget.status.toUpperCase() == "disconnected_status".tr()
+                    ? (_isDisconnectingState()
+                        ? 'disconnecting'.tr()
+                        : 'connecting'.tr())
+                    : widget.status.toUpperCase() == "DISCONNECTED" ||
+                            widget.status.isEmpty ||
+                            widget.status.toLowerCase() == "disconnected"
                         ? 'disconnected'.tr()
                         : 'connected'.tr(),
                 style: ThemeColor.headingStyle(
-                  fontSize: 18,
+                  fontSize: isSmallScreen ? 16 : 18,
                   color: _getShadowColor(),
                 ),
                 textAlign: TextAlign.center,
@@ -327,6 +366,7 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
                 child: Text(
                   _getStatusDescription(),
                   style: ThemeColor.captionStyle(
+                    fontSize: isSmallScreen ? 12 : 14,
                     color: _getShadowColor(),
                     fontWeight: FontWeight.w500,
                   ),
@@ -344,8 +384,11 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
 
   String _getStatusDescription() {
     if (widget.isLoading) {
+      if (_isDisconnectingState()) {
+        return 'disconnecting_secure_connection'.tr();
+      }
       return 'establishing_secure_connection'.tr();
-    } else if (widget.status.toUpperCase() == "connected_status".tr()) {
+    } else if (widget.status.toUpperCase() == "CONNECTED") {
       return 'connection_secure_private'.tr();
     } else {
       return 'tap_connect_vpn'.tr();

@@ -1,10 +1,12 @@
 import 'package:shinenet_vpn/common/theme.dart';
+import 'package:shinenet_vpn/common/font_helper.dart';
 import 'package:shinenet_vpn/widgets/settings/blocked_apps_widget.dart';
 import 'package:shinenet_vpn/widgets/settings/language_widget.dart';
+import 'package:shinenet_vpn/widgets/settings/font_accessibility_widget.dart';
+import 'package:shinenet_vpn/services/language_manager.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class SettingsWidget extends StatefulWidget {
   SettingsWidget({super.key});
@@ -14,7 +16,7 @@ class SettingsWidget extends StatefulWidget {
 }
 
 class _SettingsWidgetState extends State<SettingsWidget> {
-  String? _selectedLanguage;
+  String _selectedLanguage = '';
 
   @override
   void initState() {
@@ -22,12 +24,33 @@ class _SettingsWidgetState extends State<SettingsWidget> {
     _loadSelectedLanguage();
   }
 
-  // بارگذاری زبان از SharedPreferences
+  // Refresh language when returning from language screen
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _loadSelectedLanguage();
+  }
+
+  // Load current language from LanguageManager using saved preference
   void _loadSelectedLanguage() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _selectedLanguage = prefs.getString('selectedLanguage') ?? 'English';
-    });
+    try {
+      final currentLang =
+          await LanguageManager.getCurrentLanguageFromPreference();
+      if (mounted) {
+        setState(() {
+          _selectedLanguage = LanguageManager.getLanguageDisplayName(
+            currentLang.code,
+            context,
+          );
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _selectedLanguage = 'language_english'.tr();
+        });
+      }
+    }
   }
 
   @override
@@ -45,26 +68,22 @@ class _SettingsWidgetState extends State<SettingsWidget> {
               pinned: false,
               expandedHeight: 80,
               automaticallyImplyLeading: false,
-              flexibleSpace: FlexibleSpaceBar(
-                titlePadding: EdgeInsets.symmetric(
-                  horizontal: ThemeColor.mediumSpacing,
-                  vertical: ThemeColor.smallSpacing,
-                ),
-                title: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'setting'.tr(),
-                      style: ThemeColor.headingStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
+              title: Container(
+                width: double.infinity,
+                height: 80,
+                alignment: Alignment.center,
+                child: Text(
+                  'setting'.tr(),
+                  style: FontHelper.getHeadingStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                    context: context,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ),
-            
+
             // Main content
             SliverPadding(
               padding: EdgeInsets.all(ThemeColor.mediumSpacing),
@@ -73,7 +92,7 @@ class _SettingsWidgetState extends State<SettingsWidget> {
                   // Simplified settings sections
                   _buildSimplifiedSettingsSection(),
                   SizedBox(height: ThemeColor.largeSpacing),
-                  
+
                   // Simplified app info
                   _buildSimplifiedAppInfo(),
                 ]),
@@ -97,7 +116,7 @@ class _SettingsWidgetState extends State<SettingsWidget> {
             // Security info
             _buildSecurityInfo(),
             SizedBox(height: ThemeColor.largeSpacing),
-            
+
             // Settings options
             _buildSettingsOptions(),
           ],
@@ -138,17 +157,18 @@ class _SettingsWidgetState extends State<SettingsWidget> {
               children: [
                 Text(
                   'privacy_security'.tr(),
-                  style: ThemeColor.bodyStyle(
+                  style: FontHelper.getBodyStyle(
                     fontWeight: FontWeight.w600,
-                    color: ThemeColor.primaryText,
+                    context: context,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
                 SizedBox(height: 4),
                 Text(
                   'no_logs_policy'.tr(),
-                  style: ThemeColor.captionStyle(
+                  style: FontHelper.getCaptionStyle(
                     color: ThemeColor.successColor.withValues(alpha: 0.8),
+                    context: context,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -181,21 +201,36 @@ class _SettingsWidgetState extends State<SettingsWidget> {
         _buildSettingOption(
           icon: Icons.translate_rounded,
           title: 'language'.tr(),
-          subtitle: _selectedLanguage ?? 'language_english'.tr(),
+          subtitle: _selectedLanguage.isNotEmpty
+              ? _selectedLanguage
+              : 'language_english'.tr(),
           color: ThemeColor.warningColor,
           onTap: () {
             HapticFeedback.lightImpact();
             Navigator.of(context)
                 .push(
               MaterialPageRoute(
-                builder: (context) => LanguageWidget(
-                  selectedLanguage: _selectedLanguage!,
-                ),
+                builder: (context) => const LanguageWidget(),
               ),
             )
                 .then((value) {
               _loadSelectedLanguage();
             });
+          },
+        ),
+        SizedBox(height: ThemeColor.mediumSpacing),
+        _buildSettingOption(
+          icon: Icons.text_fields_rounded,
+          title: 'font_accessibility'.tr(),
+          subtitle: 'font_size_settings'.tr(),
+          color: ThemeColor.primaryColor.withValues(alpha: 0.8),
+          onTap: () {
+            HapticFeedback.lightImpact();
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => const FontAccessibilityWidget(),
+              ),
+            );
           },
         ),
       ],
@@ -245,16 +280,17 @@ class _SettingsWidgetState extends State<SettingsWidget> {
                   children: [
                     Text(
                       title,
-                      style: ThemeColor.bodyStyle(
+                      style: FontHelper.getBodyStyle(
                         fontWeight: FontWeight.w600,
-                        color: ThemeColor.primaryText,
+                        context: context,
                       ),
                     ),
                     SizedBox(height: 4),
                     Text(
                       subtitle,
-                      style: ThemeColor.captionStyle(
+                      style: FontHelper.getCaptionStyle(
                         color: ThemeColor.mutedText,
+                        context: context,
                       ),
                     ),
                   ],
@@ -291,9 +327,9 @@ class _SettingsWidgetState extends State<SettingsWidget> {
                 Expanded(
                   child: Text(
                     'app_information'.tr(),
-                    style: ThemeColor.bodyStyle(
+                    style: FontHelper.getBodyStyle(
                       fontWeight: FontWeight.w600,
-                      color: ThemeColor.primaryText,
+                      context: context,
                     ),
                   ),
                 ),
@@ -306,7 +342,7 @@ class _SettingsWidgetState extends State<SettingsWidget> {
                   child: _buildInfoCard(
                     icon: Icons.update_rounded,
                     title: 'version'.tr(),
-                    value: '1.0.5',
+                    value: '1.0.6',
                     color: ThemeColor.primaryColor,
                   ),
                 ),
@@ -349,21 +385,22 @@ class _SettingsWidgetState extends State<SettingsWidget> {
           SizedBox(height: ThemeColor.smallSpacing),
           Text(
             value,
-            style: ThemeColor.bodyStyle(
+            style: FontHelper.getBodyStyle(
               fontWeight: FontWeight.w700,
               color: color,
               fontSize: 16,
+              context: context,
             ),
           ),
           Text(
             title,
-            style: ThemeColor.captionStyle(
+            style: FontHelper.getCaptionStyle(
               color: color.withValues(alpha: 0.8),
+              context: context,
             ),
           ),
         ],
       ),
     );
   }
-
 }

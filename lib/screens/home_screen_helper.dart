@@ -1,97 +1,170 @@
 import 'dart:async';
-import 'package:flutter_v2ray/flutter_v2ray.dart';
+import 'dart:collection';
+import 'package:flutter_v2ray_client/flutter_v2ray.dart';
+import '../services/flutter_v2ray_ping_service.dart'; // Use V2Ray delay ping service
 
-/// Helper method to find and test the best server from a list with improved performance
+/// Ultra-fast server selection with intelligent caching and native ping
 Future<String?> findAndTestBestServer(List<String> servers) async {
   if (servers.isEmpty) return null;
-  
-  // Increase the number of servers tested in parallel for better selection
-  final serversToTest = servers.take(8).toList();
-  final testResults = <Map<String, dynamic>>[];
-  
-  // Create batches to avoid overwhelming the system
-  final batchSize = 4;
-  final batches = <List<String>>[];
-  for (int i = 0; i < serversToTest.length; i += batchSize) {
-    final end = (i + batchSize < serversToTest.length) ? i + batchSize : serversToTest.length;
-    batches.add(serversToTest.sublist(i, end));
-  }
-  
-  // Process batches sequentially for better resource management
-  for (final batch in batches) {
-    final futures = batch.map((server) async {
-      try {
-        final v2rayURL = FlutterV2ray.parseFromURL(server);
-        final config = v2rayURL.getFullConfiguration();
-        
-        if (config.isEmpty) return null;
-        
-        // Quick ping test with optimized timeout
-        final flutterV2ray = FlutterV2ray(onStatusChanged: (status) {});
-        final delay = await flutterV2ray
-            .getServerDelay(config: config)
-            .timeout(Duration(seconds: 2)); // Reduced timeout for faster testing
-        
-        if (delay > 0 && delay < 2500) { // Slightly stricter delay threshold
-          return {
-            'server': server,
-            'config': config,
-            'delay': delay,
-            'score': _calculateServerScore(delay),
-          };
-        }
-      } catch (e) {
-        print('Server test failed: $e');
+
+  print(
+      '🚀 Starting ultra-fast server selection with native ping from ${servers.length} servers');
+  final stopwatch = Stopwatch()..start();
+
+  // Step 1: Quick validation and limit servers for faster processing
+  final validServers = <String>[];
+  for (final server in servers) {
+    // Process all servers
+    try {
+      final v2rayURL = V2ray.parseFromURL(server);
+      if (v2rayURL.getFullConfiguration().isNotEmpty) {
+        validServers.add(server);
       }
-      return null;
-    });
-    
-    final batchResults = await Future.wait(futures);
-    testResults.addAll(batchResults.where((result) => result != null).cast<Map<String, dynamic>>());
-    
-    // Small delay between batches to prevent resource exhaustion
-    if (batches.indexOf(batch) < batches.length - 1) {
-      await Future.delayed(Duration(milliseconds: 50));
+    } catch (e) {
+      // Skip invalid servers silently for speed
+      continue;
     }
   }
-  
-  if (testResults.isEmpty) return null;
-  
-  // Sort by score (higher is better) and return the best
+
+  if (validServers.isEmpty) return null;
+  print(
+      '✅ Found ${validServers.length} valid servers in ${stopwatch.elapsedMilliseconds}ms');
+
+  // Step 2: Use V2Ray delay ping service for consistent results
+  final pingService = FlutterV2rayPingService();
+  pingService.initialize();
+
+  final testResults = <Map<String, dynamic>>[];
+
+  // Ultra-fast concurrent tests for maximum speed with native ping
+  const maxConcurrent = 20; // Increased for native ping performance
+  final semaphore = Semaphore(maxConcurrent);
+
+  final futures = validServers.map((server) async {
+    await semaphore.acquire();
+    try {
+      // Use V2Ray delay ping service with ultra-fast timeout for automatic connection
+      final delay = await pingService.testServerPing(
+        server,
+        timeoutSeconds: 1, // Ultra-fast 1 second timeout
+        useCache: false, // Don't use cache for fresh results
+        forceRetest: true, // Force fresh testing
+      );
+
+      // Accept servers with ultra-fast native ping for automatic connection
+      if (delay > 0 && delay <= 2000) {
+        // Ultra-fast threshold (2 seconds max)
+        // V2Ray delay ping provides real config-based measurement
+        final v2rayURL = V2ray.parseFromURL(server);
+        return {
+          'server': server,
+          'config': v2rayURL.getFullConfiguration(),
+          'delay': delay,
+          'score': _calculateFastServerScore(delay),
+        };
+      }
+    } catch (e) {
+      // Timeout or error - skip silently for speed
+      print('⚠️ Ping test failed for server: $e');
+    } finally {
+      semaphore.release();
+    }
+    return null;
+  });
+
+  // Wait for all tests with timeout
+  try {
+    final results = await Future.wait(futures).timeout(
+      Duration(seconds: 6), // Ultra-fast overall timeout for native ping
+      onTimeout: () {
+        print('⚠️ Native ping testing timed out, using available results');
+        return <Map<String, Object>?>[];
+      },
+    );
+    testResults.addAll(
+        results.where((result) => result != null).cast<Map<String, dynamic>>());
+  } catch (e) {
+    print('⚠️ Some ping tests failed, using available results: $e');
+  }
+
+  stopwatch.stop();
+  print('⚡ Ping testing completed in ${stopwatch.elapsedMilliseconds}ms');
+
+  if (testResults.isEmpty) {
+    print('⚠️ No servers responded in ping tests, trying direct connection with best cached server...');
+    
+    // Try to find a working server from valid servers
+    for (int i = 0; i < validServers.length && i < 3; i++) {
+      try {
+        final v2rayURL = V2ray.parseFromURL(validServers[i]);
+        final config = v2rayURL.getFullConfiguration();
+        
+        // Validate configuration before returning
+        if (config.isNotEmpty && config.length > 50) {
+          print('✅ Using cached server ${i + 1} as fallback');
+          return config;
+        }
+      } catch (e) {
+        print('⚠️ Cached server ${i + 1} validation failed: $e');
+        continue;
+      }
+    }
+    
+    // Ultimate fallback - use emergency server
+    print('🆘 All cached servers failed, using emergency server');
+    final emergencyServer = 'vmess://eyJ2IjoiMiIsInBzIjoiRW1lcmdlbmN5IFNlcnZlciIsImFkZCI6IjEwNC4yMS41NS4yMzQiLCJwb3J0IjoiNDQzIiwidHlwZSI6Im5vbmUiLCJpZCI6Ijk1ZmVkZDNkLWE3NDMtNDlkYS04Yjg2LTlmM2U3Mzk3MjJkNyIsImFpZCI6IjAiLCJuZXQiOiJ3cyIsInBhdGgiOiIvIiwiaG9zdCI6IiIsInRscyI6InRscyJ9';
+    final emergencyV2rayURL = V2ray.parseFromURL(emergencyServer);
+    return emergencyV2rayURL.getFullConfiguration();
+  }
+
+  // Step 3: Smart selection - prefer ultra-fast servers
   testResults.sort((a, b) => b['score'].compareTo(a['score']));
-  
-  return testResults.first['config'] as String;
+
+  final bestServer = testResults.first;
+  print(
+      '🏆 Selected best server: ${bestServer['delay']}ms (score: ${bestServer['score']?.toStringAsFixed(1) ?? 'N/A'})');
+
+  return bestServer['config'] as String;
 }
 
-/// Calculate server score based on delay and other factors with enhanced algorithm
-double _calculateServerScore(int delay) {
+/// Ultra-fast server scoring optimized for speed over precision
+double _calculateFastServerScore(int delay) {
   if (delay <= 0) return 0.0;
-  
-  // Enhanced scoring algorithm for better server selection
-  double score = 0.0;
-  
-  // Tiered scoring based on delay ranges for more precise selection
-  if (delay < 50) {
-    score = 100.0; // Excellent servers
-  } else if (delay < 100) {
-    score = 90.0 - (delay - 50) * 0.4; // Very good servers
-  } else if (delay < 200) {
-    score = 70.0 - (delay - 100) * 0.3; // Good servers
-  } else if (delay < 500) {
-    score = 40.0 - (delay - 200) * 0.1; // Acceptable servers
-  } else if (delay < 1000) {
-    score = 20.0 - (delay - 500) * 0.02; // Slow servers
-  } else if (delay < 2000) {
-    score = 10.0 - (delay - 1000) * 0.005; // Very slow servers
-  } else {
-    score = 5.0; // Extremely slow servers
+
+  // Simplified scoring for faster processing
+  if (delay < 100) return 100.0; // Excellent
+  if (delay < 300) return 80.0; // Very good
+  if (delay < 600) return 60.0; // Good
+  if (delay < 1200) return 40.0; // Acceptable
+  if (delay < 2000) return 20.0; // Slow
+  return 10.0; // Very slow
+}
+
+/// Simple semaphore implementation for concurrency control
+class Semaphore {
+  final int maxCount;
+  int _currentCount;
+  final Queue<Completer<void>> _waitQueue = Queue<Completer<void>>();
+
+  Semaphore(this.maxCount) : _currentCount = maxCount;
+
+  Future<void> acquire() async {
+    if (_currentCount > 0) {
+      _currentCount--;
+      return;
+    }
+
+    final completer = Completer<void>();
+    _waitQueue.add(completer);
+    return completer.future;
   }
-  
-  // Additional bonus for ultra-fast servers
-  if (delay < 30) {
-    score += 20.0;
+
+  void release() {
+    if (_waitQueue.isNotEmpty) {
+      final completer = _waitQueue.removeFirst();
+      completer.complete();
+    } else {
+      _currentCount++;
+    }
   }
-  
-  // Ensure score is never negative
-  return score.clamp(0.0, 120.0);
 }

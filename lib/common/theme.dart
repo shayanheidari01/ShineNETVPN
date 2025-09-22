@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shinenet_vpn/common/font_helper.dart';
 
 class ThemeColor {
   // Modern minimal color palette
@@ -126,39 +127,66 @@ class ThemeColor {
     double fontSize = 24,
     FontWeight fontWeight = FontWeight.bold,
     Color? color,
+    BuildContext? context,
   }) {
-    return TextStyle(
-      fontSize: fontSize,
-      fontWeight: fontWeight,
-      color: color ?? primaryText,
-      fontFamily: 'GM',
-    );
+    try {
+      return FontHelper.getHeadingStyle(
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+        color: color ?? primaryText,
+        context: context,
+      );
+    } catch (e) {
+      return TextStyle(
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+        color: color ?? primaryText,
+      );
+    }
   }
 
   static TextStyle bodyStyle({
     double fontSize = 16,
     FontWeight fontWeight = FontWeight.normal,
     Color? color,
+    BuildContext? context,
   }) {
-    return TextStyle(
-      fontSize: fontSize,
-      fontWeight: fontWeight,
-      color: color ?? secondaryText,
-      fontFamily: 'GM',
-    );
+    try {
+      return FontHelper.getBodyStyle(
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+        color: color ?? secondaryText,
+        context: context,
+      );
+    } catch (e) {
+      return TextStyle(
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+        color: color ?? secondaryText,
+      );
+    }
   }
 
   static TextStyle captionStyle({
     double fontSize = 14,
     FontWeight fontWeight = FontWeight.normal,
     Color? color,
+    BuildContext? context,
   }) {
-    return TextStyle(
-      fontSize: fontSize,
-      fontWeight: fontWeight,
-      color: color ?? mutedText,
-      fontFamily: 'GM',
-    );
+    try {
+      return FontHelper.getCaptionStyle(
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+        color: color ?? mutedText,
+        context: context,
+      );
+    } catch (e) {
+      return TextStyle(
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+        color: color ?? mutedText,
+      );
+    }
   }
 
   // Modern server icon helper
@@ -170,7 +198,7 @@ class ThemeColor {
   }) {
     IconData iconData;
     Color iconColor = color ?? (isSelected ? primaryColor : secondaryText);
-    
+
     switch (serverType.toLowerCase()) {
       case 'automatic':
       case 'auto':
@@ -187,16 +215,16 @@ class ThemeColor {
       default:
         iconData = Icons.router_rounded;
     }
-    
+
     return Container(
       width: size + 16,
       height: size + 16,
       decoration: BoxDecoration(
-        color: isSelected 
-            ? primaryColor.withValues(alpha: 0.15) 
+        color: isSelected
+            ? primaryColor.withValues(alpha: 0.15)
             : surfaceColor.withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(smallRadius),
-        border: isSelected 
+        border: isSelected
             ? Border.all(color: primaryColor.withValues(alpha: 0.3), width: 1)
             : null,
       ),
@@ -224,7 +252,7 @@ class ThemeColor {
       default:
         indicatorColor = mutedText;
     }
-    
+
     return Container(
       width: size,
       height: size,

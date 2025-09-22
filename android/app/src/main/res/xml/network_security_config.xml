@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Default: disallow cleartext traffic -->
+    <base-config cleartextTrafficPermitted="false" />
+
+    <!-- Allow cleartext only for ip-api.com (geolocation of server IPs) -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">ip-api.com</domain>
+    </domain-config>
+</network-security-config>

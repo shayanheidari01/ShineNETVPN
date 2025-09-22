@@ -5,7 +5,7 @@
   
   **Protecting Your Privacy, Securing Your Freedom**
   
-  *Last Updated: December 2024*
+  *Last Updated: September 2025*
   
 </div>
 
@@ -63,6 +63,25 @@ This limited data helps us:
 - ✅ Optimize server selection based on your region
 - ✅ Improve app performance and stability
 - ✅ Detect and resolve connectivity issues
+
+### 2.3 Server IP Geolocation (for accurate location labels)
+- 🌐 We may query free IP geolocation services to resolve the approximate location of VPN servers only (not your IP).
+- 🎯 We only query when we have a real IP address for a server. If the configuration uses a domain name, we skip external lookup.
+- 🧭 Data requested: server IP → country, region, city (to display flag and location next to the server name).
+- 🔁 Caching: results are cached locally for 24–48 hours to reduce network calls; no personal identifiers are stored.
+- ⏱️ Timeouts: requests have strict 5s connect/receive timeouts and a simple User-Agent (e.g., "ShineNETVPN/1.0").
+- 🚫 No personal data is sent. Only the server IP is used for lookup.
+
+### 2.4 Version Update Check
+- 📦 On startup, the app may fetch a tiny JSON file from GitHub to check the latest version and a download link.
+- 🔒 We do not send any personal data. The app version comparison happens locally on your device.
+- 🔔 If a mandatory update is required, the app shows a non-dismissible dialog with a link to the latest release.
+
+### 2.5 Latency (Ping) Measurements
+- 📶 The app measures latency to available VPN servers to recommend better-performing options.
+- 🧪 Only the target servers are tested; no user content is inspected or analyzed.
+- 🗃️ Results are stored locally and may be cached for 5–10 minutes to improve responsiveness.
+- 🔐 These measurements are used solely to rank servers; they are not linked to personal identities.
 
 ---
 

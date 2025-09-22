@@ -1,54 +1,143 @@
 import 'package:shinenet_vpn/common/theme.dart';
+import 'package:shinenet_vpn/common/font_helper.dart';
+import 'package:shinenet_vpn/services/language_manager.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:easy_localization/easy_localization.dart';
 
 class LanguageWidget extends StatefulWidget {
-  final String selectedLanguage;
-
-  LanguageWidget({required this.selectedLanguage});
+  const LanguageWidget({super.key});
 
   @override
-  _LanguageWidgetState createState() => _LanguageWidgetState();
+  State<LanguageWidget> createState() => _LanguageWidgetState();
 }
 
 class _LanguageWidgetState extends State<LanguageWidget> {
-  late String _selectedLanguage;
+  String _selectedLanguageCode = 'en';
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _selectedLanguage =
-        widget.selectedLanguage; // مقدار اولیه را از ورودی دریافت کنید
+    _loadSelectedLanguage();
   }
 
-  // ذخیره زبان انتخاب شده در SharedPreferences
-  void _saveSelectedLanguage(String language) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setString('selectedLanguage', language);
+  // Refresh language when widget becomes visible again
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _loadSelectedLanguage();
   }
 
-  // تغییر زبان با استفاده از easy_localization
-  void _changeLocale(BuildContext context, String language) {
-    if (language == 'language_english'.tr()) {
-      context.setLocale(Locale('en', 'US'));
-    } else if (language == 'language_persian'.tr()) {
-      context.setLocale(Locale('fa', 'IR'));
-    } else if (language == 'language_chinese'.tr()) {
-      context.setLocale(Locale('zh', 'CN'));
-    } else if (language == 'language_russian'.tr()) {
-      context.setLocale(Locale('ru', 'RU'));
-    } else if (language == 'language_spanish'.tr()) {
-      context.setLocale(Locale('es', 'ES'));
-    } else if (language == 'language_french'.tr()) {
-      context.setLocale(Locale('fr', 'FR'));
-    } else if (language == 'language_german'.tr()) {
-      context.setLocale(Locale('de', 'DE'));
-    } else if (language == 'language_hindi'.tr()) {
-      context.setLocale(Locale('hi', 'IN'));
-    } else if (language == 'language_portuguese'.tr()) {
-      context.setLocale(Locale('pt', 'BR'));
+  Future<void> _loadSelectedLanguage() async {
+    try {
+      // Load from saved preference instead of context
+      final savedLanguage = await LanguageManager.getSavedLanguage();
+      if (mounted) {
+        setState(() {
+          _selectedLanguageCode = savedLanguage;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _selectedLanguageCode = 'en'; // fallback to English
+        });
+      }
+    }
+  }
+
+  Future<void> _changeLanguage(String languageCode) async {
+    if (_selectedLanguageCode == languageCode) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final success =
+          await LanguageManager.changeLanguage(context, languageCode);
+
+      if (success) {
+        setState(() => _selectedLanguageCode = languageCode);
+        HapticFeedback.lightImpact();
+
+        // Show success message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'language_changed_successfully'.tr(),
+                style: FontHelper.getBodyStyle(
+                  color: Colors.white,
+                  context: context,
+                ),
+              ),
+              backgroundColor: ThemeColor.successColor,
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+              margin: EdgeInsets.all(ThemeColor.mediumSpacing),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
+              ),
+            ),
+          );
+
+          // Force rebuild of parent contexts
+          // This ensures the UI updates immediately
+          Future.delayed(Duration(milliseconds: 500), () {
+            if (mounted) {
+              Navigator.of(context).popUntil((route) => route.isFirst);
+            }
+          });
+        }
+      } else {
+        // Show error message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'language_change_failed'.tr(),
+                style: FontHelper.getBodyStyle(
+                  color: Colors.white,
+                  context: context,
+                ),
+              ),
+              backgroundColor: ThemeColor.errorColor,
+              duration: const Duration(seconds: 3),
+              behavior: SnackBarBehavior.floating,
+              margin: EdgeInsets.all(ThemeColor.mediumSpacing),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
+              ),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      // Handle unexpected errors
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'language_change_failed'.tr(),
+              style: FontHelper.getBodyStyle(
+                color: Colors.white,
+                context: context,
+              ),
+            ),
+            backgroundColor: ThemeColor.errorColor,
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+            margin: EdgeInsets.all(ThemeColor.mediumSpacing),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -61,171 +150,129 @@ class _LanguageWidgetState extends State<LanguageWidget> {
         elevation: 0,
         title: Text(
           'select_language'.tr(),
-          style: ThemeColor.headingStyle(
+          style: FontHelper.getHeadingStyle(
             fontSize: 20,
             fontWeight: FontWeight.w600,
+            context: context,
           ),
         ),
         centerTitle: true,
       ),
-      body: Padding(
-        padding: EdgeInsets.all(ThemeColor.mediumSpacing),
-        child: Column(
-          children: [
-            // Simple description
-            Text(
-              'choose_preferred_language'.tr(),
-              style: ThemeColor.captionStyle(
-                fontSize: 16,
-                color: ThemeColor.mutedText,
-              ),
-              textAlign: TextAlign.center,
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: EdgeInsets.all(ThemeColor.mediumSpacing),
+              children: [
+                Text(
+                  'choose_preferred_language'.tr(),
+                  style: FontHelper.getCaptionStyle(
+                    fontSize: 16,
+                    color: ThemeColor.mutedText,
+                    context: context,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: ThemeColor.largeSpacing),
+
+                // Language options
+                for (final language in LanguageManager.getAllLanguages())
+                  Padding(
+                    padding: EdgeInsets.only(bottom: ThemeColor.smallSpacing),
+                    child: _buildLanguageCard(language),
+                  ),
+              ],
             ),
-            SizedBox(height: ThemeColor.largeSpacing),
-            
-            // Language options
-            Expanded(
-              child: ListView(
-                children: [
-                  _buildSimpleLanguageCard(
-                    context,
-                    'language_english'.tr(),
-                    '🇺🇸',
-                    'English',
-                  ),
-                  SizedBox(height: ThemeColor.smallSpacing),
-                  _buildSimpleLanguageCard(
-                    context,
-                    'language_persian'.tr(),
-                    '🇮🇷',
-                    'فارسی',
-                  ),
-                  SizedBox(height: ThemeColor.smallSpacing),
-                  _buildSimpleLanguageCard(
-                    context,
-                    'language_chinese'.tr(),
-                    '🇨🇳',
-                    '中文',
-                  ),
-                  SizedBox(height: ThemeColor.smallSpacing),
-                  _buildSimpleLanguageCard(
-                    context,
-                    'language_russian'.tr(),
-                    '🇷🇺',
-                    'Русский',
-                  ),
-                  SizedBox(height: ThemeColor.smallSpacing),
-                  _buildSimpleLanguageCard(
-                    context,
-                    'language_spanish'.tr(),
-                    '🇪🇸',
-                    'Español',
-                  ),
-                  SizedBox(height: ThemeColor.smallSpacing),
-                  _buildSimpleLanguageCard(
-                    context,
-                    'language_french'.tr(),
-                    '🇫🇷',
-                    'Français',
-                  ),
-                  SizedBox(height: ThemeColor.smallSpacing),
-                  _buildSimpleLanguageCard(
-                    context,
-                    'language_german'.tr(),
-                    '🇩🇪',
-                    'Deutsch',
-                  ),
-                  SizedBox(height: ThemeColor.smallSpacing),
-                  _buildSimpleLanguageCard(
-                    context,
-                    'language_hindi'.tr(),
-                    '🇮🇳',
-                    'हिंदी',
-                  ),
-                  SizedBox(height: ThemeColor.smallSpacing),
-                  _buildSimpleLanguageCard(
-                    context,
-                    'language_portuguese'.tr(),
-                    '🇧🇷',
-                    'Português',
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
+  Widget _buildLanguageCard(LanguageInfo language) {
+    final isSelected = _selectedLanguageCode == language.code;
 
-  Widget _buildSimpleLanguageCard(
-    BuildContext context,
-    String language,
-    String flag,
-    String nativeName,
-  ) {
-    final isSelected = _selectedLanguage == language;
-    
     return Container(
-      decoration: ThemeColor.cardDecoration(
-        withBorder: true,
-        withShadow: false,
+      decoration: BoxDecoration(
+        color: isSelected
+            ? ThemeColor.primaryColor.withValues(alpha: 0.1)
+            : ThemeColor.cardColor,
+        borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
+        border: Border.all(
+          color: isSelected ? ThemeColor.primaryColor : ThemeColor.borderColor,
+          width: isSelected ? 2 : 1,
+        ),
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
-          onTap: () {
-            HapticFeedback.selectionClick();
-            setState(() {
-              _selectedLanguage = language;
-              _saveSelectedLanguage(language);
-              _changeLocale(context, language);
-            });
-          },
+          onTap: _isLoading ? null : () => _changeLanguage(language.code),
           child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: ThemeColor.mediumSpacing,
-              vertical: ThemeColor.largeSpacing,
-            ),
+            padding: EdgeInsets.all(ThemeColor.mediumSpacing),
             child: Row(
               children: [
-                // Flag
-                Text(
-                  flag,
-                  style: TextStyle(fontSize: 24),
+                // Flag with background
+                Container(
+                  padding: EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? ThemeColor.primaryColor.withValues(alpha: 0.1)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
+                  ),
+                  child: Text(
+                    language.flag,
+                    style: const TextStyle(fontSize: 24),
+                  ),
                 ),
                 SizedBox(width: ThemeColor.mediumSpacing),
-                
-                // Language name
+
+                // Language info
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        language,
-                        style: ThemeColor.bodyStyle(
+                        LanguageManager.getLanguageDisplayName(
+                          language.code,
+                          context,
+                        ),
+                        style: FontHelper.getBodyStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w500,
+                          color: isSelected
+                              ? ThemeColor.primaryColor
+                              : ThemeColor.primaryText,
+                          context: context,
                         ),
                       ),
-                      if (nativeName != language) ...[
-                        SizedBox(height: 2),
+                      if (language.nativeName !=
+                          LanguageManager.getLanguageDisplayName(
+                            language.code,
+                            context,
+                          ))
                         Text(
-                          nativeName,
-                          style: ThemeColor.captionStyle(
+                          language.nativeName,
+                          style: FontHelper.getCaptionStyle(
                             fontSize: 14,
                             color: ThemeColor.mutedText,
+                            context: context,
                           ),
                         ),
-                      ],
                     ],
                   ),
                 ),
-                
-                // Selection indicator
-                if (isSelected)
+
+                // Selection indicator with loading state
+                if (_isLoading && _selectedLanguageCode == language.code)
+                  SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        ThemeColor.primaryColor,
+                      ),
+                    ),
+                  )
+                else if (isSelected)
                   Icon(
                     Icons.check_circle,
                     color: ThemeColor.primaryColor,

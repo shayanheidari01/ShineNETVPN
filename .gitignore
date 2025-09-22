@@ -51,7 +51,9 @@ app.*.map.json
 # Android related
 **/android/**/gradle-wrapper.jar
 **/android/.gradle
+/.gradle/
 **/android/app/.cxx
+**/android/.cxx
 **/android/captures/
 **/android/gradlew
 **/android/gradlew.bat

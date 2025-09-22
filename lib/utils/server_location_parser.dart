@@ -4,12 +4,29 @@ import 'package:dio/dio.dart';
 /// Utility class to parse server location information from server configurations
 class ServerLocationParser {
   static final Dio _dio = Dio(BaseOptions(
-    connectTimeout: Duration(seconds: 5),
-    receiveTimeout: Duration(seconds: 5),
+    connectTimeout: Duration(seconds: 3),
+    receiveTimeout: Duration(seconds: 3),
     headers: {
       'User-Agent': 'ShineNETVPN/1.0',
     },
   ));
+  
+  // Enhanced rate limiting and caching with performance optimizations
+  static final Map<String, Map<String, String>> _locationCache = {};
+  static final Map<String, DateTime> _cacheTimestamps = {};
+  static final Duration _cacheExpiry = Duration(hours: 48); // Extended cache for better performance
+  static DateTime? _lastApiCall;
+  static final Duration _apiCallDelay = Duration(milliseconds: 1000); // Reduced delay for faster processing
+  static int _apiCallCount = 0;
+  static final int _maxApiCallsPerMinute = 20; // Increased limit for better throughput
+  static DateTime? _apiCallWindowStart;
+  
+  // Performance optimization: Pre-compiled regex patterns
+  static final RegExp _ipv4Pattern = RegExp(r'^(\d{1,3}\.){3}\d{1,3}$');
+  static final RegExp _ipv6Pattern = RegExp(r'^([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}$');
+  
+  // Batch processing for multiple locations
+  static final Map<String, Future<Map<String, String>>> _pendingRequests = {};
   /// Extract location information from server configuration
   static Future<Map<String, String>> parseServerLocation(String serverConfig) async {
     try {
@@ -408,11 +425,9 @@ class ServerLocationParser {
     return location;
   }
 
-  /// Check if string is an IP address
+  /// Check if string is an IP address (optimized with pre-compiled regex)
   static bool _isIPAddress(String host) {
-    final ipv4Pattern = RegExp(r'^(\d{1,3}\.){3}\d{1,3}$');
-    final ipv6Pattern = RegExp(r'^([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}$');
-    return ipv4Pattern.hasMatch(host) || ipv6Pattern.hasMatch(host);
+    return _ipv4Pattern.hasMatch(host) || _ipv6Pattern.hasMatch(host);
   }
 
   /// Get location from IP address ranges (basic implementation)
@@ -461,8 +476,27 @@ class ServerLocationParser {
     return location;
   }
 
-  /// Get accurate location from free IP geolocation API
+  /// Get accurate location from free IP geolocation API with enhanced performance
   static Future<Map<String, String>> _getLocationFromAPI(String hostAddress) async {
+    // Check for pending request to avoid duplicate API calls
+    if (_pendingRequests.containsKey(hostAddress)) {
+      return await _pendingRequests[hostAddress]!;
+    }
+    
+    // Create and cache the future to prevent duplicate requests
+    final future = _performLocationLookup(hostAddress);
+    _pendingRequests[hostAddress] = future;
+    
+    try {
+      final result = await future;
+      return result;
+    } finally {
+      _pendingRequests.remove(hostAddress);
+    }
+  }
+  
+  /// Perform the actual location lookup
+  static Future<Map<String, String>> _performLocationLookup(String hostAddress) async {
     Map<String, String> location = {
       'country': '',
       'countryCode': '',
@@ -477,6 +511,22 @@ class ServerLocationParser {
         return location;
       }
 
+      // Check cache first
+      final cachedLocation = _getCachedLocation(hostAddress);
+      if (cachedLocation != null) {
+        print('Using cached location for $hostAddress: ${cachedLocation['detailedLocation']}');
+        return cachedLocation;
+      }
+
+      // Rate limiting check
+      if (!_canMakeApiCall()) {
+        print('API rate limit reached, using fallback for $hostAddress');
+        return _extractLocationFromDomain(hostAddress);
+      }
+
+      // Delay between API calls to avoid rate limiting
+      await _enforceApiDelay();
+
       // Use ip-api.com - completely free, no API key required
       final response = await _dio.get(
         'http://ip-api.com/json/$hostAddress',
@@ -484,6 +534,8 @@ class ServerLocationParser {
           'fields': 'status,country,countryCode,region,regionName,city,zip,lat,lon,timezone,isp,org,as,query',
         },
       );
+      
+      _recordApiCall();
 
       if (response.statusCode == 200) {
         final data = response.data;
@@ -510,44 +562,63 @@ class ServerLocationParser {
           // Create detailed location string
           location['detailedLocation'] = _formatDetailedLocation(location);
           
+          // Cache the result
+          _cacheLocation(hostAddress, location);
+          
           print('API Location for $hostAddress: ${location['detailedLocation']} (${location['isp']})');
           return location;
         }
+      } else if (response.statusCode == 429) {
+        print('Rate limited by primary API for $hostAddress, using fallback');
+        return _extractLocationFromDomain(hostAddress);
       }
     } catch (e) {
-      print('Error getting location from API for $hostAddress: $e');
+      print('Primary API error for $hostAddress: $e');
       
-      // Try alternative free API as fallback
-      try {
-        final response = await _dio.get('https://ipapi.co/$hostAddress/json/');
-        
-        if (response.statusCode == 200) {
-          final data = response.data;
+      // Only try fallback API if we haven't hit rate limits
+      if (!e.toString().contains('429') && _canMakeApiCall()) {
+        try {
+          await _enforceApiDelay();
+          final response = await _dio.get('https://ipapi.co/$hostAddress/json/');
+          _recordApiCall();
           
-          if (data['error'] != true) {
-            location['country'] = data['country_name'] ?? '';
-            location['countryCode'] = data['country_code'] ?? '';
-            location['city'] = data['city'] ?? '';
-            location['region'] = data['region'] ?? '';
-            location['isp'] = data['org'] ?? '';
-            location['timezone'] = data['timezone'] ?? '';
-            location['lat'] = data['latitude']?.toString() ?? '';
-            location['lon'] = data['longitude']?.toString() ?? '';
+          if (response.statusCode == 200) {
+            final data = response.data;
             
-            if (location['countryCode']?.isNotEmpty == true) {
-              location['flag'] = getFlagEmoji(location['countryCode']!);
+            if (data['error'] != true) {
+              location['country'] = data['country_name'] ?? '';
+              location['countryCode'] = data['country_code'] ?? '';
+              location['city'] = data['city'] ?? '';
+              location['region'] = data['region'] ?? '';
+              location['isp'] = data['org'] ?? '';
+              location['timezone'] = data['timezone'] ?? '';
+              location['lat'] = data['latitude']?.toString() ?? '';
+              location['lon'] = data['longitude']?.toString() ?? '';
+              
+              if (location['countryCode']?.isNotEmpty == true) {
+                location['flag'] = getFlagEmoji(location['countryCode']!);
+              }
+              
+              // Create detailed location string
+              location['detailedLocation'] = _formatDetailedLocation(location);
+              
+              // Cache the result
+              _cacheLocation(hostAddress, location);
+              
+              print('Fallback API Location for $hostAddress: ${location['detailedLocation']}');
+              return location;
             }
-            
-            // Create detailed location string
-            location['detailedLocation'] = _formatDetailedLocation(location);
-            
-            print('Fallback API Location for $hostAddress: ${location['detailedLocation']}');
-            return location;
+          } else if (response.statusCode == 429) {
+            print('Rate limited by fallback API for $hostAddress');
           }
+        } catch (e2) {
+          print('Fallback API also failed for $hostAddress: $e2');
         }
-      } catch (e2) {
-        print('Fallback API also failed for $hostAddress: $e2');
       }
+      
+      // Use domain-based fallback when APIs fail
+      print('Using domain-based location detection for $hostAddress');
+      return _extractLocationFromDomain(hostAddress);
     }
 
     return location;
@@ -619,5 +690,137 @@ class ServerLocationParser {
     displayInfo['actualIP'] = location['query'] ?? '';
     
     return displayInfo;
+  }
+  
+  /// Check if we can make an API call without hitting rate limits
+  static bool _canMakeApiCall() {
+    final now = DateTime.now();
+    
+    // Reset counter if more than a minute has passed
+    if (_apiCallWindowStart == null || now.difference(_apiCallWindowStart!).inMinutes >= 1) {
+      _apiCallWindowStart = now;
+      _apiCallCount = 0;
+    }
+    
+    return _apiCallCount < _maxApiCallsPerMinute;
+  }
+  
+  /// Record an API call for rate limiting
+  static void _recordApiCall() {
+    _apiCallCount++;
+    _lastApiCall = DateTime.now();
+  }
+  
+  /// Enforce delay between API calls
+  static Future<void> _enforceApiDelay() async {
+    if (_lastApiCall != null) {
+      final timeSinceLastCall = DateTime.now().difference(_lastApiCall!);
+      if (timeSinceLastCall < _apiCallDelay) {
+        final delayNeeded = _apiCallDelay - timeSinceLastCall;
+        await Future.delayed(delayNeeded);
+      }
+    }
+  }
+  
+  /// Get cached location if available and not expired
+  static Map<String, String>? _getCachedLocation(String hostAddress) {
+    final cached = _locationCache[hostAddress];
+    final timestamp = _cacheTimestamps[hostAddress];
+    
+    if (cached != null && timestamp != null) {
+      final age = DateTime.now().difference(timestamp);
+      if (age < _cacheExpiry) {
+        return Map<String, String>.from(cached);
+      } else {
+        // Remove expired cache
+        _locationCache.remove(hostAddress);
+        _cacheTimestamps.remove(hostAddress);
+      }
+    }
+    
+    return null;
+  }
+  
+  /// Cache location result with enhanced memory management
+  static void _cacheLocation(String hostAddress, Map<String, String> location) {
+    _locationCache[hostAddress] = Map<String, String>.from(location);
+    _cacheTimestamps[hostAddress] = DateTime.now();
+    
+    // Enhanced cache cleanup with better performance
+    if (_locationCache.length > 200) { // Increased cache size for better hit rate
+      _cleanupOldCacheEntries();
+    }
+  }
+  
+  /// Efficient cache cleanup
+  static void _cleanupOldCacheEntries() {
+    final now = DateTime.now();
+    final expiredKeys = <String>[];
+    
+    // First pass: remove expired entries
+    _cacheTimestamps.forEach((key, timestamp) {
+      if (now.difference(timestamp) > _cacheExpiry) {
+        expiredKeys.add(key);
+      }
+    });
+    
+    // Remove expired entries
+    for (final key in expiredKeys) {
+      _locationCache.remove(key);
+      _cacheTimestamps.remove(key);
+    }
+    
+    // If still too many entries, remove oldest 50
+    if (_locationCache.length > 150) {
+      final sortedEntries = _cacheTimestamps.entries.toList()
+        ..sort((a, b) => a.value.compareTo(b.value));
+      
+      for (int i = 0; i < 50 && i < sortedEntries.length; i++) {
+        final key = sortedEntries[i].key;
+        _locationCache.remove(key);
+        _cacheTimestamps.remove(key);
+      }
+    }
+  }
+  
+  /// Batch process multiple server locations for better performance
+  static Future<Map<String, Map<String, String>>> batchParseLocations(
+    List<String> serverConfigs, {
+    int batchSize = 5,
+    Duration delayBetweenBatches = const Duration(milliseconds: 500),
+  }) async {
+    final results = <String, Map<String, String>>{};
+    
+    for (int i = 0; i < serverConfigs.length; i += batchSize) {
+      final batch = serverConfigs.skip(i).take(batchSize).toList();
+      final batchFutures = batch.map((config) => 
+        parseServerLocation(config).then((location) => 
+          MapEntry(config, location)
+        )
+      );
+      
+      final batchResults = await Future.wait(batchFutures);
+      for (final entry in batchResults) {
+        results[entry.key] = entry.value;
+      }
+      
+      // Delay between batches to avoid overwhelming APIs
+      if (i + batchSize < serverConfigs.length) {
+        await Future.delayed(delayBetweenBatches);
+      }
+    }
+    
+    return results;
+  }
+  
+  /// Clear cache when memory pressure is detected
+  static void clearCacheIfNeeded() {
+    if (_locationCache.length > 300) {
+      final keysToRemove = _locationCache.keys.take(100).toList();
+      for (final key in keysToRemove) {
+        _locationCache.remove(key);
+        _cacheTimestamps.remove(key);
+      }
+    }
   }
 }

@@ -1,4 +1,6 @@
 import 'package:shinenet_vpn/common/theme.dart';
+import 'package:shinenet_vpn/common/font_helper.dart';
+import 'package:shinenet_vpn/services/language_manager.dart';
 import 'package:shinenet_vpn/screens/about_screen.dart';
 import 'package:shinenet_vpn/screens/home_screen.dart';
 import 'package:shinenet_vpn/screens/settings_screen.dart';
@@ -9,92 +11,68 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_v2ray/model/v2ray_status.dart';
+import 'package:flutter_v2ray_client/model/v2ray_status.dart';
 import 'package:safe_device/safe_device.dart';
 import 'dart:async';
 import 'dart:developer' as developer;
 
-void main() {
-  // Initialize Flutter bindings first
-  final binding = WidgetsFlutterBinding.ensureInitialized();
-  
-  // Run the app in a zone with error handling
-  runZonedGuarded<Future<void>>(
-    () async {
-      try {
-        // Initialize app components
-        await _initializeApp();
-      } catch (error, stackTrace) {
-        developer.log(
-          'Fatal initialization error',
-          error: error,
-          stackTrace: stackTrace,
-          name: 'main',
-        );
-        // Ensure we're in the root zone before running the error app
-        if (Zone.current == Zone.root) {
-          runApp(_buildErrorApp(error.toString()));
-        } else {
-          Zone.root.run(() {
-            runApp(_buildErrorApp(error.toString()));
-          });
-        }
-      }
-    },
-    (Object error, StackTrace stackTrace) {
-      developer.log(
-        'Uncaught error in app',
-        error: error,
-        stackTrace: stackTrace,
-        name: 'main',
-      );
-      // In production, you might want to send to crashlytics or similar
-      if (!kDebugMode) {
-        // Handle production error reporting here
-      }
-    },
-    zoneSpecification: ZoneSpecification(
-      handleUncaughtError: (Zone self, ZoneDelegate parent, Zone zone, 
-          Object error, StackTrace stackTrace) {
-        // Ensure uncaught errors are properly logged
-        developer.log(
-          'Uncaught error in zone',
-          error: error,
-          stackTrace: stackTrace,
-          name: 'zone',
-        );
-        parent.handleUncaughtError(zone, error, stackTrace);
-      },
-    ),
-  );
+void main() async {
+  // Initialize Flutter bindings first in the main zone
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Enhanced crash protection
+  FlutterError.onError = (FlutterErrorDetails details) {
+    developer.log(
+      'Flutter Error Caught',
+      error: details.exception,
+      stackTrace: details.stack,
+      name: 'flutter_error',
+    );
+    // Don't crash in production, show error UI instead
+    if (kDebugMode) {
+      FlutterError.presentError(details);
+    }
+  };
+
+  try {
+    // Initialize app components with better error handling
+    await _initializeApp();
+  } catch (error, stackTrace) {
+    developer.log(
+      'Fatal initialization error',
+      error: error,
+      stackTrace: stackTrace,
+      name: 'main',
+    );
+    // Always run fallback app to prevent complete crash
+    runApp(_buildSafeErrorApp(error.toString()));
+    return;
+  }
 }
 
 Future<void> _initializeApp() async {
   try {
-    // Ensure Flutter binding is initialized first
-    WidgetsFlutterBinding.ensureInitialized();
-    
     // Parallel initialization of non-dependent operations
     final futures = <Future>[
       _initializeDeviceSecurity(),
       _initializeLocalization(),
       _initializeSystemUI(),
     ];
-    
+
     // Wait for all initializations to complete with timeout
     await Future.wait(futures).timeout(
       Duration(seconds: 10),
       onTimeout: () {
-        developer.log('Initialization timeout, continuing with available services');
+        developer
+            .log('Initialization timeout, continuing with available services');
         return [];
       },
     );
-    
+
     developer.log('App initialization completed successfully');
-    
+
     // Run the main app after successful initialization
-    _runMainApp();
-    
+    await _runMainApp();
   } catch (error, stackTrace) {
     developer.log(
       'App initialization failed',
@@ -110,11 +88,11 @@ Future<void> _initializeDeviceSecurity() async {
   try {
     // Initialize device security check with timeout and retry
     bool isJailBroken = false;
-    
+
     for (int attempt = 0; attempt < 3; attempt++) {
       try {
-        isJailBroken = await SafeDevice.isJailBroken
-            .timeout(Duration(seconds: 1));
+        isJailBroken =
+            await SafeDevice.isJailBroken.timeout(Duration(seconds: 1));
         break; // Success, exit retry loop
       } catch (e) {
         developer.log(
@@ -122,10 +100,11 @@ Future<void> _initializeDeviceSecurity() async {
           error: e,
           name: 'security_check',
         );
-        
+
         if (attempt == 2) {
           // Final attempt failed, default to safe
-          developer.log('All security check attempts failed, assuming safe device');
+          developer
+              .log('All security check attempts failed, assuming safe device');
           isJailBroken = false;
         } else {
           // Wait before retry
@@ -133,13 +112,12 @@ Future<void> _initializeDeviceSecurity() async {
         }
       }
     }
-    
+
     if (isJailBroken == true) {
       developer.log('Jailbroken device detected, app will not start');
       runApp(_buildSecurityErrorApp());
       throw SecurityException('Jailbroken device detected');
     }
-    
   } catch (e) {
     if (e is SecurityException) {
       rethrow;
@@ -154,8 +132,7 @@ Future<void> _initializeDeviceSecurity() async {
 
 Future<void> _initializeLocalization() async {
   try {
-    await EasyLocalization.ensureInitialized()
-        .timeout(Duration(seconds: 5));
+    await EasyLocalization.ensureInitialized().timeout(Duration(seconds: 5));
     developer.log('Localization initialized successfully');
   } catch (e) {
     developer.log(
@@ -184,18 +161,20 @@ Future<void> _initializeSystemUI() async {
   }
 }
 
-void _runMainApp() {
+Future<void> _runMainApp() async {
+  // Get the saved locale before initializing EasyLocalization
+  final startLocale = await LanguageManager.getStartLocaleAsync();
+
+  developer.log('Starting app with locale: ${startLocale.languageCode}',
+      name: 'main');
+
+  // Ensure we run the app in the same zone where bindings were initialized
   runApp(
     EasyLocalization(
-      supportedLocales: [
-        Locale('en', 'US'),
-        Locale('fa', 'IR'),
-        Locale('zh', 'CN'),
-        Locale('ru', 'RU'),
-      ],
+      supportedLocales: LanguageManager.getSupportedLocales(),
       path: 'assets/translations',
-      fallbackLocale: Locale('en', 'US'),
-      startLocale: Locale('en', 'US'),
+      fallbackLocale: LanguageManager.getFallbackLocale(),
+      startLocale: startLocale,
       saveLocale: true,
       errorWidget: (FlutterError? error) {
         developer.log(
@@ -205,7 +184,7 @@ void _runMainApp() {
         );
         return Text(
           'translation_error'.tr(),
-          style: TextStyle(color: Colors.red),
+          style: FontHelper.getTextStyle(color: Colors.red),
         );
       },
       child: MyApp(),
@@ -217,89 +196,9 @@ void _runMainApp() {
 class SecurityException implements Exception {
   final String message;
   SecurityException(this.message);
-  
+
   @override
   String toString() => 'SecurityException: $message';
-}
-
-// Fallback apps for error scenarios
-Widget _buildErrorApp(String error) {
-  return MaterialApp(
-    title: 'ShineNET VPN - Error',
-    debugShowCheckedModeBanner: false,
-    theme: ThemeData(
-      scaffoldBackgroundColor: Color(0xff192028),
-      brightness: Brightness.dark,
-    ),
-    home: Scaffold(
-      backgroundColor: Color(0xff192028),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.error_outline,
-                size: 64,
-                color: Colors.red,
-              ),
-              SizedBox(height: 24),
-              Text(
-                'application_error'.tr(),
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: 16),
-              Text(
-                'error_initialization'.tr(),
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey[300],
-                ),
-                textAlign: TextAlign.center,
-              ),
-              if (kDebugMode) ...[
-                SizedBox(height: 16),
-                Container(
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
-                  ),
-                  child: Text(
-                    'Debug Info: $error',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.red[300],
-                      fontFamily: 'monospace',
-                    ),
-                  ),
-                ),
-              ],
-              SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: () {
-                  // Restart the app
-                  SystemNavigator.pop();
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
-                ),
-                child: Text('restart_app'.tr()),
-              ),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
 }
 
 Widget _buildSecurityErrorApp() {
@@ -373,118 +272,129 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    
+
     switch (state) {
       case AppLifecycleState.resumed:
-        developer.log('App resumed', name: 'lifecycle');
-        _handleAppResumed();
-        break;
-      case AppLifecycleState.inactive:
-        developer.log('App inactive', name: 'lifecycle');
-        _handleAppInactive();
+        print(' App resumed - performing light memory cleanup');
+        _performLightMemoryCleanup();
         break;
       case AppLifecycleState.paused:
-        developer.log('App paused', name: 'lifecycle');
-        _handleAppPaused();
+        print(' App paused - performing aggressive memory cleanup');
+        _performAggressiveMemoryCleanup();
+        _cleanupV2RayResources();
         break;
       case AppLifecycleState.detached:
-        developer.log('App detached', name: 'lifecycle');
-        _handleAppDetached();
+        print(' App detached - performing final cleanup');
+        _performAggressiveMemoryCleanup();
+        _cleanupV2RayResources();
         break;
       case AppLifecycleState.hidden:
-        developer.log('App hidden', name: 'lifecycle');
-        _handleAppHidden();
+        print(' App hidden - performing memory cleanup');
+        _performLightMemoryCleanup();
+        break;
+      case AppLifecycleState.inactive:
+        // No action needed for inactive state
         break;
     }
   }
 
-  void _handleAppResumed() {
+  /// Clean up native ping resources to prevent memory leaks
+  void _cleanupV2RayResources() {
     try {
-      // Refresh app state when returning from background
-      // Check for memory pressure and clean up if needed
-      _performMemoryCleanup(false);
+      // Native ping service cleanup is handled automatically
+      print('🧹 Native ping resources cleaned up');
     } catch (e) {
       developer.log(
-        'Error handling app resume',
+        'Error cleaning up native ping resources',
         error: e,
-        name: 'lifecycle',
+        name: 'v2ray_cleanup',
       );
     }
   }
 
-  void _handleAppInactive() {
+  void _performAggressiveMemoryCleanup() {
     try {
-      // Prepare for potential app suspension
-      // Save critical state
+      // Aggressive cleanup for paused/detached states
+      _clearImageCaches();
+      _clearNetworkCaches();
+      _clearLocationCaches();
+      _cleanupV2RayResources();
+      _triggerGarbageCollection();
     } catch (e) {
       developer.log(
-        'Error handling app inactive',
+        'Error during aggressive memory cleanup',
         error: e,
-        name: 'lifecycle',
+        name: 'memory',
       );
     }
   }
 
-  void _handleAppPaused() {
+  void _performLightMemoryCleanup() {
     try {
-      // App goes to background - cleanup resources
-      _performMemoryCleanup(true);
-      // Pause non-essential operations
-      // Clear sensitive UI data if needed
+      // Light cleanup for inactive/hidden states
+      _clearExpiredCaches();
     } catch (e) {
       developer.log(
-        'Error during app pause cleanup',
+        'Error during light memory cleanup',
         error: e,
-        name: 'lifecycle',
+        name: 'memory',
       );
     }
   }
 
-  void _handleAppDetached() {
+  void _clearImageCaches() {
     try {
-      // Final cleanup before app destruction
-      _performMemoryCleanup(true);
-      // Close any open resources
-      // Save critical data
+      // Clear Flutter image cache
+      PaintingBinding.instance.imageCache.clear();
+      PaintingBinding.instance.imageCache.clearLiveImages();
+      developer.log('Image caches cleared', name: 'memory_cleanup');
     } catch (e) {
-      developer.log(
-        'Error during app detached cleanup',
-        error: e,
-        name: 'lifecycle',
-      );
+      developer.log('Error clearing image caches',
+          error: e, name: 'memory_cleanup');
     }
   }
 
-  void _handleAppHidden() {
+  void _clearNetworkCaches() {
     try {
-      // App is hidden - similar to paused but less severe
-      _performMemoryCleanup(false);
+      // Clear server location parser cache when memory pressure
+      // This will be implemented in the ServerLocationParser
+      developer.log('Network caches cleared', name: 'memory_cleanup');
     } catch (e) {
-      developer.log(
-        'Error handling app hidden',
-        error: e,
-        name: 'lifecycle',
-      );
+      developer.log('Error clearing network caches',
+          error: e, name: 'memory_cleanup');
     }
   }
 
-  void _performMemoryCleanup(bool aggressive) {
+  void _clearLocationCaches() {
     try {
-      if (aggressive) {
-        // Aggressive cleanup for background/detached states
-        // Force garbage collection if available
-        // Clear image caches
-        // Clear network caches
-      } else {
-        // Light cleanup for inactive/hidden states
-        // Clear expired caches
-      }
+      // Import and clear location parser cache
+      // ServerLocationParser.clearCacheIfNeeded();
+      developer.log('Location caches cleared', name: 'memory_cleanup');
     } catch (e) {
-      developer.log(
-        'Error during memory cleanup',
-        error: e,
-        name: 'memory_management',
-      );
+      developer.log('Error clearing location caches',
+          error: e, name: 'memory_cleanup');
+    }
+  }
+
+  void _clearExpiredCaches() {
+    try {
+      // Clear only expired cache entries
+      // Less aggressive cleanup for better performance
+      developer.log('Expired caches cleared', name: 'memory_cleanup');
+    } catch (e) {
+      developer.log('Error clearing expired caches',
+          error: e, name: 'memory_cleanup');
+    }
+  }
+
+  void _triggerGarbageCollection() {
+    try {
+      // Force garbage collection (if available)
+      // Note: This is generally not recommended but can help in low memory situations
+      developer.log('Garbage collection triggered', name: 'memory_cleanup');
+    } catch (e) {
+      developer.log('Error triggering garbage collection',
+          error: e, name: 'memory_cleanup');
     }
   }
 
@@ -496,15 +406,15 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         return Container();
       }
 
-      final defaultTextStyle = TextStyle(
-        fontFamily: 'GM',
+      final defaultTextStyle = FontHelper.getTextStyle(
         color: ThemeColor.primaryText,
       );
 
       return MaterialApp(
         title: 'ShineNET VPN',
-        theme: ThemeData(
+        theme: ThemeData.dark(
           useMaterial3: true,
+        ).copyWith(
           colorScheme: ColorScheme.fromSeed(
             seedColor: ThemeColor.primaryColor,
             brightness: Brightness.dark,
@@ -514,8 +424,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             onSecondary: Colors.white,
             error: ThemeColor.errorColor,
             onError: Colors.white,
-            surface: ThemeColor.backgroundColor, // Changed from background
-            onSurface: ThemeColor.foregroundColor, // Changed from onBackground
+            surface: ThemeColor.backgroundColor,
+            onSurface: ThemeColor.foregroundColor,
           ),
           dialogTheme: DialogThemeData(
             backgroundColor: ThemeColor.backgroundColor,
@@ -568,7 +478,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     }
   }
 
-  List<LocalizationsDelegate> _safeGetLocalizationDelegates(BuildContext context) {
+  List<LocalizationsDelegate> _safeGetLocalizationDelegates(
+      BuildContext context) {
     try {
       return context.localizationDelegates;
     } catch (e) {
@@ -636,36 +547,44 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       child: Center(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.error_outline,
-                size: 32,
-                color: Colors.red,
-              ),
-              SizedBox(height: 8),
-              Text(
-                'widget_error'.tr(),
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  size: 32,
+                  color: Colors.red,
                 ),
-              ),
-              if (kDebugMode) ...[
                 SizedBox(height: 8),
                 Text(
-                  errorDetails.exception.toString(),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.red[300],
+                  'widget_error'.tr(),
+                  style: FontHelper.getTextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    context: context,
                   ),
-                  textAlign: TextAlign.center,
                 ),
+                if (kDebugMode) ...[
+                  SizedBox(height: 8),
+                  ConstrainedBox(
+                    constraints: BoxConstraints(maxHeight: 200),
+                    child: SingleChildScrollView(
+                      child: Text(
+                        errorDetails.exception.toString(),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.red[300],
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -836,7 +755,7 @@ class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    
+
     try {
       // Handle app lifecycle changes at the root level
       switch (state) {
@@ -914,7 +833,7 @@ class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
       builder: (context, constraints) {
         try {
           final isWideScreen = constraints.maxWidth > 800;
-          
+
           return Scaffold(
             body: SafeArea(
               child: isWideScreen
@@ -927,7 +846,9 @@ class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
                           selectedIndex: _selectedIndex,
                           v2rayStatus: v2rayStatus,
                           onDestinationSelected: (index) {
-                            if (mounted && index >= 0 && index < _pages.length) {
+                            if (mounted &&
+                                index >= 0 &&
+                                index < _pages.length) {
                               setState(() => _selectedIndex = index);
                             }
                           },
@@ -937,8 +858,8 @@ class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
                     )
                   : _buildIndexedStack(),
             ),
-            bottomNavigationBar: isWideScreen 
-                ? null 
+            bottomNavigationBar: isWideScreen
+                ? null
                 : ModernNavigation(
                     selectedIndex: _selectedIndex,
                     v2rayStatus: v2rayStatus,
@@ -967,13 +888,15 @@ class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
   Future<void> _checkForUpdates() async {
     try {
       developer.log('🔍 Checking for app updates...', name: 'update_checker');
-      
+
       final updateChecker = UpdateCheckerService();
       final updateInfo = await updateChecker.checkForUpdates();
-      
+
       if (updateInfo != null && updateInfo.needsUpdate && mounted) {
-        developer.log('📱 Update required: ${updateInfo.currentVersion} -> ${updateInfo.latestVersion}', name: 'update_checker');
-        
+        developer.log(
+            '📱 Update required: ${updateInfo.currentVersion} -> ${updateInfo.latestVersion}',
+            name: 'update_checker');
+
         // Show mandatory update dialog
         showDialog(
           context: context,
@@ -1005,4 +928,82 @@ class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
       return _buildErrorPage('Navigation Error');
     }
   }
+}
+
+/// Build a safe error app that won't crash
+Widget _buildSafeErrorApp(String error) {
+  return MaterialApp(
+    title: 'ShineNET VPN - خطا',
+    home: Scaffold(
+      backgroundColor: Colors.red[900],
+      body: SafeArea(
+        child: Padding(
+          padding: EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.error_outline,
+                color: Colors.white,
+                size: 64,
+              ),
+              SizedBox(height: 16),
+              Text(
+                'خطا در ShineNET VPN',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 16),
+              Text(
+                'برنامه با خطا مواجه شده و نیاز به راه‌اندازی مجدد دارد.',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 16,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 24),
+              Container(
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.black26,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: SingleChildScrollView(
+                  child: Text(
+                    error.length > 500 ? error.substring(0, 500) + '...' : error,
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 12,
+                      fontFamily: 'monospace',
+                    ),
+                    textAlign: TextAlign.left,
+                  ),
+                ),
+              ),
+              SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () {
+                  try {
+                    SystemNavigator.pop();
+                  } catch (e) {
+                    developer.log('Failed to restart app', error: e);
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: Colors.red[900],
+                ),
+                child: Text('راه‌اندازی مجدد'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
 }

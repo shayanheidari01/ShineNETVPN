@@ -34,7 +34,7 @@ class _VpnCardState extends State<VpnCard> with TickerProviderStateMixin {
   String? ipflag;
   bool isLoading = false;
   late AnimationController _pulseController;
-  
+
   @override
   void initState() {
     super.initState();
@@ -43,13 +43,13 @@ class _VpnCardState extends State<VpnCard> with TickerProviderStateMixin {
       duration: Duration(seconds: 2),
     )..repeat();
   }
-  
+
   @override
   void dispose() {
     _pulseController.dispose();
     super.dispose();
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -72,7 +72,8 @@ class _VpnCardState extends State<VpnCard> with TickerProviderStateMixin {
                     padding: EdgeInsets.all(ThemeColor.smallSpacing),
                     decoration: BoxDecoration(
                       color: ThemeColor.primaryColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
+                      borderRadius:
+                          BorderRadius.circular(ThemeColor.smallRadius),
                       border: Border.all(
                         color: ThemeColor.primaryColor.withValues(alpha: 0.3),
                         width: 1,
@@ -179,14 +180,15 @@ class _VpnCardState extends State<VpnCard> with TickerProviderStateMixin {
         animation: _pulseController,
         builder: (context, child) {
           return Tooltip(
-            message: 'Connected for ${widget.duration}',
+            message: 'connected_for'.tr().replaceAll('{{duration}}', widget.duration),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
                   padding: EdgeInsets.all(6),
                   decoration: BoxDecoration(
-                    color: ThemeColor.primaryColor.withValues(alpha: 0.1 + 0.1 * _pulseController.value),
+                    color: ThemeColor.primaryColor
+                        .withValues(alpha: 0.1 + 0.1 * _pulseController.value),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
@@ -224,7 +226,7 @@ class _VpnCardState extends State<VpnCard> with TickerProviderStateMixin {
       ),
     );
   }
-  
+
   // Format duration for better readability
   String _formatDuration(String duration) {
     // If the duration is already in a good format, return it as is
@@ -235,7 +237,7 @@ class _VpnCardState extends State<VpnCard> with TickerProviderStateMixin {
         final hours = int.tryParse(parts[0]) ?? 0;
         final minutes = int.tryParse(parts[1]) ?? 0;
         // final seconds = int.tryParse(parts[2]) ?? 0;
-        
+
         if (hours > 0) {
           return '${hours}h ${minutes}m';
         } else if (minutes > 0) {
@@ -246,12 +248,12 @@ class _VpnCardState extends State<VpnCard> with TickerProviderStateMixin {
       }
       return duration;
     }
-    
+
     // Handle other formats (like seconds only)
     if (duration.contains('s') || duration.contains('sec')) {
       return duration;
     }
-    
+
     // Try to parse as seconds
     try {
       final seconds = int.tryParse(duration) ?? 0;
@@ -273,7 +275,7 @@ class _VpnCardState extends State<VpnCard> with TickerProviderStateMixin {
       // If parsing fails, return the original duration
       print('Error formatting duration: $e');
     }
-    
+
     // Return original duration if we can't format it better
     return duration;
   }
@@ -325,22 +327,48 @@ class _VpnCardState extends State<VpnCard> with TickerProviderStateMixin {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
-          onTap: () async {
-            HapticFeedback.lightImpact();
-            setState(() => isLoading = true);
-            try {
-              final ipInfo = await getIpApi();
-              setState(() {
-                ipflag = countryCodeToFlagEmoji(ipInfo['countryCode']!);
-                ipText = ipInfo['ip'];
-                isLoading = false;
-              });
-            } catch (e) {
-              setState(() {
-                isLoading = false;
-              });
-            }
-          },
+          onTap: isLoading
+              ? null
+              : () async {
+                  HapticFeedback.lightImpact();
+                  setState(() => isLoading = true);
+                  try {
+                    final ipInfo = await getIpApi();
+                    setState(() {
+                      ipflag = countryCodeToFlagEmoji(ipInfo['countryCode']!);
+                      ipText = ipInfo['ip'];
+                      isLoading = false;
+                    });
+
+                    // Show success feedback
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('ip_info_updated'.tr()),
+                          backgroundColor: ThemeColor.successColor,
+                          behavior: SnackBarBehavior.floating,
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    setState(() {
+                      isLoading = false;
+                    });
+
+                    // Show error feedback
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('failed_to_get_ip'.tr().replaceAll('{{error}}', e.toString())),
+                          backgroundColor: ThemeColor.errorColor,
+                          behavior: SnackBarBehavior.floating,
+                          duration: Duration(seconds: 3),
+                        ),
+                      );
+                    }
+                  }
+                },
           child: Padding(
             padding: EdgeInsets.symmetric(
               horizontal: ThemeColor.mediumSpacing,
@@ -356,7 +384,9 @@ class _VpnCardState extends State<VpnCard> with TickerProviderStateMixin {
                   )
                 else ...[
                   Icon(
-                    ipText != null ? Icons.language_rounded : Icons.visibility_rounded,
+                    ipText != null
+                        ? Icons.language_rounded
+                        : Icons.visibility_rounded,
                     color: ThemeColor.primaryColor,
                     size: 16,
                   ),

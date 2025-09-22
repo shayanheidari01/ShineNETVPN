@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:shinenet_vpn/common/theme.dart';
-import 'package:flutter_v2ray/flutter_v2ray.dart';
+import 'package:flutter_v2ray_client/flutter_v2ray.dart';
 
 class ModernNavigation extends StatefulWidget {
   final int selectedIndex;
@@ -433,8 +433,9 @@ class _ModernNavigationState extends State<ModernNavigation>
     return ValueListenableBuilder<V2RayStatus>(
       valueListenable: widget.v2rayStatus,
       builder: (context, status, _) {
-        final isConnected = status.state == 'CONNECTED';
-        final isConnecting = status.state == 'CONNECTING';
+        final normalized = status.state.toUpperCase();
+        final isConnected = normalized == 'CONNECTED';
+        final isConnecting = normalized == 'CONNECTING';
 
         Color statusColor;
         IconData statusIcon;

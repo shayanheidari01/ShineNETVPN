@@ -43,26 +43,22 @@ class _AboutScreenState extends State<AboutScreen> {
               pinned: false,
               expandedHeight: 80,
               automaticallyImplyLeading: false,
-              flexibleSpace: FlexibleSpaceBar(
-                titlePadding: EdgeInsets.symmetric(
-                  horizontal: ThemeColor.mediumSpacing,
-                  vertical: ThemeColor.smallSpacing,
-                ),
-                title: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'about'.tr(),
-                      style: ThemeColor.headingStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
+              title: Container(
+                width: double.infinity,
+                height: 80,
+                alignment: Alignment.center,
+                child: Text(
+                  'about'.tr(),
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                    color: ThemeColor.primaryText,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ),
-            
+
             // Main content
             SliverPadding(
               padding: EdgeInsets.all(ThemeColor.mediumSpacing),
@@ -71,15 +67,15 @@ class _AboutScreenState extends State<AboutScreen> {
                   // Simplified app header
                   _buildSimplifiedAppHeader(),
                   SizedBox(height: ThemeColor.largeSpacing),
-                  
+
                   // Simplified features
                   _buildSimplifiedFeatures(),
                   SizedBox(height: ThemeColor.largeSpacing),
-                  
+
                   // Simplified contact section
                   _buildSimplifiedContactSection(),
                   SizedBox(height: ThemeColor.largeSpacing),
-                  
+
                   // Simplified app info
                   _buildSimplifiedAppInfo(),
                 ]),
@@ -301,9 +297,7 @@ class _AboutScreenState extends State<AboutScreen> {
                 final Uri emailLaunchUri = Uri(
                   scheme: 'mailto',
                   path: 'support_email'.tr(),
-                  queryParameters: {
-                    'subject': 'support_email_subject'.tr()
-                  },
+                  queryParameters: {'subject': 'support_email_subject'.tr()},
                 );
                 await launchUrl(emailLaunchUri);
               },
@@ -443,7 +437,7 @@ class _AboutScreenState extends State<AboutScreen> {
                   child: _buildInfoItem(
                     icon: Icons.update_rounded,
                     title: 'version'.tr(),
-                    value: version ?? '1.0.5',
+                    value: version ?? '1.0.6',
                     color: ThemeColor.primaryColor,
                   ),
                 ),
@@ -509,5 +503,4 @@ class _AboutScreenState extends State<AboutScreen> {
       ],
     );
   }
-
 }

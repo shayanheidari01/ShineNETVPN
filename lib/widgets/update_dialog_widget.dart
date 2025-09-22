@@ -3,11 +3,12 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/update_checker_service.dart';
 import '../common/theme.dart';
+import '../common/font_helper.dart';
 import 'dart:developer' as developer;
 
 class UpdateDialogWidget extends StatelessWidget {
   final UpdateInfo updateInfo;
-  
+
   const UpdateDialogWidget({
     Key? key,
     required this.updateInfo,
@@ -33,10 +34,11 @@ class UpdateDialogWidget extends StatelessWidget {
             Expanded(
               child: Text(
                 'update_available'.tr(),
-                style: TextStyle(
-                  color: ThemeColor.primaryText,
+                style: FontHelper.getHeadingStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
+                  color: ThemeColor.primaryText,
+                  context: context,
                 ),
               ),
             ),
@@ -48,9 +50,10 @@ class UpdateDialogWidget extends StatelessWidget {
           children: [
             Text(
               'update_message'.tr(),
-              style: TextStyle(
-                color: ThemeColor.secondaryText,
+              style: FontHelper.getBodyStyle(
                 fontSize: 16,
+                color: ThemeColor.secondaryText,
+                context: context,
               ),
             ),
             SizedBox(height: 16),
@@ -70,18 +73,20 @@ class UpdateDialogWidget extends StatelessWidget {
                     children: [
                       Text(
                         'current_version'.tr(),
-                        style: TextStyle(
-                          color: ThemeColor.secondaryText,
+                        style: FontHelper.getCaptionStyle(
                           fontSize: 14,
+                          color: ThemeColor.secondaryText,
+                          context: context,
                         ),
                       ),
                       Spacer(),
                       Text(
                         updateInfo.currentVersion,
-                        style: TextStyle(
-                          color: ThemeColor.primaryText,
+                        style: FontHelper.getBodyStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
+                          color: ThemeColor.primaryText,
+                          context: context,
                         ),
                       ),
                     ],
@@ -91,24 +96,27 @@ class UpdateDialogWidget extends StatelessWidget {
                     children: [
                       Text(
                         'latest_version'.tr(),
-                        style: TextStyle(
-                          color: ThemeColor.secondaryText,
+                        style: FontHelper.getCaptionStyle(
                           fontSize: 14,
+                          color: ThemeColor.secondaryText,
+                          context: context,
                         ),
                       ),
                       Spacer(),
                       Container(
-                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding:
+                            EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
                           color: ThemeColor.primaryColor,
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           updateInfo.latestVersion,
-                          style: TextStyle(
-                            color: Colors.white,
+                          style: FontHelper.getBodyStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            context: context,
                           ),
                         ),
                       ),
@@ -120,10 +128,11 @@ class UpdateDialogWidget extends StatelessWidget {
             SizedBox(height: 16),
             Text(
               'update_required_message'.tr(),
-              style: TextStyle(
-                color: ThemeColor.errorColor,
+              style: FontHelper.getBodyStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
+                color: ThemeColor.errorColor,
+                context: context,
               ),
             ),
           ],
@@ -148,9 +157,11 @@ class UpdateDialogWidget extends StatelessWidget {
                   SizedBox(width: 8),
                   Text(
                     'download_update'.tr(),
-                    style: TextStyle(
+                    style: FontHelper.getBodyStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      context: context,
                     ),
                   ),
                 ],
@@ -164,8 +175,9 @@ class UpdateDialogWidget extends StatelessWidget {
 
   void _downloadUpdate(BuildContext context) async {
     try {
-      developer.log('🔗 Opening download link: ${updateInfo.downloadLink}', name: 'update_dialog');
-      
+      developer.log('🔗 Opening download link: ${updateInfo.downloadLink}',
+          name: 'update_dialog');
+
       final uri = Uri.parse(updateInfo.downloadLink);
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
