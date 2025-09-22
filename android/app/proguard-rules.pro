@@ -17,7 +17,7 @@
 
 # VPN related optimizations
 -keep class com.shythonx.shinenet_vpn.** { *; }
--keep class flutter_v2ray.** { *; }
+-keep class dev.amirzr.flutter_v2ray_client.** { *; }
 
 # This is generated automatically by the Android Gradle plugin.
 -dontwarn com.google.android.play.core.splitcompat.SplitCompatApplication
