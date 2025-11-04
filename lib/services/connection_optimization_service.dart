@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter_v2ray_client/flutter_v2ray.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'flutter_v2ray_client_manager.dart';
 import 'flutter_v2ray_ping_service.dart'; // Use V2Ray delay ping
 
 class ConnectionOptimizationService {
@@ -10,8 +11,8 @@ class ConnectionOptimizationService {
   factory ConnectionOptimizationService() => _instance;
   ConnectionOptimizationService._internal();
 
-  late V2ray _flutterV2ray;
-  bool _externalV2rayAttached = false;
+  final FlutterV2rayClientManager _v2rayManager = FlutterV2rayClientManager();
+  bool _statusListenerAttached = false;
   final List<ConnectionAttempt> _connectionHistory = [];
   final Map<String, ConnectionStats> _connectionStats = {};
 
@@ -65,32 +66,34 @@ class ConnectionOptimizationService {
 
   /// Initialize the service
   Future<void> initialize() async {
-    // If an external V2Ray instance was not attached, create and initialize our own
-    if (!_externalV2rayAttached) {
-      _flutterV2ray = V2ray(
-        onStatusChanged: (status) {
-          _handleV2RayStatusChange(status);
-        },
-      );
-      // Initialize V2Ray client (required before starting connections)
-      try {
-        await _flutterV2ray.initialize(
-          notificationIconResourceType: 'mipmap',
-          notificationIconResourceName: 'ic_launcher',
-        );
-      } catch (e) {
-        // Continue even if initialization throws; HomePage also initializes globally
-        print('V2Ray initialize error (service): $e');
-      }
+    if (!_statusListenerAttached) {
+      _v2rayManager.addStatusListener(_handleV2RayStatusChange);
+      _statusListenerAttached = true;
     }
+
+    try {
+      await _v2rayManager.ensureInitialized(
+        notificationIconResourceType: 'mipmap',
+        notificationIconResourceName: 'ic_launcher',
+      );
+    } catch (e) {
+      print('V2Ray initialize error (service): $e');
+    }
+
     await _loadConnectionHistory();
     _startConnectionMonitoring();
   }
 
-  /// Attach an external, shared V2Ray instance (so status events propagate to UI)
-  void attachExternalV2ray(V2ray instance) {
-    _flutterV2ray = instance;
-    _externalV2rayAttached = true;
+  /// Attach shared manager used by UI so that status listeners remain synchronized
+  void attachManager(FlutterV2rayClientManager manager) {
+    if (identical(_v2rayManager, manager)) {
+      if (!_statusListenerAttached) {
+        _v2rayManager.addStatusListener(_handleV2RayStatusChange);
+        _statusListenerAttached = true;
+      }
+      return;
+    }
+    // No-op because singleton instance already covers this scenario.
   }
 
   /// Handle V2Ray status changes
@@ -692,7 +695,7 @@ class ConnectionOptimizationService {
   /// Quick connection attempt with minimal overhead
   Future<bool> _quickConnect(String serverConfig) async {
     try {
-      await _flutterV2ray.startV2Ray(
+      await _v2rayManager.start(
         remark: 'Quick Reconnect',
         config: serverConfig,
         proxyOnly: false,
@@ -1306,7 +1309,7 @@ class ConnectionOptimizationService {
       try {
         // Request VPN permission (only on first attempt)
         if (attempt == 0) {
-          final hasPermission = await _flutterV2ray.requestPermission();
+          final hasPermission = await _v2rayManager.requestPermission();
           if (!hasPermission) {
             return ConnectionResult(
               success: false,
@@ -1390,7 +1393,7 @@ class ConnectionOptimizationService {
       _activeConnections[serverId] = DateTime.now().millisecondsSinceEpoch;
 
       // Configure V2Ray with optimized settings and proper resource management
-      await _flutterV2ray.startV2Ray(
+      await _v2rayManager.start(
         remark: 'ShineNET VPN - Optimized',
         config: server,
         proxyOnly: false,
@@ -1443,7 +1446,7 @@ class ConnectionOptimizationService {
     for (final serverId in expiredConnections) {
       try {
         print('🧹 Cleaning up expired connection: $serverId');
-        await _flutterV2ray.stopV2Ray();
+        await _v2rayManager.stop();
         _activeConnections.remove(serverId);
       } catch (e) {
         print('⚠️ Error cleaning up connection $serverId: $e');
@@ -1647,6 +1650,9 @@ class ConnectionOptimizationService {
     if (servers.isEmpty) return servers;
 
     // Intelligent server selection instead of testing ALL servers
+    const int maxTotalServers = 12;
+    const int maxPrioritizedServers = 6;
+
     final prioritizedServers = <String>[];
     final regularServers = <String>[];
 
@@ -1664,17 +1670,27 @@ class ConnectionOptimizationService {
       }
     }
 
-    // Combine lists: priority servers first, then up to 20 regular servers
     final selectedServers = <String>[];
-    selectedServers.addAll(prioritizedServers);
-    selectedServers
-        .addAll(regularServers.take(20)); // Limit to 20 regular servers
+
+    // Always take the best performing servers first, but keep the cap small
+    selectedServers.addAll(prioritizedServers.take(maxPrioritizedServers));
+
+    if (selectedServers.length < maxTotalServers) {
+      final remainingSlots = maxTotalServers - selectedServers.length;
+      selectedServers.addAll(regularServers.take(remainingSlots));
+    }
+
+    final totalPrioritized = min(prioritizedServers.length, maxPrioritizedServers);
+    final totalRegular = max(0, selectedServers.length - totalPrioritized);
 
     print(
-        '🎯 Enhanced selection: ${prioritizedServers.length} priority + ${min(regularServers.length, 20)} regular = ${selectedServers.length} servers');
-    return selectedServers.isEmpty
-        ? servers.take(15).toList()
-        : selectedServers;
+        '🎯 Enhanced selection: $totalPrioritized priority + $totalRegular regular = ${selectedServers.length} servers (max $maxTotalServers)');
+
+    if (selectedServers.isEmpty) {
+      return servers.take(maxTotalServers).toList();
+    }
+
+    return selectedServers;
   }
 
   /// Calculate dynamic timeout based on network conditions
@@ -2012,7 +2028,7 @@ class ConnectionOptimizationService {
       // Multiple attempts to stop V2Ray connections
       for (int attempt = 0; attempt < 3; attempt++) {
         print('🛑 V2Ray stop attempt ${attempt + 1}/3');
-        await _flutterV2ray.stopV2Ray();
+        await _v2rayManager.stop();
 
         // Wait between attempts
         if (attempt < 2) {

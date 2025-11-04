@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:shinenet_vpn/common/liquid_glass_container.dart';
 import 'package:shinenet_vpn/common/theme.dart';
 import 'package:flutter_v2ray_client/flutter_v2ray.dart';
 
@@ -61,61 +62,48 @@ class _ModernNavigationState extends State<ModernNavigation>
   }
 
   Widget _buildDesktopNavigation() {
-    return Container(
+    return SizedBox(
       width: 280,
-      decoration: BoxDecoration(
-        color: ThemeColor.surfaceColor,
-        border: Border(
-          right: BorderSide(
-            color: ThemeColor.borderColor.withValues(alpha: 0.2),
-            width: 1,
-          ),
+      child: LiquidGlassContainer(
+        borderRadius: ThemeColor.largeRadius,
+        blurSigma: 26,
+        opacity: 0.08,
+        borderColor: ThemeColor.primaryColor.withValues(alpha: 0.4),
+        gradientColors: [
+          ThemeColor.surfaceColor.withValues(alpha: 0.75),
+          ThemeColor.surfaceColor.withValues(alpha: 0.55),
+        ],
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+        child: Column(
+          children: [
+            _buildAppHeader(),
+            const SizedBox(height: 32),
+            Expanded(
+              child: _buildNavigationItems(),
+            ),
+            const SizedBox(height: 16),
+            _buildConnectionStatus(),
+          ],
         ),
-        boxShadow: [
-          BoxShadow(
-            color: ThemeColor.shadowColor.withValues(alpha: 0.1),
-            blurRadius: 20,
-            offset: const Offset(4, 0),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          const SizedBox(height: 40),
-          _buildAppHeader(),
-          const SizedBox(height: 40),
-          Expanded(
-            child: _buildNavigationItems(),
-          ),
-          const SizedBox(height: 20),
-          _buildConnectionStatus(),
-          const SizedBox(height: 20),
-        ],
       ),
     );
   }
 
   Widget _buildMobileNavigation() {
-    return Container(
-      decoration: BoxDecoration(
-        color: ThemeColor.surfaceColor,
-        border: Border(
-          top: BorderSide(
-            color: ThemeColor.borderColor.withValues(alpha: 0.2),
-            width: 1,
-          ),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: ThemeColor.shadowColor.withValues(alpha: 0.1),
-            blurRadius: 20,
-            offset: const Offset(0, -4),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        child: LiquidGlassContainer(
+          borderRadius: ThemeColor.largeRadius,
+          blurSigma: 20,
+          opacity: 0.1,
+          showShadow: false,
+          borderColor: ThemeColor.primaryColor.withValues(alpha: 0.25),
+          gradientColors: [
+            ThemeColor.surfaceColor.withValues(alpha: 0.75),
+            ThemeColor.surfaceColor.withValues(alpha: 0.5),
+          ],
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: _buildMobileNavigationItems(),
@@ -350,8 +338,8 @@ class _ModernNavigationState extends State<ModernNavigation>
                   curve: Curves.easeInOut,
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 12,
+                    horizontal: 6,
+                    vertical: 9,
                   ),
                   decoration: BoxDecoration(
                     gradient: isSelected
@@ -389,7 +377,7 @@ class _ModernNavigationState extends State<ModernNavigation>
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(6),
+                        padding: const EdgeInsets.all(5),
                         decoration: BoxDecoration(
                           color: isSelected
                               ? ThemeColor.primaryColor.withValues(alpha: 0.2)
@@ -401,10 +389,10 @@ class _ModernNavigationState extends State<ModernNavigation>
                           color: isSelected
                               ? ThemeColor.primaryColor
                               : ThemeColor.mutedText,
-                          size: 18,
+                          size: 16,
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 5),
                       Text(
                         item.label,
                         style: ThemeColor.captionStyle(
@@ -414,7 +402,7 @@ class _ModernNavigationState extends State<ModernNavigation>
                           fontWeight: isSelected
                               ? FontWeight.w700
                               : FontWeight.w500,
-                          fontSize: 11,
+                          fontSize: 10,
                         ),
                         textAlign: TextAlign.center,
                       ),

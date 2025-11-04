@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shinenet_vpn/common/theme.dart';
 import 'package:shinenet_vpn/common/font_helper.dart';
+import 'package:shinenet_vpn/common/liquid_glass_container.dart';
 import 'package:shinenet_vpn/services/language_manager.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'dart:developer' as developer;
@@ -178,9 +179,15 @@ class _FontAccessibilityWidgetState extends State<FontAccessibilityWidget> {
   }
 
   Widget _buildFontScaleSection() {
-    return Container(
+    return LiquidGlassContainer(
       padding: EdgeInsets.all(ThemeColor.mediumSpacing),
-      decoration: ThemeColor.cardDecoration(),
+      borderRadius: ThemeColor.largeRadius,
+      blurSigma: 26,
+      gradientColors: [
+        ThemeColor.surfaceColor.withValues(alpha: 0.75),
+        ThemeColor.surfaceColor.withValues(alpha: 0.4),
+      ],
+      borderColor: ThemeColor.primaryColor.withValues(alpha: 0.35),
       child: Column(
         children: [
           // Current scale display
@@ -327,78 +334,92 @@ class _FontAccessibilityWidgetState extends State<FontAccessibilityWidget> {
     final currentLang = LanguageManager.getCurrentLanguage(context);
     final previewText = FontHelper.getFontPreviewText(currentLang.code);
 
-    return Container(
+    return SizedBox(
       width: double.infinity,
-      padding: EdgeInsets.all(ThemeColor.mediumSpacing),
-      decoration: ThemeColor.cardDecoration(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Large heading
-          Text(
-            'large_heading_example'.tr(),
-            style: FontHelper.getHeadingStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              context: context,
-            ),
-          ),
-
-          SizedBox(height: ThemeColor.smallSpacing),
-
-          // Medium heading
-          Text(
-            'medium_heading_example'.tr(),
-            style: FontHelper.getHeadingStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-              context: context,
-            ),
-          ),
-
-          SizedBox(height: ThemeColor.smallSpacing),
-
-          // Body text
-          Text(
-            previewText,
-            style: FontHelper.getBodyStyle(
-              fontSize: 16,
-              context: context,
-            ),
-          ),
-
-          SizedBox(height: ThemeColor.smallSpacing),
-
-          // Caption text
-          Text(
-            'caption_text_example'.tr(),
-            style: FontHelper.getCaptionStyle(
-              fontSize: 14,
-              color: ThemeColor.mutedText,
-              context: context,
-            ),
-          ),
-
-          SizedBox(height: ThemeColor.smallSpacing),
-
-          // Small text
-          Text(
-            'small_text_example'.tr(),
-            style: FontHelper.getCaptionStyle(
-              fontSize: 12,
-              color: ThemeColor.mutedText,
-              context: context,
-            ),
-          ),
+      child: LiquidGlassContainer(
+        padding: EdgeInsets.all(ThemeColor.mediumSpacing),
+        borderRadius: ThemeColor.largeRadius,
+        blurSigma: 24,
+        gradientColors: [
+          ThemeColor.surfaceColor.withValues(alpha: 0.8),
+          ThemeColor.surfaceColor.withValues(alpha: 0.45),
         ],
+        borderColor: ThemeColor.primaryColor.withValues(alpha: 0.25),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Large heading
+            Text(
+              'large_heading_example'.tr(),
+              style: FontHelper.getHeadingStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                context: context,
+              ),
+            ),
+
+            SizedBox(height: ThemeColor.smallSpacing),
+
+            // Medium heading
+            Text(
+              'medium_heading_example'.tr(),
+              style: FontHelper.getHeadingStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+                context: context,
+              ),
+            ),
+
+            SizedBox(height: ThemeColor.smallSpacing),
+
+            // Body text
+            Text(
+              previewText,
+              style: FontHelper.getBodyStyle(
+                fontSize: 16,
+                context: context,
+              ),
+            ),
+
+            SizedBox(height: ThemeColor.smallSpacing),
+
+            // Caption text
+            Text(
+              'caption_text_example'.tr(),
+              style: FontHelper.getCaptionStyle(
+                fontSize: 14,
+                color: ThemeColor.mutedText,
+                context: context,
+              ),
+            ),
+
+            SizedBox(height: ThemeColor.smallSpacing),
+
+            // Small text
+            Text(
+              'small_text_example'.tr(),
+              style: FontHelper.getCaptionStyle(
+                fontSize: 12,
+                color: ThemeColor.mutedText,
+                context: context,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildAccessibilityOptions() {
-    return Container(
+    return LiquidGlassContainer(
       padding: EdgeInsets.all(ThemeColor.mediumSpacing),
-      decoration: ThemeColor.cardDecoration(),
+      borderRadius: ThemeColor.largeRadius,
+      blurSigma: 26,
+      gradientColors: [
+        ThemeColor.surfaceColor.withValues(alpha: 0.78),
+        ThemeColor.surfaceColor.withValues(alpha: 0.42),
+      ],
+      borderColor: ThemeColor.primaryColor.withValues(alpha: 0.3),
       child: Column(
         children: [
           // Use system font scale

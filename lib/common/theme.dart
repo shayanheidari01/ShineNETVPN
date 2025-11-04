@@ -53,9 +53,9 @@ class ThemeColor {
   static const Color glowColor = Color(0x330A84FF);
 
   // Smooth animation durations
-  static const Duration fastAnimation = Duration(milliseconds: 200);
-  static const Duration mediumAnimation = Duration(milliseconds: 300);
-  static const Duration slowAnimation = Duration(milliseconds: 600);
+  static const Duration fastAnimation = Duration(milliseconds: 250);
+  static const Duration mediumAnimation = Duration(milliseconds: 420);
+  static const Duration slowAnimation = Duration(milliseconds: 750);
 
   // Modern border radius values
   static const double smallRadius = 12.0;

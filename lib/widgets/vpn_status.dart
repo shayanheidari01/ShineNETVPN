@@ -1,9 +1,7 @@
 import 'package:shinenet_vpn/common/theme.dart';
-import 'package:dio/dio.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:loading_animation_widget/loading_animation_widget.dart';
 
 class VpnCard extends StatefulWidget {
   final int downloadSpeed;
@@ -30,9 +28,6 @@ class VpnCard extends StatefulWidget {
 }
 
 class _VpnCardState extends State<VpnCard> with TickerProviderStateMixin {
-  String? ipText;
-  String? ipflag;
-  bool isLoading = false;
   late AnimationController _pulseController;
 
   @override
@@ -99,7 +94,7 @@ class _VpnCardState extends State<VpnCard> with TickerProviderStateMixin {
                           ),
                         ),
                         SizedBox(height: ThemeColor.smallSpacing),
-                        _buildIpButton(),
+                        _buildIpDisplay(),
                       ],
                     ),
                   ),
@@ -306,8 +301,12 @@ class _VpnCardState extends State<VpnCard> with TickerProviderStateMixin {
     return '${(bytes / gb).toStringAsFixed(2)}GB/s';
   }
 
-  Widget _buildIpButton() {
+  Widget _buildIpDisplay() {
     return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: ThemeColor.mediumSpacing,
+        vertical: ThemeColor.smallSpacing,
+      ),
       decoration: BoxDecoration(
         color: ThemeColor.surfaceColor,
         borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
@@ -315,103 +314,27 @@ class _VpnCardState extends State<VpnCard> with TickerProviderStateMixin {
           color: ThemeColor.borderColor.withValues(alpha: 0.3),
           width: 1,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: ThemeColor.shadowColor.withValues(alpha: 0.1),
-            blurRadius: 4,
-            offset: Offset(0, 2),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.language_rounded,
+            color: ThemeColor.primaryColor,
+            size: 16,
+          ),
+          SizedBox(width: ThemeColor.smallSpacing),
+          Expanded(
+            child: Text(
+              'ip_lookup_disabled'.tr(),
+              style: ThemeColor.captionStyle(
+                color: ThemeColor.secondaryText,
+                fontWeight: FontWeight.w500,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
-          onTap: isLoading
-              ? null
-              : () async {
-                  HapticFeedback.lightImpact();
-                  setState(() => isLoading = true);
-                  try {
-                    final ipInfo = await getIpApi();
-                    setState(() {
-                      ipflag = countryCodeToFlagEmoji(ipInfo['countryCode']!);
-                      ipText = ipInfo['ip'];
-                      isLoading = false;
-                    });
-
-                    // Show success feedback
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('ip_info_updated'.tr()),
-                          backgroundColor: ThemeColor.successColor,
-                          behavior: SnackBarBehavior.floating,
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
-                    }
-                  } catch (e) {
-                    setState(() {
-                      isLoading = false;
-                    });
-
-                    // Show error feedback
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('failed_to_get_ip'.tr().replaceAll('{{error}}', e.toString())),
-                          backgroundColor: ThemeColor.errorColor,
-                          behavior: SnackBarBehavior.floating,
-                          duration: Duration(seconds: 3),
-                        ),
-                      );
-                    }
-                  }
-                },
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: ThemeColor.mediumSpacing,
-              vertical: ThemeColor.smallSpacing,
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (isLoading)
-                  LoadingAnimationWidget.threeArchedCircle(
-                    color: ThemeColor.primaryColor,
-                    size: 16,
-                  )
-                else ...[
-                  Icon(
-                    ipText != null
-                        ? Icons.language_rounded
-                        : Icons.visibility_rounded,
-                    color: ThemeColor.primaryColor,
-                    size: 16,
-                  ),
-                  SizedBox(width: ThemeColor.smallSpacing),
-                  Text(
-                    ipText ?? 'show_ip'.tr(),
-                    style: ThemeColor.captionStyle(
-                      color: ThemeColor.secondaryText,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  if (ipflag != null) ...[
-                    SizedBox(width: ThemeColor.smallSpacing),
-                    Text(
-                      ipflag!,
-                      style: TextStyle(
-                        fontSize: 16,
-                      ),
-                    ),
-                  ],
-                ],
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }
@@ -493,60 +416,3 @@ class _VpnCardState extends State<VpnCard> with TickerProviderStateMixin {
   }
 }
 
-String countryCodeToFlagEmoji(String countryCode) {
-  countryCode = countryCode.toUpperCase();
-  final flag = countryCode.codeUnits
-      .map((codeUnit) => String.fromCharCode(0x1F1E6 + codeUnit - 0x41))
-      .join();
-
-  return Text(
-        flag,
-        style: const TextStyle(
-          fontSize: 16,
-        ),
-      ).data ??
-      flag;
-}
-
-Future<Map<String, String>> getIpApi() async {
-  try {
-    final dio = Dio();
-
-    final response = await dio.get(
-      'https://freeipapi.com/api/json',
-      options: Options(
-        headers: {
-          'X-Content-Type-Options': 'nosniff',
-        },
-      ),
-    );
-
-    if (response.statusCode == 200) {
-      final data = response.data;
-      if (data != null && data is Map) {
-        String ip = data['ipAddress'] ?? 'Unknown IP';
-
-        if (ip.contains('.')) {
-          // IPv4
-          final parts = ip.split('.');
-          if (parts.length == 4) {
-            ip = '${parts[0]}.*.*.${parts[3]}';
-          }
-        } else if (ip.contains(':')) {
-          // IPv6
-          final parts = ip.split(':');
-          if (parts.length > 4) {
-            ip = '${parts[0]}:${parts[1]}:****:${parts.last}';
-          }
-        }
-
-        return {'countryCode': data['countryCode'] ?? 'unknown'.tr(), 'ip': ip};
-      }
-    }
-
-    return {'countryCode': 'unknown'.tr(), 'ip': 'unknown_ip'.tr()};
-  } catch (e) {
-    print('Error getting IP info: $e');
-    return {'countryCode': 'error'.tr(), 'ip': 'error'.tr()};
-  }
-}

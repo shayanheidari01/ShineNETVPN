@@ -93,7 +93,8 @@ class IntelligentServerSelector {
         final pingMap = await v2rayPing.testMultipleServerPingsRobust(
           servers,
           timeoutSeconds: 2,
-          parallel: false, // Sequential single-attempt pre-check per requirement
+          parallel: true,
+          maxConcurrent: 8,
           onProgress: (completed, total) =>
               onProgressUpdate?.call(completed, total),
         );

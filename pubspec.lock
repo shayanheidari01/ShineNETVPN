@@ -381,10 +381,10 @@ packages:
     description:
       path: "."
       ref: HEAD
-      resolved-ref: ac2194a08e44678afd5b7ee930a3a147fcf103dd
+      resolved-ref: e10c9c83fa9577c87ea87d7ebb990ae0262a86a6
       url: "https://github.com/shayanheidari01/flutter_v2ray_client.git"
     source: git
-    version: "1.1.0"
+    version: "3.0.0"
   flutter_web_plugins:
     dependency: transitive
     description: flutter

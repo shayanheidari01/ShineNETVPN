@@ -58,6 +58,7 @@
     "restart_app": "راه‌اندازی مجدد برنامه",
     "retry": "تلاش دوباره",
     "no_healthy_servers": "هیچ سرور سالمی در دسترس نیست. در حال دریافت سرورهای جدید...",
+    "no_servers_available_fetching": "هیچ سروری در دسترس نیست. در حال دریافت لیست سرورها...",
     "connection_failed": "اتصال ناموفق بود",
     "cancel": "لغو",
     "try_direct_connection": "امتحان اتصال مستقیم",
@@ -310,6 +311,11 @@
     "sort_by_ping": "مرتب‌سازی بر اساس پینگ",
     "server_metrics": "معیارهای سرور",
     
+    "testing_servers_unified": "در حال تست {{count}} سرور...",
+    "testing_progress_unified": "پیشرفت تست: {{current}}/{{total}} سرور",
+    "ping_test_completed_unified": "تست پینگ تکمیل شد: {{successful}}/{{total}} موفق، میانگین: {{average}}ms",
+    "ping_test_failed": "تست پینگ ناموفق",
+    
     "get_my_ip": "نمایش IP من",
     "fetching_ip_info": "در حال دریافت اطلاعات IP...",
     "ip_updated_successfully": "اطلاعات IP با موفقیت به‌روزرسانی شد",
@@ -317,5 +323,22 @@
     
     "ping_testing": "تست پینگ",
     "real_time_sorting": "مرتب‌سازی لحظه‌ای",
-    "automatic_description": "بهترین سرور را بر اساس پینگ انتخاب می‌کند"
+    "automatic_description": "بهترین سرور را بر اساس پینگ انتخاب می‌کند",
+    
+    "startup_ping_testing": "تست فوری پینگ در راه‌اندازی",
+    "immediate_server_testing": "تست فوری سرورها",
+    "startup_testing_in_progress": "تست فوری در حال انجام...",
+    "startup_testing_completed": "تست فوری تکمیل شد",
+    "unified_ping_manager_ready": "سیستم یکپارچه پینگ آماده است",
+    "testing_all_servers_startup": "تست همه سرورها در راه‌اندازی...",
+    "server_quality_distribution": "توزیع کیفیت سرورها",
+    "excellent_servers_count": "سرورهای عالی: {{count}}",
+    "good_servers_count": "سرورهای خوب: {{count}}",
+    "fair_servers_count": "سرورهای متوسط: {{count}}",
+    "poor_servers_count": "سرورهای ضعیف: {{count}}",
+    "ping_statistics_summary": "خلاصه آمار پینگ",
+    "unified_testing_progress": "پیشرفت تست یکپارچه: {{completed}}/{{total}}",
+    "immediate_results_available": "نتایج فوری در دسترس است",
+    "background_testing_active": "تست پس‌زمینه فعال است",
+    "real_time_ping_updates": "به‌روزرسانی لحظه‌ای پینگ"
 }

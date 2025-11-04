@@ -26,9 +26,16 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
   late AnimationController _scaleController;
   late AnimationController _rotationController;
   late AnimationController _waveController;
+  late AnimationController _colorController;
+  late AnimationController _glowController;
+  late AnimationController _bounceController;
+  
   late Animation<double> _scaleAnimation;
   late Animation<double> _rotationAnimation;
   late Animation<double> _waveAnimation;
+  late Animation<Color?> _colorAnimation;
+  late Animation<double> _glowAnimation;
+  late Animation<double> _bounceAnimation;
 
   @override
   void initState() {
@@ -40,7 +47,7 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
 
     _scaleController = AnimationController(
       vsync: this,
-      duration: ThemeColor.mediumAnimation,
+      duration: Duration(milliseconds: 200),
     );
 
     _rotationController = AnimationController(
@@ -50,15 +57,30 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
 
     _waveController = AnimationController(
       vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    );
+
+    _colorController = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: 600),
+    );
+
+    _glowController = AnimationController(
+      vsync: this,
       duration: Duration(milliseconds: 1500),
+    )..repeat(reverse: true);
+
+    _bounceController = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: 400),
     );
 
     _scaleAnimation = Tween<double>(
       begin: 1.0,
-      end: 0.95,
+      end: 0.92,
     ).animate(CurvedAnimation(
       parent: _scaleController,
-      curve: Curves.easeInOut,
+      curve: Curves.elasticOut,
     ));
 
     _rotationAnimation = Tween<double>(
@@ -77,6 +99,30 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
       curve: Curves.easeInOut,
     ));
 
+    _colorAnimation = ColorTween(
+      begin: ThemeColor.disconnectedColor,
+      end: ThemeColor.connectedColor,
+    ).animate(CurvedAnimation(
+      parent: _colorController,
+      curve: Curves.easeInOutCubic,
+    ));
+
+    _glowAnimation = Tween<double>(
+      begin: 0.3,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _glowController,
+      curve: Curves.easeInOut,
+    ));
+
+    _bounceAnimation = Tween<double>(
+      begin: 1.0,
+      end: 1.15,
+    ).animate(CurvedAnimation(
+      parent: _bounceController,
+      curve: Curves.elasticOut,
+    ));
+
     // Start wave animation for connected state
     _updateAnimationState();
   }
@@ -87,15 +133,20 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
     _scaleController.dispose();
     _rotationController.dispose();
     _waveController.dispose();
+    _colorController.dispose();
+    _glowController.dispose();
+    _bounceController.dispose();
     super.dispose();
   }
 
   void _updateAnimationState() {
     if (widget.status.toUpperCase() == "CONNECTED") {
       _waveController.repeat(reverse: true);
+      _colorController.forward();
     } else {
       _waveController.stop();
       _waveController.reset();
+      _colorController.reverse();
     }
   }
 
@@ -106,9 +157,11 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
       }
       return ThemeColor.connectingColor; // Blue for connecting
     } else if (widget.status.toUpperCase() == "CONNECTED") {
-      return ThemeColor.connectedColor; // Green for connected
+      // Use animated color for smooth transition to connected state
+      return _colorAnimation.value ?? ThemeColor.connectedColor;
     } else {
-      return ThemeColor.disconnectedColor; // Red for disconnected
+      // Use animated color for smooth transition to disconnected state
+      return _colorAnimation.value ?? ThemeColor.disconnectedColor;
     }
   }
 
@@ -142,6 +195,9 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
       print('Status changed from ${oldWidget.status} to ${widget.status}');
       _rotationController.forward().then((_) {
         _rotationController.reset();
+      });
+      _bounceController.forward().then((_) {
+        _bounceController.reverse();
       });
       _updateAnimationState();
     }
@@ -197,7 +253,7 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
             ]),
             builder: (context, child) {
               return Transform.scale(
-                scale: _scaleAnimation.value,
+                scale: _scaleAnimation.value * _bounceAnimation.value,
                 child: Transform.rotate(
                   angle: _rotationAnimation.value * 0.1,
                   child: Stack(
@@ -233,18 +289,18 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: _getShadowColor().withValues(alpha: 0.4),
+                              color: _getShadowColor().withValues(alpha: 0.4 * _glowAnimation.value),
                               blurRadius: 40 + (20 * _pulseController.value),
                               spreadRadius: 4 + (4 * _pulseController.value),
                             ),
                             BoxShadow(
-                              color: _getShadowColor().withValues(alpha: 0.2),
+                              color: _getShadowColor().withValues(alpha: 0.2 * _glowAnimation.value),
                               blurRadius: 80 + (40 * _pulseController.value),
                               spreadRadius: 8 + (8 * _pulseController.value),
                             ),
                             // Add inner glow effect
                             BoxShadow(
-                              color: _getShadowColor().withValues(alpha: 0.1),
+                              color: _getShadowColor().withValues(alpha: 0.1 * _glowAnimation.value),
                               blurRadius: 20,
                               spreadRadius: -10,
                             ),
@@ -284,13 +340,28 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
                                         size: iconSize,
                                       )
                                     : AnimatedSwitcher(
-                                        duration: ThemeColor.mediumAnimation,
+                                        duration: Duration(milliseconds: 500),
                                         transitionBuilder: (child, animation) {
                                           return ScaleTransition(
-                                            scale: animation,
+                                            scale: Tween<double>(
+                                              begin: 0.5,
+                                              end: 1.0,
+                                            ).animate(CurvedAnimation(
+                                              parent: animation,
+                                              curve: Curves.elasticOut,
+                                            )),
                                             child: RotationTransition(
-                                              turns: animation,
-                                              child: child,
+                                              turns: Tween<double>(
+                                                begin: 0.5,
+                                                end: 0.0,
+                                              ).animate(CurvedAnimation(
+                                                parent: animation,
+                                                curve: Curves.easeOutBack,
+                                              )),
+                                              child: FadeTransition(
+                                                opacity: animation,
+                                                child: child,
+                                              ),
                                             ),
                                           );
                                         },

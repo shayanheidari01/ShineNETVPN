@@ -37,6 +37,38 @@ class FlutterV2rayPingService {
   // Parse cache: map share URL -> full JSON config to avoid repeated parsing
   final LinkedHashMap<String, String> _configCache = LinkedHashMap();
   static const int _maxConfigCacheEntries = 1000;
+
+  String? _getOrCreateFullConfig(String serverConfig) {
+    if (serverConfig.isEmpty || serverConfig == 'Automatic') {
+      return null;
+    }
+
+    final cachedConfig = _configCache[serverConfig];
+    if (cachedConfig != null) {
+      return cachedConfig;
+    }
+
+    try {
+      final v2rayURL = V2ray.parseFromURL(serverConfig);
+      final computed = v2rayURL.getFullConfiguration();
+      if (computed.isEmpty) {
+        return null;
+      }
+
+      while (_configCache.length >= _maxConfigCacheEntries) {
+        final oldestKey = _configCache.keys.isEmpty ? null : _configCache.keys.first;
+        if (oldestKey == null) {
+          break;
+        }
+        _configCache.remove(oldestKey);
+      }
+
+      _configCache[serverConfig] = computed;
+      return computed;
+    } catch (_) {
+      return null;
+    }
+  }
   
   // Server quality tracking
   final Map<String, ServerQualityMetrics> _serverMetrics = {};
@@ -78,27 +110,9 @@ class FlutterV2rayPingService {
   }) async {
     if (!_isInitialized) initialize();
     try {
-      if (serverConfig.isEmpty || serverConfig == 'Automatic') {
+      final fullConfig = _getOrCreateFullConfig(serverConfig);
+      if (fullConfig == null) {
         return -1;
-      }
-
-      // Convert URL to JSON config expected by getServerDelay
-      String? cachedConfig = _configCache[serverConfig];
-      late final String fullConfig;
-      if (cachedConfig == null) {
-        final v2rayURL = V2ray.parseFromURL(serverConfig);
-        final computed = v2rayURL.getFullConfiguration();
-        if (computed.isEmpty) return -1;
-        // Save to parse cache with simple LRU eviction
-        while (_configCache.length >= _maxConfigCacheEntries) {
-          final oldestKey = _configCache.keys.isEmpty ? null : _configCache.keys.first;
-          if (oldestKey == null) break;
-          _configCache.remove(oldestKey);
-        }
-        _configCache[serverConfig] = computed;
-        fullConfig = computed;
-      } else {
-        fullConfig = cachedConfig;
       }
 
       // Simple cache key since we only use Google's probe URL
@@ -126,32 +140,28 @@ class FlutterV2rayPingService {
       () async {
         try {
           // Test server without any timeout - let V2Ray decide naturally
-          print('⏱️ Testing server without timeout: ${serverConfig.length > 50 ? serverConfig.substring(0, 50) + '...' : serverConfig}');
+          print('⏱️ شروع تست سرور: ${serverConfig.length > 50 ? serverConfig.substring(0, 50) + '...' : serverConfig}');
           
           // Always use Google's reliable probe URL for all tests
-          print('🔗 Using Google probe URL: $_probeUrl');
           int raw = await _v2ray
               .getServerDelay(config: fullConfig, url: _probeUrl);
               // No timeout() call - unlimited time for testing
           
-          // Update server metrics
+          // Update server metrics immediately
           _updateServerMetrics(serverConfig, raw, _probeUrl);
-
-          print('📊 Raw ping result: ${raw}ms');
           
           // Normalize values: <=0 => failed (-1); retain 9999 for timeout
           final int normalized = raw <= 0 ? -1 : raw;
-          print('✅ Normalized result: ${normalized}ms');
+          print('✅ نتیجه دریافت شد: ${normalized}ms - بازگشت فوری');
 
+          // Cache result and complete immediately
           _setCache(cacheKey, normalized);
           if (!completer.isCompleted) completer.complete(normalized);
         } catch (e) {
           // Enhanced error logging
-          print('❌ Exception during ping test: $e');
-          print('🔧 Server config length: ${fullConfig.length} chars');
-          print('🔧 Error type: ${e.runtimeType}');
+          print('❌ خطا در تست پینگ: $e');
           
-          // On error, mark as failed and cache shortly
+          // On error, mark as failed and complete immediately
           _setCache(cacheKey, -1);
           if (!completer.isCompleted) completer.complete(-1);
         } finally {
@@ -164,6 +174,116 @@ class FlutterV2rayPingService {
       // If plugin throws due to invalid JSON or parsing issues, treat as failed
       return -1;
     }
+  }
+
+  Future<Map<String, int>> testServersDelayConcurrently(
+    List<String> serverConfigs, {
+    int maxConcurrency = 4,
+    int timeoutMs = 3000,
+    bool useCache = true,
+    bool forceRetest = false,
+    Function(int completed, int total)? onProgress,
+    Function(String server, int ping)? onServerComplete,
+  }) async {
+    if (!_isInitialized) initialize();
+
+    final results = <String, int>{};
+    if (serverConfigs.isEmpty) {
+      return results;
+    }
+
+    final total = serverConfigs.length;
+    int completed = 0;
+
+    final configsToMeasure = <String>[];
+    final serverByMeasurementIndex = <int, String>{};
+    final cacheKeyByMeasurementIndex = <int, String>{};
+
+    Future<void> _emitProgress(String server, int ping) async {
+      completed++;
+      onServerComplete?.call(server, ping);
+      onProgress?.call(completed, total);
+    }
+
+    for (final entry in serverConfigs.asMap().entries) {
+      final serverConfig = entry.value;
+
+      final fullConfig = _getOrCreateFullConfig(serverConfig);
+      if (fullConfig == null) {
+        results[serverConfig] = -1;
+        await _emitProgress(serverConfig, -1);
+        continue;
+      }
+
+      final cacheKey = '$fullConfig|google_204';
+
+      if (forceRetest) {
+        _cache.remove(cacheKey);
+      }
+
+      if (useCache) {
+        final cached = _getFromCache(cacheKey);
+        if (cached != null) {
+          results[serverConfig] = cached;
+          await _emitProgress(serverConfig, cached);
+          continue;
+        }
+      }
+
+      if (_inFlight.containsKey(cacheKey)) {
+        final ping = await _inFlight[cacheKey]!;
+        results[serverConfig] = ping;
+        await _emitProgress(serverConfig, ping);
+        continue;
+      }
+
+      final measurementIndex = configsToMeasure.length;
+      configsToMeasure.add(fullConfig);
+      serverByMeasurementIndex[measurementIndex] = serverConfig;
+      cacheKeyByMeasurementIndex[measurementIndex] = cacheKey;
+    }
+
+    if (configsToMeasure.isEmpty) {
+      return results;
+    }
+
+    try {
+      final delays = await _v2ray.getServersDelayConcurrently(
+        configs: configsToMeasure,
+        url: _probeUrl,
+        maxConcurrency: maxConcurrency < 1 ? 1 : maxConcurrency,
+        timeoutMs: timeoutMs < 1 ? 1 : timeoutMs,
+      );
+
+      for (var i = 0; i < configsToMeasure.length; i++) {
+        final serverConfig = serverByMeasurementIndex[i];
+        if (serverConfig == null) {
+          continue;
+        }
+
+        final rawDelay = i < delays.length ? delays[i] : -1;
+        final normalized = rawDelay <= 0 ? -1 : rawDelay;
+
+        results[serverConfig] = normalized;
+        _setCache(cacheKeyByMeasurementIndex[i]!, normalized);
+        _updateServerMetrics(serverConfig, normalized, _probeUrl);
+        await _emitProgress(serverConfig, normalized);
+      }
+    } catch (e) {
+      for (final entry in serverByMeasurementIndex.entries) {
+        final serverConfig = entry.value;
+        final ping = await testServerPing(
+          serverConfig,
+          timeoutSeconds: null,
+          useCache: useCache,
+          forceRetest: forceRetest,
+        );
+        results[serverConfig] = ping;
+        await _emitProgress(serverConfig, ping);
+      }
+    }
+
+    return results;
   }
   
   /// Update server quality metrics
@@ -310,17 +430,38 @@ class FlutterV2rayPingService {
       if (onServerComplete != null) onServerComplete(s, ping);
     }
 
-    // Sequential testing: Test each server one by one without timeout
-    print('🔄 Starting sequential server testing: ${serverConfigs.length} servers, one by one (no timeout)...');
-    
-    // Test servers one by one sequentially 
-    for (int serverIndex = 0; serverIndex < serverConfigs.length; serverIndex++) {
-      final s = serverConfigs[serverIndex];
-      await runOne(s);
-      print('⚡ Server ${serverIndex + 1}/${serverConfigs.length}: ${results[s]}ms - Immediate UI update');
+    if (parallel) {
+      final int concurrency = ((maxConcurrent ?? serverConfigs.length)
+              .clamp(1, serverConfigs.length))
+          .toInt();
+      print(
+          '🚀 Starting parallel server testing via getServersDelayConcurrently: ${serverConfigs.length} servers with up to $concurrency concurrent tasks...');
+
+      final concurrentResults = await testServersDelayConcurrently(
+        serverConfigs,
+        maxConcurrency: concurrency,
+        timeoutMs: (timeoutSeconds ?? 3).clamp(1, 120) * 1000,
+        useCache: enableRetry,
+        forceRetest: !enableRetry,
+        onProgress: onProgress,
+        onServerComplete: onServerComplete,
+      );
+
+      results.addAll(concurrentResults);
+      print('🏁 Parallel testing completed: ${results.length} total results');
+    } else {
+      // Sequential testing: Test each server one by one without timeout
+      print('🔄 Starting sequential server testing: ${serverConfigs.length} servers, one by one (no timeout)...');
+
+      // Test servers one by one sequentially
+      for (int serverIndex = 0; serverIndex < serverConfigs.length; serverIndex++) {
+        final s = serverConfigs[serverIndex];
+        await runOne(s);
+        print('⚡ Server ${serverIndex + 1}/${serverConfigs.length}: ${results[s]}ms - Immediate UI update');
+      }
+
+      print('🏁 Sequential testing completed: ${results.length} total results');
     }
-    
-    print('🏁 Sequential testing completed: ${results.length} total results');
     return results;
   }
 
@@ -393,7 +534,7 @@ class FlutterV2rayPingService {
     List<String> serverConfigs, {
     int? baseTimeoutSeconds,
     bool parallel = false, // Sequential testing for accuracy (no timeout)
-    int maxConcurrent = 20, // Higher concurrency for maximum speed
+    int? maxConcurrent,
     Function(int completed, int total)? onProgress,
     Function(String server, int ping)? onServerComplete,
     bool prioritizeByQuality = true,
@@ -424,60 +565,62 @@ class FlutterV2rayPingService {
     }
 
     if (parallel) {
-      // Task-based parallel testing: Multiple tasks, each with 5 servers tested sequentially
-      final serverBatches = <List<String>>[];
-      const int serversPerTask = 5;
-      
-      // Create tasks with 5 servers each
-      for (int i = 0; i < serversToTest.length; i += serversPerTask) {
-        final end = (i + serversPerTask < serversToTest.length) ? i + serversPerTask : serversToTest.length;
-        serverBatches.add(serversToTest.sublist(i, end));
-      }
-      
-      print('🚀 Starting task-based testing: ${serverBatches.length} tasks, each with max ${serversPerTask} servers...');
-      
-      // Create parallel tasks
-      final taskWorkers = <Future<void>>[];
-      for (int taskIndex = 0; taskIndex < serverBatches.length; taskIndex++) {
-        final batch = serverBatches[taskIndex]; 
-        taskWorkers.add(() async {
-          print('📋 Task ${taskIndex + 1} started: Testing ${batch.length} servers sequentially (no timeout - unlimited)...');
-          
-          // Test servers in this task one by one without timeout
-          for (int serverIndex = 0; serverIndex < batch.length; serverIndex++) {
-            final serverConfig = batch[serverIndex];
-            try {
-              // Test individual server with 10s timeout for reliable results
-              final ping = await testServerPing(
-                serverConfig,
-                timeoutSeconds: 5, // 10 second timeout for sequential testing
-                enableRetry: false,
-              );
-              
-              results[serverConfig] = ping;
-              completed++;
-              
-              print('⚡ Task ${taskIndex + 1} Server ${serverIndex + 1}/${batch.length}: ${ping}ms - Immediate UI update');
-              
-              // Immediate callback for real-time UI update
-              onProgress?.call(completed, total);
-              onServerComplete?.call(serverConfig, ping);
-              
-            } catch (e) {
-              print('❌ Task ${taskIndex + 1} Server ${serverIndex + 1} failed: $e');
-              results[serverConfig] = -1;
-              completed++;
-              onProgress?.call(completed, total);
-              onServerComplete?.call(serverConfig, -1);
+      final int concurrency = ((maxConcurrent ?? serversToTest.length)
+              .clamp(1, serversToTest.length))
+          .toInt();
+      print(
+          '🚀 Starting fully parallel testing: $total servers with up to $concurrency concurrent tasks (each server in its own task)...');
+
+      final limiter = _AsyncSemaphore(concurrency);
+      final tasks = <Future<void>>[];
+
+      for (int index = 0; index < serversToTest.length; index++) {
+        final serverConfig = serversToTest[index];
+        final task = () async {
+          await limiter.acquire();
+          try {
+            final ping = await testServerPingAdaptive(
+              serverConfig,
+              baseTimeoutSeconds: baseTimeoutSeconds,
+              useCache: false,
+              forceRetest: true,
+            );
+
+            results[serverConfig] = ping;
+            final currentCompleted = ++completed;
+
+            print('⚡ تست ${index + 1}/$total تکمیل شد: ${ping}ms - فراخوانی فوری callback');
+
+            // فراخوانی فوری callback بلافاصله بعد از دریافت نتیجه
+            // بدون هیچ تاخیری
+            if (onServerComplete != null) {
+              onServerComplete(serverConfig, ping);
             }
+            if (onProgress != null) {
+              onProgress(currentCompleted, total);
+            }
+          } catch (e) {
+            print('❌ تست ${index + 1}/$total با خطا مواجه شد: $e');
+            results[serverConfig] = -1;
+            final currentCompleted = ++completed;
+            
+            // فراخوانی فوری callback حتی در صورت خطا
+            if (onServerComplete != null) {
+              onServerComplete(serverConfig, -1);
+            }
+            if (onProgress != null) {
+              onProgress(currentCompleted, total);
+            }
+          } finally {
+            limiter.release();
           }
-          
-          print('✅ Task ${taskIndex + 1} completed: ${batch.length} servers tested');
-        }());
+        }();
+
+        tasks.add(task);
       }
-      
-      await Future.wait(taskWorkers);
-      print('🏁 All ${serverBatches.length} tasks completed: ${results.length} total results');
+
+      await Future.wait(tasks);
+      print('🏁 Parallel testing completed: ${results.length} total results');
     } else {
       // Sequential testing: Test each server one by one without timeout
       print('🔄 Starting sequential server testing: ${serversToTest.length} servers, one by one (no timeout)...');
@@ -519,13 +662,13 @@ class FlutterV2rayPingService {
     return results;
   }
   
-  /// Robust multi-server ping with individual testing (no timeout pressure)
+  /// Robust multi-server ping with individual testing (optionally parallel with bounded concurrency)
   Future<Map<String, int>> testMultipleServerPingsRobust(
     List<String> serverConfigs, {
     int samples = 1,
     int timeoutSeconds = 15, // Reasonable timeout for robust testing
-    bool parallel = false, // Force sequential for accuracy
-    int maxConcurrent = 1, // Individual testing only
+    bool parallel = false,
+    int? maxConcurrent,
     Function(int completed, int total)? onProgress,
     Function(String server, int ping)? onServerComplete,
   }) async {
@@ -550,18 +693,45 @@ class FlutterV2rayPingService {
       onProgress?.call(completed, total);
     }
 
-    // Always use individual sequential testing for robust results
-    print('🛡️ Starting robust individual server testing for ${serverConfigs.length} servers...');
-    for (int i = 0; i < serverConfigs.length; i++) {
-      final s = serverConfigs[i];
-      print('🔍 Robust test ${i + 1}/${total}: ${s.length > 40 ? s.substring(0, 40) + '...' : s}');
-      await runOne(s);
-      // Longer delay for robust testing to ensure accuracy
-      if (i < serverConfigs.length - 1) {
-        await Future.delayed(Duration(milliseconds: 250));
+    if (parallel) {
+      final int concurrency = ((maxConcurrent ?? serverConfigs.length)
+              .clamp(1, serverConfigs.length))
+          .toInt();
+      print(
+          '🛡️ Starting robust parallel testing for ${serverConfigs.length} servers with up to $concurrency concurrent tasks...');
+
+      final limiter = _AsyncSemaphore(concurrency);
+      final tasks = <Future<void>>[];
+
+      for (int i = 0; i < serverConfigs.length; i++) {
+        final s = serverConfigs[i];
+        tasks.add(() async {
+          await limiter.acquire();
+          try {
+            print('🔍 Robust parallel test ${i + 1}/${total}: ${s.length > 40 ? s.substring(0, 40) + '...' : s}');
+            await runOne(s);
+          } finally {
+            limiter.release();
+          }
+        }());
       }
+
+      await Future.wait(tasks);
+      print('🏁 Robust parallel testing completed: ${results.length} comprehensive results');
+    } else {
+      // Always use individual sequential testing for robust results
+      print('🛡️ Starting robust individual server testing for ${serverConfigs.length} servers...');
+      for (int i = 0; i < serverConfigs.length; i++) {
+        final s = serverConfigs[i];
+        print('🔍 Robust test ${i + 1}/${total}: ${s.length > 40 ? s.substring(0, 40) + '...' : s}');
+        await runOne(s);
+        // Longer delay for robust testing to ensure accuracy
+        if (i < serverConfigs.length - 1) {
+          await Future.delayed(Duration(milliseconds: 250));
+        }
+      }
+      print('🏁 Robust individual testing completed: ${results.length} comprehensive results');
     }
-    print('🏁 Robust individual testing completed: ${results.length} comprehensive results');
     return results;
   }
 
@@ -759,6 +929,40 @@ class FlutterV2rayPingService {
 
   void forceCleanup() {
     dispose();
+  }
+}
+
+class _AsyncSemaphore {
+  _AsyncSemaphore(this._maxPermits)
+      : assert(_maxPermits > 0, 'Semaphore must have positive permits');
+
+  final int _maxPermits;
+  int _currentPermits = 0;
+  final Queue<Completer<void>> _waitQueue = Queue();
+
+  Future<void> acquire() {
+    if (_currentPermits < _maxPermits) {
+      _currentPermits++;
+      return Future.value();
+    }
+
+    final completer = Completer<void>();
+    _waitQueue.add(completer);
+    return completer.future;
+  }
+
+  void release() {
+    if (_waitQueue.isNotEmpty) {
+      final next = _waitQueue.removeFirst();
+      if (!next.isCompleted) {
+        next.complete();
+      }
+      return;
+    }
+
+    if (_currentPermits > 0) {
+      _currentPermits--;
+    }
   }
 }
 

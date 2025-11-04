@@ -58,6 +58,7 @@
     "restart_app": "Restart App",
     "retry": "Retry",
     "no_healthy_servers": "No healthy servers available. Fetching new servers...",
+    "no_servers_available_fetching": "No servers available. Fetching server list...",
     "connection_failed": "Connection Failed",
     "cancel": "Cancel",
     "try_direct_connection": "Try Direct Connection",
@@ -314,6 +315,11 @@
     "sort_by_ping": "Sort by ping", 
     "server_metrics": "Server metrics",
     
+    "testing_servers_unified": "Testing {{count}} servers...",
+    "testing_progress_unified": "Testing progress: {{current}}/{{total}} servers",
+    "ping_test_completed_unified": "Ping test completed: {{successful}}/{{total}} successful, avg: {{average}}ms",
+    "ping_test_failed": "Ping test failed",
+    
     "get_my_ip": "Get My IP",
     "fetching_ip_info": "Fetching IP information...",
     "ip_updated_successfully": "IP information updated successfully",
@@ -321,5 +327,22 @@
     
     "ping_testing": "Ping Testing",
     "real_time_sorting": "Real-time Sorting",
-    "automatic_description": "Selects the best server based on ping performance"
+    "automatic_description": "Selects the best server based on ping performance",
+    
+    "startup_ping_testing": "Startup Ping Testing",
+    "immediate_server_testing": "Immediate Server Testing",
+    "startup_testing_in_progress": "Startup testing in progress...",
+    "startup_testing_completed": "Startup testing completed",
+    "unified_ping_manager_ready": "Unified ping system ready",
+    "testing_all_servers_startup": "Testing all servers on startup...",
+    "server_quality_distribution": "Server Quality Distribution",
+    "excellent_servers_count": "Excellent servers: {{count}}",
+    "good_servers_count": "Good servers: {{count}}",
+    "fair_servers_count": "Fair servers: {{count}}",
+    "poor_servers_count": "Poor servers: {{count}}",
+    "ping_statistics_summary": "Ping Statistics Summary",
+    "unified_testing_progress": "Unified testing progress: {{completed}}/{{total}}",
+    "immediate_results_available": "Immediate results available",
+    "background_testing_active": "Background testing active",
+    "real_time_ping_updates": "Real-time ping updates"
 }

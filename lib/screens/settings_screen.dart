@@ -3,6 +3,7 @@ import 'package:shinenet_vpn/common/font_helper.dart';
 import 'package:shinenet_vpn/widgets/settings/blocked_apps_widget.dart';
 import 'package:shinenet_vpn/widgets/settings/language_widget.dart';
 import 'package:shinenet_vpn/widgets/settings/font_accessibility_widget.dart';
+import 'package:shinenet_vpn/common/liquid_glass_container.dart';
 import 'package:shinenet_vpn/services/language_manager.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
@@ -17,22 +18,58 @@ class SettingsWidget extends StatefulWidget {
 
 class _SettingsWidgetState extends State<SettingsWidget> {
   String _selectedLanguage = '';
+  bool _isLoading = false;
+  
+  // Cached gradients for performance
+  late final List<Color> _primaryGradient;
+  late final List<Color> _successGradient;
+  late final List<Color> _warningGradient;
+  late final List<Color> _neutralGradient;
 
   @override
   void initState() {
     super.initState();
+    _initializeGradients();
     _loadSelectedLanguage();
+  }
+
+  // Initialize gradients once to avoid repeated calculations
+  void _initializeGradients() {
+    _primaryGradient = _tintedGlassGradient(
+      ThemeColor.primaryColor,
+      highlight: 0.24,
+      lowlight: 0.06,
+    );
+    _successGradient = _tintedGlassGradient(
+      ThemeColor.successColor,
+      highlight: 0.26,
+      lowlight: 0.07,
+    );
+    _warningGradient = _tintedGlassGradient(
+      ThemeColor.warningColor,
+      highlight: 0.22,
+      lowlight: 0.05,
+    );
+    _neutralGradient = _neutralGlassGradient(
+      highlight: 0.18,
+      lowlight: 0.04,
+    );
   }
 
   // Refresh language when returning from language screen
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _loadSelectedLanguage();
+    if (!_isLoading) {
+      _loadSelectedLanguage();
+    }
   }
 
   // Load current language from LanguageManager using saved preference
   void _loadSelectedLanguage() async {
+    if (_isLoading) return; // Prevent duplicate calls
+    
+    _isLoading = true;
     try {
       final currentLang =
           await LanguageManager.getCurrentLanguageFromPreference();
@@ -50,6 +87,8 @@ class _SettingsWidgetState extends State<SettingsWidget> {
           _selectedLanguage = 'language_english'.tr();
         });
       }
+    } finally {
+      _isLoading = false;
     }
   }
 
@@ -104,12 +143,15 @@ class _SettingsWidgetState extends State<SettingsWidget> {
     );
   }
 
-  // Simplified settings section
+  // Simplified settings section with RepaintBoundary
   Widget _buildSimplifiedSettingsSection() {
-    return Container(
-      decoration: ThemeColor.cardDecoration(),
-      child: Padding(
+    return RepaintBoundary(
+      child: LiquidGlassContainer(
         padding: EdgeInsets.all(ThemeColor.largeSpacing),
+        borderRadius: ThemeColor.largeRadius,
+        blurSigma: 16, // Reduced from 28 to 16 (43% reduction)
+        gradientColors: _primaryGradient, // Use cached gradient
+        borderColor: ThemeColor.primaryColor.withValues(alpha: 0.25),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -126,56 +168,55 @@ class _SettingsWidgetState extends State<SettingsWidget> {
   }
 
   Widget _buildSecurityInfo() {
-    return Container(
-      padding: EdgeInsets.all(ThemeColor.mediumSpacing),
-      decoration: BoxDecoration(
-        color: ThemeColor.successColor.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
-        border: Border.all(
-          color: ThemeColor.successColor.withValues(alpha: 0.3),
-          width: 1,
+    return RepaintBoundary(
+      child: LiquidGlassContainer(
+        padding: EdgeInsets.all(ThemeColor.mediumSpacing),
+        borderRadius: ThemeColor.mediumRadius,
+        blurSigma: 12, // Reduced from 24 to 12 (50% reduction)
+        gradientColors: _successGradient, // Use cached gradient
+        borderColor: ThemeColor.successColor.withValues(alpha: 0.35),
+        child: Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
+              ),
+              child: Icon(
+                Icons.security_rounded,
+                color: Colors.white,
+                size: 24,
+              ),
+            ),
+            SizedBox(width: ThemeColor.mediumSpacing),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'privacy_security'.tr(),
+                    style: FontHelper.getBodyStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                      context: context,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'no_logs_policy'.tr(),
+                    style: FontHelper.getCaptionStyle(
+                      color: Colors.white.withValues(alpha: 0.85),
+                      context: context,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: ThemeColor.successColor.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
-            ),
-            child: Icon(
-              Icons.security_rounded,
-              color: ThemeColor.successColor,
-              size: 24,
-            ),
-          ),
-          SizedBox(width: ThemeColor.mediumSpacing),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'privacy_security'.tr(),
-                  style: FontHelper.getBodyStyle(
-                    fontWeight: FontWeight.w600,
-                    context: context,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'no_logs_policy'.tr(),
-                  style: FontHelper.getCaptionStyle(
-                    color: ThemeColor.successColor.withValues(alpha: 0.8),
-                    context: context,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -205,17 +246,17 @@ class _SettingsWidgetState extends State<SettingsWidget> {
               ? _selectedLanguage
               : 'language_english'.tr(),
           color: ThemeColor.warningColor,
-          onTap: () {
+          onTap: () async {
             HapticFeedback.lightImpact();
-            Navigator.of(context)
-                .push(
+            await Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (context) => const LanguageWidget(),
               ),
-            )
-                .then((value) {
+            );
+            // Use async/await pattern for better performance
+            if (mounted) {
               _loadSelectedLanguage();
-            });
+            }
           },
         ),
         SizedBox(height: ThemeColor.mediumSpacing),
@@ -244,76 +285,90 @@ class _SettingsWidgetState extends State<SettingsWidget> {
     required Color color,
     required VoidCallback onTap,
   }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
-        child: Container(
-          padding: EdgeInsets.all(ThemeColor.mediumSpacing),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.05),
-            borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
-            border: Border.all(
-              color: color.withValues(alpha: 0.2),
-              width: 1,
+    // Select appropriate cached gradient based on color
+    List<Color> gradientColors;
+    if (color == ThemeColor.warningColor) {
+      gradientColors = _warningGradient;
+    } else if (color == ThemeColor.primaryColor || 
+               color == ThemeColor.primaryColor.withValues(alpha: 0.8)) {
+      gradientColors = _primaryGradient;
+    } else {
+      gradientColors = _tintedGlassGradient(color, highlight: 0.22, lowlight: 0.05);
+    }
+
+    return RepaintBoundary(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
+          child: LiquidGlassContainer(
+            padding: EdgeInsets.all(ThemeColor.mediumSpacing),
+            borderRadius: ThemeColor.mediumRadius,
+            blurSigma: 8, // Reduced from 22 to 8 (64% reduction)
+            showShadow: false,
+            gradientColors: gradientColors, // Use cached or computed gradient
+            borderColor: color.withValues(alpha: 0.3),
+            child: Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+                SizedBox(width: ThemeColor.mediumSpacing),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: FontHelper.getBodyStyle(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                          context: context,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: FontHelper.getCaptionStyle(
+                          color: Colors.white.withValues(alpha: 0.85),
+                          context: context,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  color: Colors.white,
+                  size: 16,
+                ),
+              ],
             ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
-                ),
-                child: Icon(
-                  icon,
-                  color: color,
-                  size: 24,
-                ),
-              ),
-              SizedBox(width: ThemeColor.mediumSpacing),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: FontHelper.getBodyStyle(
-                        fontWeight: FontWeight.w600,
-                        context: context,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: FontHelper.getCaptionStyle(
-                        color: ThemeColor.mutedText,
-                        context: context,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(
-                Icons.arrow_forward_ios_rounded,
-                color: color,
-                size: 16,
-              ),
-            ],
           ),
         ),
       ),
     );
   }
 
-  // Simplified app info
+  // Simplified app info with RepaintBoundary
   Widget _buildSimplifiedAppInfo() {
-    return Container(
-      decoration: ThemeColor.cardDecoration(),
-      child: Padding(
+    return RepaintBoundary(
+      child: LiquidGlassContainer(
         padding: EdgeInsets.all(ThemeColor.largeSpacing),
+        borderRadius: ThemeColor.largeRadius,
+        blurSigma: 12, // Reduced from 26 to 12 (54% reduction)
+        gradientColors: _neutralGradient, // Use cached gradient
+        borderColor: ThemeColor.primaryColor.withValues(alpha: 0.2),
         child: Column(
           children: [
             Row(
@@ -329,6 +384,7 @@ class _SettingsWidgetState extends State<SettingsWidget> {
                     'app_information'.tr(),
                     style: FontHelper.getBodyStyle(
                       fontWeight: FontWeight.w600,
+                      color: ThemeColor.primaryText,
                       context: context,
                     ),
                   ),
@@ -342,7 +398,7 @@ class _SettingsWidgetState extends State<SettingsWidget> {
                   child: _buildInfoCard(
                     icon: Icons.update_rounded,
                     title: 'version'.tr(),
-                    value: '1.0.8',
+                    value: '1.1.0',
                     color: ThemeColor.primaryColor,
                   ),
                 ),
@@ -369,38 +425,68 @@ class _SettingsWidgetState extends State<SettingsWidget> {
     required String value,
     required Color color,
   }) {
-    return Container(
-      padding: EdgeInsets.all(ThemeColor.mediumSpacing),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
-        border: Border.all(
-          color: color.withValues(alpha: 0.3),
-          width: 1,
+    // Select appropriate cached gradient based on color
+    List<Color> gradientColors;
+    if (color == ThemeColor.primaryColor) {
+      gradientColors = _primaryGradient;
+    } else if (color == ThemeColor.successColor) {
+      gradientColors = _successGradient;
+    } else {
+      gradientColors = _tintedGlassGradient(color, highlight: 0.2, lowlight: 0.05);
+    }
+
+    return RepaintBoundary(
+      child: LiquidGlassContainer(
+        padding: EdgeInsets.all(ThemeColor.mediumSpacing),
+        borderRadius: ThemeColor.mediumRadius,
+        blurSigma: 6, // Reduced from 20 to 6 (70% reduction)
+        showShadow: false,
+        gradientColors: gradientColors, // Use cached or computed gradient
+        borderColor: color.withValues(alpha: 0.3),
+        child: Column(
+          children: [
+            Icon(icon, color: Colors.white, size: 24),
+            SizedBox(height: ThemeColor.smallSpacing),
+            Text(
+              value,
+              style: FontHelper.getBodyStyle(
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+                fontSize: 16,
+                context: context,
+              ),
+            ),
+            Text(
+              title,
+              style: FontHelper.getCaptionStyle(
+                color: Colors.white.withValues(alpha: 0.85),
+                context: context,
+              ),
+            ),
+          ],
         ),
       ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 24),
-          SizedBox(height: ThemeColor.smallSpacing),
-          Text(
-            value,
-            style: FontHelper.getBodyStyle(
-              fontWeight: FontWeight.w700,
-              color: color,
-              fontSize: 16,
-              context: context,
-            ),
-          ),
-          Text(
-            title,
-            style: FontHelper.getCaptionStyle(
-              color: color.withValues(alpha: 0.8),
-              context: context,
-            ),
-          ),
-        ],
-      ),
     );
+  }
+
+  List<Color> _tintedGlassGradient(
+    Color tint, {
+    double highlight = 0.22,
+    double lowlight = 0.06,
+  }) {
+    return [
+      tint.withOpacity(highlight.clamp(0.0, 1.0)),
+      Colors.white.withOpacity(lowlight.clamp(0.0, 1.0)),
+    ];
+  }
+
+  List<Color> _neutralGlassGradient({
+    double highlight = 0.16,
+    double lowlight = 0.05,
+  }) {
+    return [
+      Colors.white.withOpacity(highlight.clamp(0.0, 1.0)),
+      Colors.white.withOpacity(lowlight.clamp(0.0, 1.0)),
+    ];
   }
 }

@@ -1,18 +1,25 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:http/http.dart' as http;
 
+import 'package:dio/dio.dart';
+import 'package:shinenet_vpn/common/http_client.dart';
+import 'package:shinenet_vpn/common/liquid_glass_container.dart';
 import 'package:shinenet_vpn/common/theme.dart';
+
 import 'package:shinenet_vpn/widgets/connection_widget.dart';
 import 'package:shinenet_vpn/widgets/server_selection_modal_widget.dart';
 import 'package:shinenet_vpn/services/server_optimization_service.dart';
 import 'package:shinenet_vpn/services/connection_optimization_service.dart';
 import 'package:shinenet_vpn/services/server_cache_manager.dart';
+import 'package:shinenet_vpn/services/intelligent_server_selector.dart';
 import 'package:shinenet_vpn/utils/server_location_parser.dart';
 import 'package:shinenet_vpn/screens/home_screen_helper.dart';
-import 'package:shinenet_vpn/services/flutter_v2ray_ping_service.dart'; // V2Ray delay ping service
+import 'package:shinenet_vpn/services/flutter_v2ray_client_manager.dart';
+import 'package:shinenet_vpn/services/flutter_v2ray_ping_service.dart';
+import 'package:shinenet_vpn/services/unified_ping_manager.dart'; // V2Ray delay ping service
 import 'package:flutter/material.dart';
 import 'package:flutter_v2ray_client/flutter_v2ray.dart';
+import 'package:flutter_v2ray_client/model/v2ray_status.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -29,17 +36,18 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  final v2rayStatus = ValueNotifier<V2RayStatus>(V2RayStatus());
-  late final V2ray flutterV2ray = V2ray(
-    onStatusChanged: (status) {
-      v2rayStatus.value = status;
-    },
-  );
+  final FlutterV2rayClientManager _v2rayManager = FlutterV2rayClientManager();
+  ValueNotifier<V2RayStatus> get v2rayStatus => _v2rayManager.statusNotifier;
+
+  static const String _lastSuccessfulServerKey = 'last_successful_server';
+  static const String _lastSuccessfulTimestampKey = 'last_successful_server_time';
+  static const Duration _fastReconnectValidity = Duration(minutes: 45);
 
   // Optimization services
   final ServerOptimizationService _serverService = ServerOptimizationService();
   final ConnectionOptimizationService _connectionService = ConnectionOptimizationService();
   final ServerCacheManager _cacheManager = ServerCacheManager();
+  final IntelligentServerSelector _intelligentSelector = IntelligentServerSelector();
 
   // UI State
   bool isLoading = false;
@@ -56,6 +64,7 @@ class _HomePageState extends State<HomePage> {
   String selectedServerType = 'Automatic'; // Changed from selectedServerLogo
   int? connectedServerDelay;
   bool isFetchingPing = false;
+  bool _isFetchingIP = false;
 
   // Additional State
   bool proxyOnly = false;
@@ -68,8 +77,14 @@ class _HomePageState extends State<HomePage> {
   // Server management - unified with ServerCacheManager
   List<String> cachedServers = <String>[];
   List<Map<String, dynamic>> processedServers = <Map<String, dynamic>>[];
-  Map<String, int> serverPings = <String, int>{}; // Store ping results
+  Map<String, int> serverPings = <String, int>{}; // Legacy ping results (deprecated)
   DateTime? lastServerFetch;
+  String? _lastSuccessfulServer;
+  DateTime? _lastSuccessfulServerTime;
+  
+  // Unified ping management system
+  final UnifiedPingManager _unifiedPingManager = UnifiedPingManager();
+  StreamSubscription<Map<String, PingResult>>? _pingUpdateSubscription;
   
   // Background health monitoring
   Timer? _healthCheckTimer;
@@ -94,15 +109,13 @@ class _HomePageState extends State<HomePage> {
   
   // User IP Information
   String? _userIP;
-  String? _userCountryFlag;
-  String? _userFlagImageUrl;
-  Map<String, dynamic>? _userIPInfo;
   
 
   Future<void> _initializeServices() async {
     try {
       await _serverService.initialize();
       await _connectionService.initialize();
+      await _intelligentSelector.initialize();
       await _loadConnectionAnalytics();
       
       // Background testing removed for optimization
@@ -110,6 +123,161 @@ class _HomePageState extends State<HomePage> {
       print('Error initializing optimization services: $e');
       // Continue with original implementation if optimization services fail
     }
+  }
+
+  Future<void> _saveLastSuccessfulServer(String serverConfig) async {
+    try {
+      final timestamp = DateTime.now();
+      await _prefs.setString(_lastSuccessfulServerKey, serverConfig);
+      await _prefs.setString(_lastSuccessfulTimestampKey, timestamp.toIso8601String());
+      _lastSuccessfulServer = serverConfig;
+      _lastSuccessfulServerTime = timestamp;
+    } catch (e) {
+      print('Failed to persist last successful server: $e');
+    }
+  }
+
+  bool _isLastSuccessfulServerFresh() {
+    if (_lastSuccessfulServer == null || _lastSuccessfulServer!.isEmpty) {
+      return false;
+    }
+    if (_lastSuccessfulServerTime == null) {
+      return true;
+    }
+    return DateTime.now().difference(_lastSuccessfulServerTime!) <= _fastReconnectValidity;
+  }
+
+  Future<bool> _tryReconnectUsingLastSuccessfulServer() async {
+    if (!_isLastSuccessfulServerFresh()) {
+      return false;
+    }
+
+    final server = _lastSuccessfulServer!;
+    try {
+      if (mounted) {
+        setState(() {
+          loadingStatus = '⚡️ Reconnecting to your fastest server...';
+        });
+      } else {
+        loadingStatus = '⚡️ Reconnecting to your fastest server...';
+      }
+
+      print('⚡ Attempting fast reconnect with last successful server');
+      await _connectToServer(server);
+      return true;
+    } catch (e) {
+      print('Fast reconnect failed: $e');
+      return false;
+    }
+  }
+
+  Future<void> _fetchUserIP() async {
+    if (_isFetchingIP) return;
+
+    if (mounted) {
+      setState(() {
+        _isFetchingIP = true;
+      });
+    } else {
+      _isFetchingIP = true;
+    }
+
+    try {
+      final dio = OptimizedHttpClient.instance;
+      final response = await dio.get(
+        'https://api64.ipify.org',
+        queryParameters: {'format': 'json'},
+        options: Options(responseType: ResponseType.json),
+      );
+
+      if (response.statusCode != null && response.statusCode != 200) {
+        throw DioException(
+          requestOptions: response.requestOptions,
+          response: response,
+          error: 'Status ${response.statusCode}',
+        );
+      }
+
+      String? ipAddress;
+      final data = response.data;
+      if (data is Map) {
+        final dynamic value = data['ip'];
+        if (value != null) {
+          ipAddress = value.toString();
+        }
+      } else if (data is String) {
+        ipAddress = data.trim();
+      }
+
+      if (ipAddress == null || ipAddress.isEmpty) {
+        throw Exception('Empty IP response');
+      }
+
+      if (!mounted) {
+        _userIP = ipAddress;
+        return;
+      }
+
+      setState(() {
+        _userIP = ipAddress;
+      });
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text('ip_updated_successfully'.tr()),
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 3),
+          ),
+        );
+    } catch (error) {
+      final readableError = _formatReadableError(error);
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(
+                'failed_to_fetch_ip'.tr(
+                  namedArgs: {'error': readableError},
+                ),
+              ),
+              behavior: SnackBarBehavior.floating,
+              duration: Duration(seconds: 4),
+            ),
+          );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isFetchingIP = false;
+        });
+      } else {
+        _isFetchingIP = false;
+      }
+    }
+  }
+
+  String _formatReadableError(Object error) {
+    if (error is DioException) {
+      if (error.response?.statusMessage != null &&
+          error.response!.statusMessage!.isNotEmpty) {
+        return error.response!.statusMessage!;
+      }
+      if (error.response?.statusCode != null) {
+        return 'HTTP ${error.response!.statusCode}';
+      }
+      if (error.message != null && error.message!.isNotEmpty) {
+        return error.message!;
+      }
+    }
+
+    final message = error.toString();
+    if (message.length > 60) {
+      return '${message.substring(0, 57)}...';
+    }
+    return message;
   }
   
   /// Load connection analytics from storage
@@ -239,8 +407,11 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     _healthCheckTimer?.cancel();
+    _pingUpdateSubscription?.cancel();
     _pingService.dispose();
-    flutterV2ray.stopV2Ray();
+    _intelligentSelector.dispose();
+    _unifiedPingManager.dispose();
+    _v2rayManager.stop();
     super.dispose();
   }
 
@@ -249,12 +420,14 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     getVersionName();
     // Attach shared V2ray instance to services BEFORE initializing them
-    _connectionService.attachExternalV2ray(flutterV2ray);
     _initializeServices();
     _loadServerSelection();
     
     // Initialize ping service
     _pingService.initialize();
+    
+    // Initialize unified ping manager
+    _initializeUnifiedPingManager();
     
     // Fetch servers once on app startup
     _fetchAndCacheServersOnStartup();
@@ -262,14 +435,16 @@ class _HomePageState extends State<HomePage> {
     // Start background health monitoring
     _startBackgroundHealthCheck();
     
-    flutterV2ray
-        .initialize(
+    _v2rayManager
+        .ensureInitialized(
       notificationIconResourceType: "notification_icon_type".tr(),
       notificationIconResourceName: "notification_icon_name".tr(),
     )
         .then((value) async {
-      coreVersion = await flutterV2ray.getCoreVersion();
+      coreVersion = await _v2rayManager.getCoreVersion();
       setState(() {});
+    }).catchError((error) {
+      print('V2Ray initialization failed: $error');
     });
   }
 
@@ -280,70 +455,162 @@ class _HomePageState extends State<HomePage> {
 
     return Scaffold(
       backgroundColor: ThemeColor.backgroundColor,
-      body: SafeArea(
-        child: ValueListenableBuilder<V2RayStatus>(
-          valueListenable: v2rayStatus,
-          builder: (context, status, _) {
-            // Normalize plugin status and map to display states (case-insensitive)
-            final String normalizedState = status.state.toUpperCase();
-            final bool isExplicitConnecting = normalizedState == 'CONNECTING' || normalizedState == 'STARTING';
-            // Treat common plugin variants as connected
-            final bool isConnected = normalizedState == 'CONNECTED' || normalizedState == 'RUNNING' || normalizedState == 'STARTED';
-            final bool isConnecting = isLoading || isExplicitConnecting;
-            final String displayStatus = isConnected
-                ? 'CONNECTED'
-                : (isConnecting ? 'CONNECTING' : 'DISCONNECTED');
-            
-            return CustomScrollView(
-              slivers: [
-                // Modern app bar (simplified to avoid FlexibleSpaceBar null settings)
-                SliverAppBar(
-                  backgroundColor: Colors.transparent,
-                  elevation: 0,
-                  floating: true,
-                  pinned: false,
-                  toolbarHeight: 64,
-                  centerTitle: true,
-                  title: Text(
-                    'app_title'.tr(),
-                    style: ThemeColor.headingStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
+      body: Stack(
+        children: [
+          Positioned.fill(child: _buildLiquidBackground()),
+          SafeArea(
+            child: ValueListenableBuilder<V2RayStatus>(
+              valueListenable: v2rayStatus,
+              builder: (context, status, _) {
+                // Normalize plugin status and map to display states (case-insensitive)
+                final String normalizedState = status.state.toUpperCase();
+                final bool isExplicitConnecting = normalizedState == 'CONNECTING' || normalizedState == 'STARTING';
+                // Treat common plugin variants as connected
+                final bool isConnected = normalizedState == 'CONNECTED' || normalizedState == 'RUNNING' || normalizedState == 'STARTED';
+                final bool isConnecting = isLoading || isExplicitConnecting;
+                final String displayStatus = isConnected
+                    ? 'CONNECTED'
+                    : (isConnecting ? 'CONNECTING' : 'DISCONNECTED');
                 
-                // Main content
-                SliverPadding(
-                  padding: EdgeInsets.all(ThemeColor.mediumSpacing),
-                  sliver: SliverList(
-                    delegate: SliverChildListDelegate([
-                      // Simplified connection section (pass displayStatus explicitly)
-                      _buildSimplifiedConnectionSection(status, isConnected, isConnecting, displayStatus),
-                      SizedBox(height: ThemeColor.largeSpacing),
-                      
-                      // Server selection (simplified)
-                      _buildSimplifiedServerSelection(),
-                      SizedBox(height: ThemeColor.largeSpacing),
-                      
-                      // Statistics (only when connected)
-                      if (isConnected) ...[
-                        _buildSimplifiedStats(status),
-                        SizedBox(height: ThemeColor.largeSpacing),
-                      ],
-                      
-                      // Quick actions (simplified)
-                      _buildSimplifiedQuickActions(),
-                    ]),
-                  ),
-                ),
+                return CustomScrollView(
+                  slivers: [
+                    // Modern app bar (simplified to avoid FlexibleSpaceBar null settings)
+                    SliverAppBar(
+                      backgroundColor: Colors.transparent,
+                      elevation: 0,
+                      floating: true,
+                      pinned: false,
+                      toolbarHeight: 64,
+                      centerTitle: true,
+                      title: Text(
+                        'app_title'.tr(),
+                        style: ThemeColor.headingStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    
+                    // Main content
+                    SliverPadding(
+                      padding: EdgeInsets.all(ThemeColor.mediumSpacing),
+                      sliver: SliverList(
+                        delegate: SliverChildListDelegate([
+                          // Simplified connection section (pass displayStatus explicitly)
+                          _buildSimplifiedConnectionSection(status, isConnected, isConnecting, displayStatus),
+                          SizedBox(height: ThemeColor.largeSpacing),
+                          
+                          // Server selection (simplified)
+                          _buildSimplifiedServerSelection(),
+                          SizedBox(height: ThemeColor.largeSpacing),
+                          
+                          // Statistics (only when connected)
+                          if (isConnected) ...[
+                            _buildSimplifiedStats(status),
+                            SizedBox(height: ThemeColor.largeSpacing),
+                          ],
+                          
+                          // Quick actions (simplified)
+                          _buildSimplifiedQuickActions(),
+                        ]),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+
+  Widget _buildLiquidBackground() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF050506),
+            Color(0xFF0F1115),
+          ],
+        ),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            top: -140,
+            left: -80,
+            child: _buildGlowBlob(
+              diameter: 260,
+              colors: [
+                ThemeColor.primaryColor.withOpacity(0.28),
+                ThemeColor.primaryColor.withOpacity(0.05),
               ],
-            );
-          },
+            ),
+          ),
+          Positioned(
+            bottom: -160,
+            right: -60,
+            child: _buildGlowBlob(
+              diameter: 300,
+              colors: [
+                ThemeColor.connectedColor.withOpacity(0.24),
+                ThemeColor.connectedColor.withOpacity(0.04),
+              ],
+            ),
+          ),
+          Positioned(
+            top: 120,
+            right: -120,
+            child: _buildGlowBlob(
+              diameter: 220,
+              colors: [
+                ThemeColor.warningColor.withOpacity(0.18),
+                ThemeColor.warningColor.withOpacity(0.04),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGlowBlob({
+    required double diameter,
+    required List<Color> colors,
+  }) {
+    return Container(
+      width: diameter,
+      height: diameter,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: RadialGradient(
+          colors: colors,
         ),
       ),
     );
+  }
+
+  List<Color> _neutralGlassGradient({double highlight = 0.14, double lowlight = 0.04}) {
+    return [
+      Colors.white.withOpacity(highlight.clamp(0.0, 1.0)),
+      Colors.white.withOpacity(lowlight.clamp(0.0, 1.0)),
+    ];
+  }
+
+  List<Color> _tintedGlassGradient(
+    Color tint, {
+    double highlight = 0.22,
+    double lowlight = 0.06,
+  }) {
+    return [
+      tint.withOpacity(highlight.clamp(0.0, 1.0)),
+      Colors.white.withOpacity(lowlight.clamp(0.0, 1.0)),
+    ];
   }
 
 
@@ -354,50 +621,51 @@ class _HomePageState extends State<HomePage> {
     bool isConnecting,
     String displayStatus,
   ) {
-    return Container(
-      decoration: ThemeColor.cardDecoration(
-        withGradient: isConnected,
-        withShadow: true,
+    final Color baseTint = isConnected
+        ? ThemeColor.connectedColor
+        : (isConnecting ? ThemeColor.connectingColor : ThemeColor.primaryColor);
+
+    return LiquidGlassContainer(
+      borderRadius: ThemeColor.xlRadius,
+      padding: EdgeInsets.all(ThemeColor.largeSpacing),
+      blurSigma: 28,
+      gradientColors: _tintedGlassGradient(
+        baseTint,
+        highlight: isConnected ? 0.28 : 0.2,
+        lowlight: 0.05,
       ),
-      child: Padding(
-        padding: EdgeInsets.all(ThemeColor.largeSpacing),
-        child: Column(
-          children: [
-            // Connection button (simplified)
-            ConnectionWidget(
-              onTap: () => _handleConnectionTap(status),
-              isLoading: isLoading,
-              status: displayStatus,
-            ),
-            
-            // Status info (simplified)
-            if (isConnected) ...[
-              SizedBox(height: ThemeColor.mediumSpacing),
-              _buildSimplifiedStatusInfo(status),
-            ],
-            
-            // Loading status (simplified)
-            if (isLoading && loadingStatus.isNotEmpty) ...[
-              SizedBox(height: ThemeColor.mediumSpacing),
-              _buildSimplifiedLoadingStatus(),
-            ],
+      child: Column(
+        children: [
+          ConnectionWidget(
+            onTap: () => _handleConnectionTap(status),
+            isLoading: isLoading,
+            status: displayStatus,
+          ),
+          if (isConnected) ...[
+            SizedBox(height: ThemeColor.mediumSpacing),
+            _buildSimplifiedStatusInfo(status),
           ],
-        ),
+          if (isLoading && loadingStatus.isNotEmpty) ...[
+            SizedBox(height: ThemeColor.mediumSpacing),
+            _buildSimplifiedLoadingStatus(),
+          ],
+        ],
       ),
     );
   }
 
   // Simplified status info
   Widget _buildSimplifiedStatusInfo(V2RayStatus status) {
-    return Container(
+    return LiquidGlassContainer(
       padding: EdgeInsets.all(ThemeColor.mediumSpacing),
-      decoration: BoxDecoration(
-        color: ThemeColor.successColor.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
-        border: Border.all(
-          color: ThemeColor.successColor.withValues(alpha: 0.3),
-          width: 1,
-        ),
+      borderRadius: ThemeColor.largeRadius,
+      blurSigma: 24,
+      enableBlur: false,
+      showShadow: false,
+      gradientColors: _tintedGlassGradient(
+        ThemeColor.successColor,
+        highlight: 0.24,
+        lowlight: 0.05,
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -462,15 +730,16 @@ class _HomePageState extends State<HomePage> {
 
   // Simplified loading status
   Widget _buildSimplifiedLoadingStatus() {
-    return Container(
+    return LiquidGlassContainer(
       padding: EdgeInsets.all(ThemeColor.mediumSpacing),
-      decoration: BoxDecoration(
-        color: ThemeColor.connectingColor.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
-        border: Border.all(
-          color: ThemeColor.connectingColor.withValues(alpha: 0.3),
-          width: 1,
-        ),
+      borderRadius: ThemeColor.largeRadius,
+      blurSigma: 22,
+      enableBlur: false,
+      showShadow: false,
+      gradientColors: _tintedGlassGradient(
+        ThemeColor.connectingColor,
+        highlight: 0.22,
+        lowlight: 0.05,
       ),
       child: Row(
         children: [
@@ -531,12 +800,21 @@ class _HomePageState extends State<HomePage> {
 
   // Simplified server selection
   Widget _buildSimplifiedServerSelection() {
-    return Container(
-      decoration: ThemeColor.cardDecoration(),
+    final borderRadius = ThemeColor.xlRadius;
+
+    return LiquidGlassContainer(
+      borderRadius: ThemeColor.xlRadius,
+      padding: EdgeInsets.zero,
+      blurSigma: 26,
+      enableBlur: false,
+      gradientColors: _neutralGlassGradient(highlight: 0.18, lowlight: 0.05),
       child: Material(
         color: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(borderRadius),
+        ),
         child: InkWell(
-          borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
+          borderRadius: BorderRadius.circular(borderRadius),
           onTap: () => _showServerSelectionModal(context),
           child: Padding(
             padding: EdgeInsets.all(ThemeColor.mediumSpacing),
@@ -545,7 +823,7 @@ class _HomePageState extends State<HomePage> {
                 Container(
                   padding: EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: ThemeColor.primaryColor.withValues(alpha: 0.1),
+                    color: ThemeColor.primaryColor.withValues(alpha: 0.18),
                     borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
                   ),
                   child: Icon(
@@ -589,54 +867,55 @@ class _HomePageState extends State<HomePage> {
 
   // Simplified stats
   Widget _buildSimplifiedStats(V2RayStatus status) {
-    return Container(
-      decoration: ThemeColor.cardDecoration(),
-      child: Padding(
-        padding: EdgeInsets.all(ThemeColor.mediumSpacing),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.analytics_rounded,
-                  color: ThemeColor.primaryColor,
-                  size: 20,
+    return LiquidGlassContainer(
+      borderRadius: ThemeColor.xlRadius,
+      padding: EdgeInsets.all(ThemeColor.mediumSpacing),
+      blurSigma: 25,
+      enableBlur: false,
+      gradientColors: _neutralGlassGradient(highlight: 0.18, lowlight: 0.05),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.analytics_rounded,
+                color: ThemeColor.primaryColor,
+                size: 20,
+              ),
+              SizedBox(width: ThemeColor.smallSpacing),
+              Text(
+                'statistics'.tr(),
+                style: ThemeColor.bodyStyle(
+                  fontWeight: FontWeight.w600,
+                  color: ThemeColor.primaryText,
                 ),
-                SizedBox(width: ThemeColor.smallSpacing),
-                Text(
-                  'statistics'.tr(),
-                  style: ThemeColor.bodyStyle(
-                    fontWeight: FontWeight.w600,
-                    color: ThemeColor.primaryText,
-                  ),
+              ),
+            ],
+          ),
+          SizedBox(height: ThemeColor.mediumSpacing),
+          Row(
+            children: [
+              Expanded(
+                child: _buildStatCard(
+                  icon: Icons.download_rounded,
+                  label: 'download'.tr(),
+                  value: '${status.download} B',
+                  color: ThemeColor.successColor,
                 ),
-              ],
-            ),
-            SizedBox(height: ThemeColor.mediumSpacing),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildStatCard(
-                    icon: Icons.download_rounded,
-                    label: 'download'.tr(),
-                    value: '${status.download} B',
-                    color: ThemeColor.successColor,
-                  ),
+              ),
+              SizedBox(width: ThemeColor.smallSpacing),
+              Expanded(
+                child: _buildStatCard(
+                  icon: Icons.upload_rounded,
+                  label: 'upload'.tr(),
+                  value: '${status.upload} B',
+                  color: ThemeColor.warningColor,
                 ),
-                SizedBox(width: ThemeColor.smallSpacing),
-                Expanded(
-                  child: _buildStatCard(
-                    icon: Icons.upload_rounded,
-                    label: 'upload'.tr(),
-                    value: '${status.upload} B',
-                    color: ThemeColor.warningColor,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -650,15 +929,16 @@ class _HomePageState extends State<HomePage> {
     // Format the value for better readability
     String formattedValue = _formatBytes(value);
     
-    return Container(
+    return LiquidGlassContainer(
+      borderRadius: ThemeColor.largeRadius,
       padding: EdgeInsets.all(ThemeColor.mediumSpacing),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
-        border: Border.all(
-          color: color.withValues(alpha: 0.3),
-          width: 1,
-        ),
+      blurSigma: 22,
+      enableBlur: false,
+      showShadow: false,
+      gradientColors: _tintedGlassGradient(
+        color,
+        highlight: 0.2,
+        lowlight: 0.05,
       ),
       child: Column(
         children: [
@@ -700,114 +980,136 @@ class _HomePageState extends State<HomePage> {
 
   // Simplified quick actions
   Widget _buildSimplifiedQuickActions() {
-    return Container(
-      decoration: ThemeColor.cardDecoration(),
-      child: Padding(
-        padding: EdgeInsets.all(ThemeColor.mediumSpacing),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.flash_on_rounded,
-                  color: ThemeColor.warningColor,
-                  size: 20,
+    return LiquidGlassContainer(
+      borderRadius: ThemeColor.xlRadius,
+      padding: EdgeInsets.all(ThemeColor.mediumSpacing),
+      blurSigma: 25,
+      enableBlur: false,
+      gradientColors: _neutralGlassGradient(highlight: 0.18, lowlight: 0.05),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.flash_on_rounded,
+                color: ThemeColor.warningColor,
+                size: 20,
+              ),
+              SizedBox(width: ThemeColor.smallSpacing),
+              Text(
+                'quick_actions'.tr(),
+                style: ThemeColor.bodyStyle(
+                  fontWeight: FontWeight.w600,
+                  color: ThemeColor.primaryText,
                 ),
-                SizedBox(width: ThemeColor.smallSpacing),
-                Text(
-                  'quick_actions'.tr(),
-                  style: ThemeColor.bodyStyle(
-                    fontWeight: FontWeight.w600,
-                    color: ThemeColor.primaryText,
-                  ),
+              ),
+            ],
+          ),
+          SizedBox(height: ThemeColor.mediumSpacing),
+          Row(
+            children: [
+              Expanded(
+                child: _buildQuickActionButton(
+                  icon: Icons.refresh_rounded,
+                  label: 'refresh'.tr(),
+                  color: ThemeColor.successColor,
+                  onTap: isLoading
+                      ? null
+                      : () async {
+                          setState(() {
+                            isLoading = true;
+                            loadingStatus = 'refreshing'.tr();
+                          });
+                          await getServerList();
+                        },
                 ),
-              ],
-            ),
-            SizedBox(height: ThemeColor.mediumSpacing),
-            // Simplified actions: Refresh and Get My IP only
-            Row(
-              children: [
-                Expanded(
-                  child: _buildQuickActionButton(
-                    icon: Icons.refresh_rounded,
-                    label: 'refresh'.tr(),
-                    color: ThemeColor.successColor,
-                    onTap: isLoading
-                        ? null
-                        : () async {
-                            setState(() {
-                              isLoading = true;
-                              loadingStatus = 'refreshing'.tr();
-                            });
-                            await getServerList();
-                          },
-                  ),
+              ),
+              SizedBox(width: ThemeColor.smallSpacing),
+              Expanded(
+                child: _buildQuickActionButton(
+                  icon: _isFetchingIP
+                      ? Icons.hourglass_top_rounded
+                      : (_userIP != null ? null : Icons.public_rounded),
+                  label: _isFetchingIP
+                      ? 'fetching_ip_info'.tr()
+                      : (_userIP != null ? _userIP! : 'get_my_ip'.tr()),
+                  color: ThemeColor.primaryColor,
+                  onTap: (isLoading || _isFetchingIP)
+                      ? null
+                      : () {
+                          _fetchUserIP();
+                        },
+                  flagImageUrl: null,
+                  isBusy: _isFetchingIP,
                 ),
-                SizedBox(width: ThemeColor.smallSpacing),
-                Expanded(
-                  child: _buildQuickActionButton(
-                    icon: _userIP != null ? null : Icons.public_rounded,
-                    label: _userIP != null ? _userIP! : 'get_my_ip'.tr(),
-                    color: ThemeColor.primaryColor,
-                    onTap: isLoading ? null : _getUserIP,
-                    flagImageUrl: _userFlagImageUrl,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
-
 
   Widget _buildQuickActionButton({
     IconData? icon,
     required String label,
     required Color color,
     required VoidCallback? onTap,
-    String? flagEmoji,
     String? flagImageUrl,
+    bool isBusy = false,
   }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
-        onTap: onTap,
-        child: Container(
-          padding: EdgeInsets.all(ThemeColor.mediumSpacing),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
-            border: Border.all(
-              color: color.withValues(alpha: 0.3),
-              width: 1,
+    final borderRadius = ThemeColor.mediumRadius;
+
+    return LiquidGlassContainer(
+      borderRadius: borderRadius,
+      padding: EdgeInsets.zero,
+      blurSigma: 20,
+      enableBlur: false,
+      showShadow: false,
+      gradientColors: _tintedGlassGradient(
+        color,
+        highlight: 0.2,
+        lowlight: 0.05,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(borderRadius),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(borderRadius),
+          onTap: onTap,
+          child: Padding(
+            padding: EdgeInsets.all(ThemeColor.mediumSpacing),
+            child: Column(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(ThemeColor.smallSpacing),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.22),
+                    borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
+                  ),
+                  child: _buildButtonIcon(
+                    icon,
+                    flagImageUrl,
+                    color,
+                    isBusy: isBusy,
+                  ),
+                ),
+                SizedBox(height: ThemeColor.smallSpacing),
+                Text(
+                  label,
+                  style: ThemeColor.captionStyle(
+                    color: color,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
-          ),
-          child: Column(
-            children: [
-              Container(
-                padding: EdgeInsets.all(ThemeColor.smallSpacing),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
-                ),
-                child: _buildButtonIcon(icon, flagImageUrl, color),
-              ),
-              SizedBox(height: ThemeColor.smallSpacing),
-              Text(
-                label,
-                style: ThemeColor.captionStyle(
-                  color: color,
-                  fontWeight: FontWeight.w600,
-                ),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
           ),
         ),
       ),
@@ -815,7 +1117,23 @@ class _HomePageState extends State<HomePage> {
   }
 
   /// Build button icon - either regular icon or SVG flag
-  Widget _buildButtonIcon(IconData? icon, String? flagImageUrl, Color color) {
+  Widget _buildButtonIcon(
+    IconData? icon,
+    String? flagImageUrl,
+    Color color, {
+    bool isBusy = false,
+  }) {
+    if (isBusy) {
+      return SizedBox(
+        width: 24,
+        height: 24,
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          valueColor: AlwaysStoppedAnimation<Color>(color),
+        ),
+      );
+    }
+
     if (flagImageUrl != null && flagImageUrl.isNotEmpty) {
       // Show SVG flag image
       return Container(
@@ -861,7 +1179,7 @@ class _HomePageState extends State<HomePage> {
     // Robust state handling: connect only when not connected/connecting
     if (current == 'CONNECTED') {
       // If already connected, stop connection
-      flutterV2ray.stopV2Ray();
+      _v2rayManager.stop();
       return;
     }
 
@@ -882,28 +1200,30 @@ class _HomePageState extends State<HomePage> {
     if (!isLoading) {
       connectionRetryCount = 0; // Reset retry count for new connection attempt
       
-      // Check if we have healthy servers available
-      final healthyServers = serverTestResults
-          .where((result) => result['status'] == 'success' && result['delay'] > 0)
-          .toList();
+      // Check if we have servers available (use actual server lists instead of test results)
+      final hasProcessedServers = processedServers.isNotEmpty;
+      final hasCachedServers = cachedServers.isNotEmpty;
+      final hasAnyServers = hasProcessedServers || hasCachedServers;
       
-      if (healthyServers.isEmpty) {
-        // No healthy servers available, fetch new servers
-        print('No healthy servers available, fetching new servers...');
+      if (!hasAnyServers) {
+        // No servers available at all, need to fetch
+        print('No servers available, fetching new servers...');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('no_healthy_servers'.tr()),
+              content: Text('no_servers_available_fetching'.tr()),
               behavior: SnackBarBehavior.floating,
             ),
           );
         }
-        await _connectWithRetry();
       } else {
-        // We have healthy servers, proceed with connection
-        print('Found ${healthyServers.length} healthy servers, proceeding with connection...');
-        await _connectWithRetry();
+        // We have servers available, proceed with connection
+        final serverCount = hasProcessedServers ? processedServers.length : cachedServers.length;
+        print('Found $serverCount available servers, proceeding with connection...');
       }
+      
+      // Always proceed with connection attempt (the connection methods handle server fetching if needed)
+      await _connectWithRetry();
     }
   }
 
@@ -928,77 +1248,6 @@ class _HomePageState extends State<HomePage> {
         
         // Final fallback to original method
         await _connectWithFallbackRetry();
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          isLoading = false;
-          loadingStatus = '';
-        });
-      }
-    }
-  }
-  
-  /// Get user's public IP information
-  Future<void> _getUserIP() async {
-    try {
-      setState(() {
-        isLoading = true;
-        loadingStatus = 'fetching_ip_info'.tr();
-      });
-
-      print('🌐 Fetching user IP information...');
-
-      // Make request to ipwho.is API
-      final response = await http.get(
-        Uri.parse('https://ipwho.is/'),
-        headers: {
-          'User-Agent': 'ShineNETVPN/1.0',
-          'Accept': 'application/json',
-        },
-      ).timeout(Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        
-        if (data['success'] == true) {
-          setState(() {
-            _userIP = data['ip'] ?? 'Unknown IP';
-            _userCountryFlag = data['flag']?['emoji'];
-            _userFlagImageUrl = data['flag']?['img'];
-            _userIPInfo = data;
-          });
-          
-          print('✅ Got IP info: ${_userIP} from ${data['country']} ${_userCountryFlag}');
-          
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('ip_info_updated'.tr()),
-                behavior: SnackBarBehavior.floating,
-                backgroundColor: ThemeColor.successColor,
-                duration: Duration(seconds: 3),
-              ),
-            );
-          }
-        } else {
-          throw Exception('API returned success: false');
-        }
-      } else {
-        throw Exception('HTTP ${response.statusCode}: ${response.reasonPhrase}');
-      }
-    } catch (e) {
-      print('❌ Failed to get IP info: $e');
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('failed_to_get_ip'.tr(namedArgs: {'error': e.toString()})),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: ThemeColor.errorColor,
-            duration: Duration(seconds: 5),
-          ),
-        );
       }
     } finally {
       if (mounted) {
@@ -1059,6 +1308,51 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       loadingStatus = '🔍 Finding best server for automatic connection...';
     });
+
+    // ⚡️ Step 0: Immediately try to reuse the last successful server if it is still fresh
+    if (await _tryReconnectUsingLastSuccessfulServer()) {
+      return;
+    }
+
+    // Step 0: Try intelligent server selector first for the best candidate
+    String? intelligentServer;
+    try {
+      if (mounted) {
+        setState(() {
+          loadingStatus = '🤖 Analyzing servers with intelligent selector...';
+        });
+      }
+
+      intelligentServer = await _intelligentSelector.getBestServer(
+        onStatusUpdate: (status) {
+          if (!mounted) return;
+          setState(() {
+            loadingStatus = '🤖 ${status.trim()}';
+          });
+        },
+        onProgressUpdate: (completed, total) {
+          if (!mounted || total == 0) return;
+          setState(() {
+            loadingStatus = '🤖 Testing servers $completed/$total...';
+          });
+        },
+      );
+    } catch (e) {
+      print('Intelligent selector failed: $e');
+    }
+
+    if (intelligentServer != null && intelligentServer.isNotEmpty) {
+      try {
+        setState(() {
+          loadingStatus = '🚀 Connecting via intelligent selector...';
+        });
+        await _connectToServer(intelligentServer);
+        print('✅ Connected using intelligent server selector');
+        return;
+      } catch (e) {
+        print('❌ Intelligent selector connection failed: $e');
+      }
+    }
 
     // Step 1: Try to use processed servers with ping data
     if (processedServers.isNotEmpty) {
@@ -1248,6 +1542,7 @@ class _HomePageState extends State<HomePage> {
       serversToTest,
       baseTimeoutSeconds: 60,
       parallel: true,
+      maxConcurrent: 12, // Test 12 servers simultaneously for speed
       prioritizeByQuality: true,
       onServerComplete: (server, ping) {
         if (!mounted) return;
@@ -1327,13 +1622,13 @@ class _HomePageState extends State<HomePage> {
       final delay = serverData['delay'] as int;
       
       // Request VPN permission
-      final hasPermission = await flutterV2ray.requestPermission();
+      final hasPermission = await _v2rayManager.requestPermission();
       if (!hasPermission) {
         throw Exception('VPN permission denied');
       }
       
       // Start V2Ray connection (remove await as startV2Ray is not async)
-      flutterV2ray.startV2Ray(
+      await _v2rayManager.start(
         remark: 'ShineNET VPN - Auto',
         config: config,
         proxyOnly: false,
@@ -1585,6 +1880,7 @@ class _HomePageState extends State<HomePage> {
             ip: serverData['ip'] as String?,
             countryCode: serverData['countryCode'] as String?,
             ping: ping,
+            remark: (serverData['remark'] as String?)?.trim(),
           );
         }).toList();
       }
@@ -1610,12 +1906,14 @@ class _HomePageState extends State<HomePage> {
           final name = _generateServerName(cfg, ip, i + 1);
           final cc = _getCountryCodeFromIPSync(ip);
           final ping = serverPings[cfg] ?? 0; // 0 = not tested
+          final remark = _extractRemark(cfg);
           list.add(ServerInfo(
             name: name,
             config: cfg,
             ip: ip,
             countryCode: cc,
             ping: ping,
+            remark: remark.isNotEmpty ? remark : null,
           ));
         }
         return list;
@@ -1734,6 +2032,15 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       selectedServer = _prefs.getString('selectedServers') ?? 'Automatic';
       selectedServerType = _prefs.getString('selectedServerTypes') ?? 'Automatic';
+      _lastSuccessfulServer = _prefs.getString(_lastSuccessfulServerKey);
+      final storedTimestamp = _prefs.getString(_lastSuccessfulTimestampKey);
+      if (storedTimestamp != null) {
+        try {
+          _lastSuccessfulServerTime = DateTime.parse(storedTimestamp);
+        } catch (_) {
+          _lastSuccessfulServerTime = null;
+        }
+      }
     });
   }
 
@@ -2322,6 +2629,14 @@ class _HomePageState extends State<HomePage> {
 
         if (cachedServers.isNotEmpty) {
           await _processServersWithLocation(cachedServers);
+          
+          // Trigger UI update to show cached servers immediately
+          if (mounted) {
+            setState(() {
+              loadingStatus = '';
+            });
+          }
+          
           print(
               ' Using cached servers (${cachedServers.length} servers) with ${serverPings.length} ping results');
           return;
@@ -2355,16 +2670,22 @@ class _HomePageState extends State<HomePage> {
           'source': 'optimization_service',
         });
 
-        setState(() {
-          loadingStatus = ' Testing server performance...';
-        });
+        // Process servers immediately with ping = 0 for immediate display
+        await _processServersWithLocation(servers);
+        
+        if (mounted) {
+          setState(() {
+            loadingStatus = ' Testing server performance...';
+          });
+        }
 
-        print(' Starting ping tests for ALL ${servers.length} servers...');
-        await _testServerPingsOnce(servers); // Use optimized method
+        print('🏓 Starting immediate ping tests for ALL ${servers.length} servers...');
+        await _testAllServersOnStartupUnified(servers); // Use enhanced unified ping manager
 
         // Cache ping results
         await _cacheManager.cachePingResults(serverPings);
 
+        // Re-process servers with updated ping data and sort
         await _processServersWithLocation(servers);
         print(
             ' Server startup completed with ${processedServers.length} processed servers');
@@ -2393,59 +2714,146 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  /// Test server pings only once at startup and cache results
-  Future<void> _testServerPingsOnce(List<String> servers) async {
+  /// Initialize unified ping manager and set up listeners
+  Future<void> _initializeUnifiedPingManager() async {
     try {
-      print(' Testing ping for ALL ${servers.length} servers using V2Ray delay (robust, parallel)...');
-      serverPings.clear();
-
-      final reachableServers = List<String>.from(servers);
-      final v2rayPingService = FlutterV2rayPingService()..initialize();
-
-      // Use high-speed intelligent ping testing with parallel processing (60s timeout) - real-time updates
-      final results = await v2rayPingService.testMultipleServerPingsIntelligent(
-        reachableServers,
-        baseTimeoutSeconds: 60,
-        parallel: true,
-        prioritizeByQuality: true,
-        onProgress: (completed, total) {
-          if (!mounted) return;
+      await _unifiedPingManager.initialize();
+      
+      // Set up real-time ping update listener
+      _pingUpdateSubscription = _unifiedPingManager.pingUpdates.listen((updates) {
+        if (mounted) {
           setState(() {
-            loadingStatus = '📊 Real-time ping testing: $completed/$total servers';
+            // Update legacy serverPings map for backward compatibility
+            for (final entry in updates.entries) {
+              final result = entry.value;
+              if (result.isSuccess) {
+                serverPings[entry.key] = result.pingMs;
+              } else if (result.isTimeout) {
+                serverPings[entry.key] = 9999;
+              } else {
+                serverPings[entry.key] = -1;
+              }
+              
+              // Update processed servers with new ping data
+              _updateProcessedServerPing(entry.key, serverPings[entry.key]!);
+            }
           });
-        },
-        onServerComplete: (server, ping) {
-          print('📊 Server test completed: ${ping}ms - updating UI immediately');
-          // Update UI immediately when each server result comes in
-          if (!mounted) return;
-          serverPings[server] = ping;
-          setState(() {
-            // Trigger UI refresh for immediate real-time update
-            loadingStatus = '⚡ Real-time results: ${serverPings.length}/${reachableServers.length}';
-          });
-        },
-      );
-
-      int filteredCount = 0;
-      results.forEach((server, ping) {
-        final normalized = ping > 5000
-            ? 9999
-            : (ping <= 0 ? -1 : ping);
-        if (normalized == 9999) filteredCount++;
-        serverPings[server] = normalized;
+        }
       });
-
-      final successfulPings =
-          results.values.where((p) => p > 0 && p <= 5000).length;
-      print(' Robust parallel ping completed: $successfulPings/${reachableServers.length} responded');
-      if (filteredCount > 0) {
-        print(' Detected $filteredCount filtered/blocked servers');
-      }
+      
+      print('🔧 Unified ping manager initialized successfully');
     } catch (e) {
-      print(' V2Ray delay ping testing failed: $e');
-      // Continue with empty ping results
+      print('❌ Failed to initialize unified ping manager: $e');
     }
   }
+
+  /// Test all servers immediately on startup using enhanced unified ping manager
+  /// یکپارچه سازی تست فوری تمام سرورها بلافاصله بعد از اجرای نرم افزار
+  Future<void> _testAllServersOnStartupUnified(List<String> servers) async {
+    try {
+      print('🚀 Starting immediate server ping testing for ${servers.length} servers...');
+      
+      // Clear legacy ping results
+      serverPings.clear();
+      
+      // Initialize processedServers with all servers (ping = 0 initially)
+      await _processServersWithLocation(servers);
+      
+      if (mounted) {
+        setState(() {
+          loadingStatus = 'شروع تست فوری پینگ ${servers.length} سرور...';
+        });
+      }
+      
+      // Subscribe to progress updates
+      StreamSubscription<PingTestProgress>? progressSubscription;
+      progressSubscription = _unifiedPingManager.progressUpdates.listen((progress) {
+        if (mounted) {
+          setState(() {
+            loadingStatus = progress.message;
+          });
+        }
+      });
+      
+      // Test all servers immediately on startup with enhanced method
+      final results = await _unifiedPingManager.testAllServersOnStartup(
+        servers,
+        timeoutSeconds: 2, // Faster timeout for startup
+        onProgress: (server, result) {
+          if (mounted) {
+            // Update legacy serverPings for backward compatibility
+            if (result.isSuccess) {
+              serverPings[server] = result.pingMs;
+            } else if (result.isTimeout) {
+              serverPings[server] = 9999;
+            } else {
+              serverPings[server] = -1;
+            }
+            
+            // Update processed servers immediately
+            _updateProcessedServerPing(server, serverPings[server]!);
+            
+            // Trigger UI update every few servers for performance
+            if (serverPings.length % 3 == 0) {
+              setState(() {});
+            }
+          }
+        },
+        onProgressCount: (completed, total) {
+          if (mounted) {
+            setState(() {
+              loadingStatus = 'تست شده: $completed از $total سرور';
+            });
+          }
+        },
+      );
+      
+      // Cancel progress subscription
+      await progressSubscription.cancel();
+      
+      // Final update of all results
+      for (final entry in results.entries) {
+        final result = entry.value;
+        if (result.isSuccess) {
+          serverPings[entry.key] = result.pingMs;
+        } else if (result.isTimeout) {
+          serverPings[entry.key] = 9999;
+        } else {
+          serverPings[entry.key] = -1;
+        }
+      }
+      
+      // Get comprehensive statistics
+      final stats = _unifiedPingManager.getStatistics(servers);
+      
+      if (mounted) {
+        setState(() {
+          loadingStatus = 'تست پینگ تکمیل شد - ${stats.successfulPings}/${stats.totalServers} موفق، میانگین: ${stats.averagePing.round()}ms';
+        });
+      }
+      
+      print('✅ Immediate startup ping testing completed: ${stats.successfulPings}/${stats.totalServers} successful, avg: ${stats.averagePing.round()}ms');
+      print('📊 Server quality distribution: Excellent: ${stats.excellentServers}, Good: ${stats.goodServers}, Fair: ${stats.fairServers}, Poor: ${stats.poorServers}');
+      
+      // Clear loading status after a short delay
+      Future.delayed(Duration(seconds: 2), () {
+        if (mounted) {
+          setState(() {
+            loadingStatus = '';
+          });
+        }
+      });
+      
+    } catch (e) {
+      print('❌ Error in immediate startup ping testing: $e');
+      if (mounted) {
+        setState(() {
+          loadingStatus = 'خطا در تست پینگ سرورها';
+        });
+      }
+    }
+  }
+
 
   /// Test server pings one by one with immediate display updates
   Future<void> _testServerPings(List<String> servers) async {
@@ -2547,6 +2955,22 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  /// Update processedServers list immediately when ping result comes in (for real-time display)
+  void _updateProcessedServerPing(String serverConfig, int ping) {
+    try {
+      // Find the server in processedServers and update its ping immediately
+      for (int i = 0; i < processedServers.length; i++) {
+        if (processedServers[i]['config'] == serverConfig) {
+          processedServers[i]['ping'] = ping;
+          print('🔄 Updated server ${i + 1} ping to ${ping}ms in processedServers list');
+          break;
+        }
+      }
+    } catch (e) {
+      print('Error updating processed server ping: $e');
+    }
+  }
+
   /// Save ping results to cache
   Future<void> _savePingCache() async {
     try {
@@ -2569,6 +2993,7 @@ class _HomePageState extends State<HomePage> {
         // Extract server information
         final ip = _extractIPFromConfig(server);
         final serverName = _generateServerName(server, ip, i + 1);
+        final remark = _extractRemark(server);
         final countryCode = _getCountryCodeFromIPSync(ip);
         final ping = serverPings[server] ?? 0;
         
@@ -2582,8 +3007,13 @@ class _HomePageState extends State<HomePage> {
             : serverName;
         final cityName = locationInfo['city'] ?? '';
         
+        final locationLabel =
+            cityName.isNotEmpty ? '$cityName, $realCountryName' : realCountryName;
+
         final serverData = {
-          'name': cityName.isNotEmpty ? '$cityName, $realCountryName' : realCountryName,
+          'name': locationLabel,
+          'location': locationLabel,
+          'remark': remark,
           'config': server,
           'ip': ip,
           'countryCode': realCountryCode,
@@ -2614,6 +3044,54 @@ class _HomePageState extends State<HomePage> {
     } catch (e) {
       print('Error processing servers: $e');
     }
+  }
+
+  String _extractRemark(String config) {
+    try {
+      if (config.startsWith('vmess://')) {
+        final base64Part = config.substring(8);
+        final normalized = base64.normalize(base64Part);
+        final decoded = utf8.decode(base64.decode(normalized));
+        final json = jsonDecode(decoded) as Map<String, dynamic>;
+        final ps = json['ps'];
+        if (ps is String && ps.trim().isNotEmpty) {
+          return _decodeRemarkText(ps);
+        }
+      } else if (config.startsWith('vless://') ||
+          config.startsWith('trojan://') ||
+          config.startsWith('ss://')) {
+        final uri = Uri.parse(config);
+        final fragment = uri.fragment;
+        if (fragment.isNotEmpty) {
+          return _decodeRemarkText(fragment);
+        }
+      }
+    } catch (e) {
+      print('Error extracting remark: $e');
+    }
+
+    return '';
+  }
+
+  String _decodeRemarkText(String value) {
+    var result = value.trim();
+    if (result.isEmpty) return result;
+
+    if (!result.contains('%')) return result;
+
+    for (final decoder in [Uri.decodeFull, Uri.decodeComponent]) {
+      try {
+        final decoded = decoder(result).trim();
+        if (decoded.isNotEmpty) {
+          result = decoded;
+          break;
+        }
+      } catch (_) {
+        continue;
+      }
+    }
+
+    return result;
   }
 
   // Essential missing functions - minimal implementations
@@ -2686,14 +3164,14 @@ class _HomePageState extends State<HomePage> {
       print('✅ Final config length: ${finalConfig.length} characters');
       
       // Request VPN permission first
-      final hasPermission = await flutterV2ray.requestPermission();
+      final hasPermission = await _v2rayManager.requestPermission();
       if (!hasPermission) {
         throw Exception('VPN permission denied');
       }
 
       // Start V2Ray connection with enhanced logging
       print('🚀 Starting V2Ray connection...');
-      flutterV2ray.startV2Ray(
+      await _v2rayManager.start(
         remark: finalV2rayURL.remark.isNotEmpty ? finalV2rayURL.remark : 'Auto Server',
         config: finalConfig,
         proxyOnly: false,
@@ -2703,6 +3181,7 @@ class _HomePageState extends State<HomePage> {
       );
 
       print('✅ Connected to server: ${finalV2rayURL.remark}');
+      await _saveLastSuccessfulServer(normalizedServer);
     } catch (e) {
       print('❌ Connection error: $e');
       if (mounted) {
@@ -2771,7 +3250,8 @@ class _HomePageState extends State<HomePage> {
       final pingMap = await v2rayPing.testMultipleServerPingsRobust(
         servers,
         timeoutSeconds: 2,
-        parallel: false,
+        parallel: true,
+        maxConcurrent: 12,
       );
 
       // Build results list in the expected structure

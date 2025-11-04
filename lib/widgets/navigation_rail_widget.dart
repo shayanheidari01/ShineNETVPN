@@ -4,9 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_v2ray_client/flutter_v2ray.dart';
 import 'package:iconsax/iconsax.dart';
 import 'dart:math';
-import 'dart:io';
-import 'package:dio/dio.dart';
-import 'package:dio/io.dart';
 import 'package:shinenet_vpn/common/theme.dart';
 
 class NavigationRailWidget extends StatefulWidget {
@@ -26,62 +23,6 @@ class NavigationRailWidget extends StatefulWidget {
 }
 
 class _NavigationRailWidgetState extends State<NavigationRailWidget> {
-  String? ip;
-  String? countryCode;
-
-  Future<Map<String, String>> getIpApi() async {
-    try {
-      final dio = Dio();
-      dio.httpClientAdapter = IOHttpClientAdapter()
-        ..createHttpClient = () {
-          final client = HttpClient();
-          client.findProxy = (uri) {
-            return 'PROXY 127.0.0.1:8569';
-          };
-          return client;
-        };
-
-      final response = await dio.get(
-        'https://freeipapi.com/api/json',
-        options: Options(
-          followRedirects: true,
-          validateStatus: (status) => true,
-          receiveTimeout: const Duration(seconds: 10),
-        ),
-      );
-
-      if (response.statusCode == 200) {
-        final data = response.data;
-        if (data != null && data is Map) {
-          String ip = data['ipAddress'] ?? 'نامشخص';
-
-          if (ip.contains('.')) {
-            final parts = ip.split('.');
-            if (parts.length == 4) {
-              ip = '${parts[0]}.*.*.${parts[3]}';
-            }
-          } else if (ip.contains(':')) {
-            final parts = ip.split(':');
-            if (parts.length > 4) {
-              ip = '${parts[0]}:${parts[1]}:****:${parts.last}';
-            }
-          }
-
-          return {'countryCode': data['countryCode'] ?? 'Unknown', 'ip': ip};
-        }
-      }
-      return {'countryCode': 'IR', 'ip': 'unknown'.tr()};
-    } catch (e) {
-      return {'countryCode': 'IR', 'ip': 'error'.tr()};
-    }
-  }
-
-  String countryCodeToFlagEmoji(String countryCode) {
-    countryCode = countryCode.toUpperCase();
-    return countryCode.codeUnits
-        .map((codeUnit) => String.fromCharCode(0x1F1E6 + codeUnit - 0x41))
-        .join();
-  }
 
   String formatBytes(int bytes) {
     if (bytes <= 0) return '0B';

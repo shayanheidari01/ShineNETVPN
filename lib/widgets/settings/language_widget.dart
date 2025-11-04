@@ -1,5 +1,6 @@
 import 'package:shinenet_vpn/common/theme.dart';
 import 'package:shinenet_vpn/common/font_helper.dart';
+import 'package:shinenet_vpn/common/liquid_glass_container.dart';
 import 'package:shinenet_vpn/services/language_manager.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -188,33 +189,47 @@ class _LanguageWidgetState extends State<LanguageWidget> {
   Widget _buildLanguageCard(LanguageInfo language) {
     final isSelected = _selectedLanguageCode == language.code;
 
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeInOut,
       decoration: BoxDecoration(
-        color: isSelected
-            ? ThemeColor.primaryColor.withValues(alpha: 0.1)
-            : ThemeColor.cardColor,
         borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
         border: Border.all(
-          color: isSelected ? ThemeColor.primaryColor : ThemeColor.borderColor,
+          color: isSelected
+              ? ThemeColor.primaryColor
+              : ThemeColor.borderColor.withOpacity(0.7),
           width: isSelected ? 2 : 1,
         ),
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
-          onTap: _isLoading ? null : () => _changeLanguage(language.code),
-          child: Padding(
-            padding: EdgeInsets.all(ThemeColor.mediumSpacing),
+      child: LiquidGlassContainer(
+        borderRadius: ThemeColor.mediumRadius,
+        blurSigma: 28,
+        padding: EdgeInsets.all(ThemeColor.mediumSpacing),
+        showShadow: isSelected,
+        showBorder: false,
+        gradientColors: isSelected
+            ? [
+                ThemeColor.primaryColor.withValues(alpha: 0.35),
+                ThemeColor.primaryColor.withValues(alpha: 0.08),
+              ]
+            : [
+                Colors.white.withOpacity(0.16),
+                Colors.white.withOpacity(0.04),
+              ],
+        opacity: isSelected ? 0.2 : 0.1,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
+            onTap: _isLoading ? null : () => _changeLanguage(language.code),
             child: Row(
               children: [
-                // Flag with background
                 Container(
-                  padding: EdgeInsets.all(6),
+                  padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
                     color: isSelected
-                        ? ThemeColor.primaryColor.withValues(alpha: 0.1)
-                        : Colors.transparent,
+                        ? ThemeColor.primaryColor.withValues(alpha: 0.15)
+                        : Colors.white.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
                   ),
                   child: Text(
@@ -223,8 +238,6 @@ class _LanguageWidgetState extends State<LanguageWidget> {
                   ),
                 ),
                 SizedBox(width: ThemeColor.mediumSpacing),
-
-                // Language info
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -259,8 +272,6 @@ class _LanguageWidgetState extends State<LanguageWidget> {
                     ],
                   ),
                 ),
-
-                // Selection indicator with loading state
                 if (_isLoading && _selectedLanguageCode == language.code)
                   SizedBox(
                     width: 24,

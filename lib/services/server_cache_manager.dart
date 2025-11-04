@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'server_optimization_service.dart';
 import 'flutter_v2ray_ping_service.dart'; // Use V2Ray delay ping for filtering
@@ -135,25 +136,54 @@ class ServerCacheManager {
       final v2rayPing = FlutterV2rayPingService();
       v2rayPing.initialize();
 
-      // Sequential single-attempt robust V2Ray delay testing
-      final pingMap = await v2rayPing.testMultipleServerPingsRobust(
+      final existingPingCache = await getCachedPingResults();
+      final serversToRetest = _selectServersForRobustTesting(
         servers,
-        timeoutSeconds: 2,
-        parallel: false,
-        onProgress: (completed, total) {
-          onStatusUpdate?.call('🚀 V2Ray delay testing... ($completed/$total)');
-        },
+        existingPingCache,
       );
+
+      Map<String, int> focusedPingResults = {};
+
+      if (serversToRetest.isNotEmpty) {
+        final concurrency = max(1, min(serversToRetest.length, 6));
+        onStatusUpdate?.call(
+            '🛡️ Focused V2Ray delay testing for ${serversToRetest.length} key servers...');
+
+        focusedPingResults = await v2rayPing.testMultipleServerPingsRobust(
+          serversToRetest,
+          timeoutSeconds: 3,
+          parallel: true,
+          maxConcurrent: concurrency,
+          onProgress: (completed, total) {
+            onStatusUpdate?.call(
+                '🚀 V2Ray delay testing... ($completed/$total selected servers)');
+          },
+        );
+      } else {
+        print('ℹ️ Skipping focused V2Ray delay testing - using cached ping data');
+      }
+
+      final mergedPingResults = <String, int>{}
+        ..addAll(existingPingCache)
+        ..addAll(focusedPingResults);
 
       // Mark reachable servers (ping > 0 and < 9999) as true
       for (final server in servers) {
-        final ping = pingMap[server] ?? -1;
-        tcpPingResults[server] = (ping > 0 && ping < 9999);
+        final ping = mergedPingResults[server];
+        if (ping == null) {
+          tcpPingResults[server] = true; // Unknown ping - keep server available
+        } else {
+          tcpPingResults[server] = (ping > 0 && ping < 9999);
+        }
       }
 
       final reachableCount = tcpPingResults.values.where((v) => v).length;
       print(
           '✅ V2Ray delay filtering completed: $reachableCount/${servers.length} servers are reachable');
+
+      if (mergedPingResults.isNotEmpty) {
+        await cachePingResults(mergedPingResults);
+      }
 
       onStatusUpdate?.call(
           '💾 Caching ${servers.length} servers with metadata and TCP ping results...');
@@ -183,6 +213,57 @@ class ServerCacheManager {
       // Enhanced fallback strategy
       return await _handleFetchFailure(e, onStatusUpdate);
     }
+  }
+
+  List<String> _selectServersForRobustTesting(
+    List<String> servers,
+    Map<String, int> existingPingCache, {
+    int maxServers = 18,
+  }) {
+    if (servers.isEmpty || maxServers <= 0) {
+      return [];
+    }
+
+    final newServers = <String>[];
+    final staleServers = <String>[];
+    final goodServers = <String>[];
+
+    for (final server in servers) {
+      final ping = existingPingCache[server];
+      if (ping == null) {
+        newServers.add(server);
+      } else if (ping <= 0 || ping >= 9999) {
+        staleServers.add(server);
+      } else {
+        goodServers.add(server);
+      }
+    }
+
+    final selected = <String>{};
+
+    void takeFrom(List<String> source) {
+      for (final server in source) {
+        if (selected.length >= maxServers) break;
+        selected.add(server);
+      }
+    }
+
+    takeFrom(newServers);
+    takeFrom(staleServers);
+
+    if (selected.length < maxServers && goodServers.isNotEmpty) {
+      goodServers.sort((a, b) {
+        final pingA = existingPingCache[a] ?? 9999;
+        final pingB = existingPingCache[b] ?? 9999;
+        return pingA.compareTo(pingB);
+      });
+      takeFrom(goodServers);
+    }
+
+    print(
+        '🎯 Focused robust testing selection: ${selected.length} servers (new: ${newServers.length}, stale: ${staleServers.length}, cached: ${goodServers.length})');
+
+    return selected.toList();
   }
 
   /// Calculate performance grade based on fetch time and server count
