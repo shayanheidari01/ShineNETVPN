@@ -19,7 +19,7 @@ class SettingsWidget extends StatefulWidget {
 class _SettingsWidgetState extends State<SettingsWidget> {
   String _selectedLanguage = '';
   bool _isLoading = false;
-  
+
   // Cached gradients for performance
   late final List<Color> _primaryGradient;
   late final List<Color> _successGradient;
@@ -68,7 +68,7 @@ class _SettingsWidgetState extends State<SettingsWidget> {
   // Load current language from LanguageManager using saved preference
   void _loadSelectedLanguage() async {
     if (_isLoading) return; // Prevent duplicate calls
-    
+
     _isLoading = true;
     try {
       final currentLang =
@@ -289,11 +289,12 @@ class _SettingsWidgetState extends State<SettingsWidget> {
     List<Color> gradientColors;
     if (color == ThemeColor.warningColor) {
       gradientColors = _warningGradient;
-    } else if (color == ThemeColor.primaryColor || 
-               color == ThemeColor.primaryColor.withValues(alpha: 0.8)) {
+    } else if (color == ThemeColor.primaryColor ||
+        color == ThemeColor.primaryColor.withValues(alpha: 0.8)) {
       gradientColors = _primaryGradient;
     } else {
-      gradientColors = _tintedGlassGradient(color, highlight: 0.22, lowlight: 0.05);
+      gradientColors =
+          _tintedGlassGradient(color, highlight: 0.22, lowlight: 0.05);
     }
 
     return RepaintBoundary(
@@ -398,7 +399,7 @@ class _SettingsWidgetState extends State<SettingsWidget> {
                   child: _buildInfoCard(
                     icon: Icons.update_rounded,
                     title: 'version'.tr(),
-                    value: '1.1.0',
+                    value: '1.1.1',
                     color: ThemeColor.primaryColor,
                   ),
                 ),
@@ -432,7 +433,8 @@ class _SettingsWidgetState extends State<SettingsWidget> {
     } else if (color == ThemeColor.successColor) {
       gradientColors = _successGradient;
     } else {
-      gradientColors = _tintedGlassGradient(color, highlight: 0.2, lowlight: 0.05);
+      gradientColors =
+          _tintedGlassGradient(color, highlight: 0.2, lowlight: 0.05);
     }
 
     return RepaintBoundary(
