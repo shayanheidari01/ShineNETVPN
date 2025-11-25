@@ -1314,7 +1314,43 @@ class _HomePageState extends State<HomePage> {
       return;
     }
 
-    // Step 0: Try intelligent server selector first for the best candidate
+    // ⚡️ Step 1: Try immediate connection mode first (connect after first ping)
+    try {
+      final servers = await _fetchServersWithFallback();
+      if (servers.isNotEmpty) {
+        setState(() {
+          loadingStatus = '📡 Testing servers for immediate connection...';
+        });
+        
+        final immediateCompleter = Completer<Map<String, dynamic>?>();
+        final bestServer = await _selectBestServerSmart(
+          servers.take(8).toList(),
+          connectImmediately: true, // Enable immediate connection mode
+          immediateCompleter: immediateCompleter,
+        ).timeout(Duration(seconds: 15), onTimeout: () {
+          print('Immediate connection mode timed out');
+          return null;
+        });
+        
+        // If immediate connection was successful, we're done
+        if (bestServer == null && immediateCompleter.isCompleted) {
+          return;
+        }
+        
+        // If we got a best server but didn't connect immediately, connect now
+        if (bestServer != null && bestServer['server'] != null) {
+          setState(() {
+            loadingStatus = '🚀 Connecting to optimal server...';
+          });
+          await _connectToServer(bestServer['server'] as String);
+          return;
+        }
+      }
+    } catch (e) {
+      print('Immediate connection mode failed: $e');
+    }
+
+    // Step 2: Fallback to intelligent server selector
     String? intelligentServer;
     try {
       if (mounted) {
@@ -1391,7 +1427,7 @@ class _HomePageState extends State<HomePage> {
       }
     }
     
-    // Step 2: Fetch fresh servers and test them
+    // Step 2: Fetch fresh servers and test them with immediate connection
     setState(() {
       loadingStatus = '📡 Fetching fresh servers...';
     });
@@ -1399,13 +1435,38 @@ class _HomePageState extends State<HomePage> {
     try {
       final freshServers = await _fetchServersWithFallback();
       if (freshServers.isNotEmpty) {
-        // Test and connect to best server from fresh list
-        final bestServer = await findAndTestBestServer(freshServers.take(5).toList());
-        if (bestServer != null) {
+        // Use smart server selection with immediate connection mode
+        final immediateCompleter = Completer<Map<String, dynamic>?>();
+        final bestServer = await _selectBestServerSmart(
+          freshServers.take(8).toList(),
+          connectImmediately: true, // Enable immediate connection mode
+          immediateCompleter: immediateCompleter,
+        ).timeout(Duration(seconds: 30), onTimeout: () {
+          print('Server selection timed out');
+          return null;
+        });
+        
+        // If immediate connection was successful, we're done
+        if (bestServer == null && immediateCompleter.isCompleted) {
+          return;
+        }
+        
+        // Fallback to old method if immediate connection didn't happen
+        if (bestServer == null) {
+          final fallbackServer = await findAndTestBestServer(freshServers.take(5).toList());
+          if (fallbackServer != null) {
+            setState(() {
+              loadingStatus = '🚀 Connecting to optimal server...';
+            });
+            await _connectToServer(fallbackServer);
+            return;
+          }
+        } else if (bestServer['server'] != null) {
+          // If we got a best server but didn't connect immediately, connect now
           setState(() {
             loadingStatus = '🚀 Connecting to optimal server...';
           });
-          await _connectToServer(bestServer);
+          await _connectToServer(bestServer['server'] as String);
           return;
         }
       }
@@ -1467,12 +1528,21 @@ class _HomePageState extends State<HomePage> {
         loadingStatus = '🔍 Analyzing ${servers.length} servers...';
       });
 
-      // Step 2: Test servers and select the best one with timeout
-      final bestServer = await _selectBestServerSmart(servers)
-          .timeout(Duration(seconds: 30), onTimeout: () {
+      // Step 2: Test servers and connect immediately after first valid ping
+      final immediateCompleter = Completer<Map<String, dynamic>?>();
+      final bestServer = await _selectBestServerSmart(
+        servers,
+        connectImmediately: true, // Enable immediate connection mode
+        immediateCompleter: immediateCompleter,
+      ).timeout(Duration(seconds: 30), onTimeout: () {
         print('Server selection timed out, using first available server');
         return null;
       });
+      
+      // If immediate connection was successful, we're done
+      if (bestServer == null && immediateCompleter.isCompleted) {
+        return;
+      }
       
       if (bestServer == null) {
         // Fallback: try direct connection with first server
@@ -1485,7 +1555,7 @@ class _HomePageState extends State<HomePage> {
         loadingStatus = '🚀 Connecting to optimal server...';
       });
 
-      // Step 3: Connect to the selected server
+      // Step 3: Connect to the selected server (if immediate connection didn't happen)
       await _connectToSelectedServer(bestServer);
       
     } catch (e) {
@@ -1525,8 +1595,12 @@ class _HomePageState extends State<HomePage> {
     throw Exception('All server fetching methods failed');
   }
   
-  /// Select the best server using smart algorithm
-  Future<Map<String, dynamic>?> _selectBestServerSmart(List<String> servers) async {
+  /// Select the best server using smart algorithm with immediate connection option
+  Future<Map<String, dynamic>?> _selectBestServerSmart(
+    List<String> servers, {
+    bool connectImmediately = false, // If true, connect immediately after first valid ping
+    Completer<Map<String, dynamic>?>? immediateCompleter, // Completer for immediate connection
+  }) async {
     final testResults = <Map<String, dynamic>>[];
     final serversToTest = servers.take(8).toList(); // Test first 8 servers
     
@@ -1538,13 +1612,16 @@ class _HomePageState extends State<HomePage> {
     final v2rayPing = FlutterV2rayPingService();
     v2rayPing.initialize();
     
+    // Flag to track if we've already connected
+    bool hasConnectedImmediately = false;
+    
     final results = await v2rayPing.testMultipleServerPingsIntelligent(
       serversToTest,
       baseTimeoutSeconds: 60,
       parallel: true,
       maxConcurrent: 12, // Test 12 servers simultaneously for speed
       prioritizeByQuality: true,
-      onServerComplete: (server, ping) {
+      onServerComplete: (server, ping) async {
         if (!mounted) return;
         
         final effectiveDelay = ping <= 0 ? -1 : ping;
@@ -1557,14 +1634,15 @@ class _HomePageState extends State<HomePage> {
             final config = v2rayURL.getFullConfiguration();
             if (config.isNotEmpty) {
               final score = _calculateServerScore(effectiveDelay, responseTime, testResults.length);
-              testResults.add({
+              final serverData = {
                 'server': server,
                 'config': config,
                 'delay': effectiveDelay,
                 'responseTime': responseTime,
                 'score': score,
                 'index': testResults.length + 1,
-              });
+              };
+              testResults.add(serverData);
               print('⚡ Real-time result ${testResults.length}: ${effectiveDelay}ms (score: ${score.toStringAsFixed(1)})');
               
               // Update UI immediately with current results count
@@ -1573,6 +1651,43 @@ class _HomePageState extends State<HomePage> {
                   loadingStatus = '⚡ Real-time testing: ${testResults.length} results found...';
                 });
               }
+              
+              // ⚡️ If in immediate connection mode and this is the first valid result, connect immediately
+              if (connectImmediately && !hasConnectedImmediately && testResults.length == 1) {
+                hasConnectedImmediately = true;
+                print('🚀 اتصال فوری به اولین سرور با پینگ معتبر: ${effectiveDelay}ms');
+                
+                // Complete the completer immediately with the first valid server
+                if (immediateCompleter != null && !immediateCompleter.isCompleted) {
+                  immediateCompleter.complete(serverData);
+                }
+                
+                // Connect immediately in background (don't await to allow other pings to continue)
+                if (mounted) {
+                  setState(() {
+                    loadingStatus = '🚀 در حال اتصال فوری به سرور (${effectiveDelay}ms)...';
+                  });
+                  
+                  // Start connection without awaiting to allow other operations to continue
+                  _connectToServer(server).then((_) {
+                    if (mounted) {
+                      print('✅ اتصال فوری موفق بود');
+                      setState(() {
+                        loadingStatus = '✅ متصل شد';
+                      });
+                    }
+                  }).catchError((e) {
+                    print('❌ اتصال فوری ناموفق بود: $e');
+                    if (mounted) {
+                      setState(() {
+                        loadingStatus = '❌ اتصال فوری ناموفق بود';
+                      });
+                    }
+                    // Note: We don't reset the flag here as we want to prevent multiple connection attempts
+                    // The fallback methods will handle retry if needed
+                  });
+                }
+              }
             }
           } catch (e) {
             print('❌ Server parsing failed: $e');
@@ -1580,6 +1695,11 @@ class _HomePageState extends State<HomePage> {
         }
       },
     );
+    
+    // If immediate connection was attempted, return null (connection already done)
+    if (connectImmediately && hasConnectedImmediately) {
+      return null;
+    }
     
     if (testResults.isEmpty) return null;
     

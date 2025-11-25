@@ -399,7 +399,7 @@ class _SettingsWidgetState extends State<SettingsWidget> {
                   child: _buildInfoCard(
                     icon: Icons.update_rounded,
                     title: 'version'.tr(),
-                    value: '1.1.1',
+                    value: '1.1.2',
                     color: ThemeColor.primaryColor,
                   ),
                 ),
