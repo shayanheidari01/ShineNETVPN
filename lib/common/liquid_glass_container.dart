@@ -75,18 +75,19 @@ class LiquidGlassContainer extends StatelessWidget {
             )
           : null,
       color: gradientColors == null
-          ? Colors.white.withOpacity(opacity)
+          ? Colors.white.withValues(alpha: opacity.clamp(0.0, 1.0))
           : null,
       border: showBorder
           ? Border.all(
-              color: (borderColor ?? Colors.white).withOpacity(0.22),
+              color: (borderColor ?? Colors.white).withValues(alpha: 0.22),
               width: 1,
             )
           : null,
       boxShadow: showShadow
           ? [
               BoxShadow(
-                color: Colors.black.withOpacity(0.25 * opacity.clamp(0.0, 1.0)),
+                color: Colors.black
+                    .withValues(alpha: 0.25 * opacity.clamp(0.0, 1.0)),
                 blurRadius: 28,
                 spreadRadius: -16,
                 offset: const Offset(0, 18),

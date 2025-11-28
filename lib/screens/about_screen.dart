@@ -35,8 +35,8 @@ class _AboutScreenState extends State<AboutScreen> {
     double lowlight = 0.06,
   }) {
     return [
-      tint.withOpacity(highlight.clamp(0.0, 1.0)),
-      Colors.white.withOpacity(lowlight.clamp(0.0, 1.0)),
+      tint.withValues(alpha: highlight.clamp(0.0, 1.0)),
+      Colors.white.withValues(alpha: lowlight.clamp(0.0, 1.0)),
     ];
   }
 
@@ -45,8 +45,8 @@ class _AboutScreenState extends State<AboutScreen> {
     double lowlight = 0.05,
   }) {
     return [
-      Colors.white.withOpacity(highlight.clamp(0.0, 1.0)),
-      Colors.white.withOpacity(lowlight.clamp(0.0, 1.0)),
+      Colors.white.withValues(alpha: highlight.clamp(0.0, 1.0)),
+      Colors.white.withValues(alpha: lowlight.clamp(0.0, 1.0)),
     ];
   }
 
@@ -471,7 +471,7 @@ class _AboutScreenState extends State<AboutScreen> {
                 child: _buildInfoItem(
                   icon: Icons.update_rounded,
                   title: 'version'.tr(),
-                  value: version ?? '1.1.2',
+                  value: version ?? '1.1.3',
                   color: ThemeColor.primaryColor,
                 ),
               ),

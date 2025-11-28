@@ -197,7 +197,7 @@ class _LanguageWidgetState extends State<LanguageWidget> {
         border: Border.all(
           color: isSelected
               ? ThemeColor.primaryColor
-              : ThemeColor.borderColor.withOpacity(0.7),
+              : ThemeColor.borderColor.withValues(alpha: 0.7),
           width: isSelected ? 2 : 1,
         ),
       ),
@@ -213,8 +213,8 @@ class _LanguageWidgetState extends State<LanguageWidget> {
                 ThemeColor.primaryColor.withValues(alpha: 0.08),
               ]
             : [
-                Colors.white.withOpacity(0.16),
-                Colors.white.withOpacity(0.04),
+                Colors.white.withValues(alpha: 0.16),
+                Colors.white.withValues(alpha: 0.04),
               ],
         opacity: isSelected ? 0.2 : 0.1,
         child: Material(
@@ -229,7 +229,7 @@ class _LanguageWidgetState extends State<LanguageWidget> {
                   decoration: BoxDecoration(
                     color: isSelected
                         ? ThemeColor.primaryColor.withValues(alpha: 0.15)
-                        : Colors.white.withOpacity(0.08),
+                        : Colors.white.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
                   ),
                   child: Text(

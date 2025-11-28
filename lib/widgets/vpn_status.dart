@@ -1,7 +1,6 @@
 import 'package:shinenet_vpn/common/theme.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 class VpnCard extends StatefulWidget {
   final int downloadSpeed;
@@ -175,7 +174,9 @@ class _VpnCardState extends State<VpnCard> with TickerProviderStateMixin {
         animation: _pulseController,
         builder: (context, child) {
           return Tooltip(
-            message: 'connected_for'.tr().replaceAll('{{duration}}', widget.duration),
+            message: 'connected_for'
+                .tr()
+                .replaceAll('{{duration}}', widget.duration),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -415,4 +416,3 @@ class _VpnCardState extends State<VpnCard> with TickerProviderStateMixin {
     );
   }
 }
-

@@ -22,12 +22,18 @@ class FlutterV2rayPingService {
 
   // Intelligent caching & inflight de-duplication
   static const int _maxCacheEntries = 1000;
-  static const Duration _excellentCacheTtl = Duration(minutes: 15); // Excellent servers (>80 score)
-  static const Duration _goodCacheTtl = Duration(minutes: 10);     // Good servers (60-80 score)
-  static const Duration _fairCacheTtl = Duration(minutes: 5);      // Fair servers (40-60 score)
-  static const Duration _poorCacheTtl = Duration(minutes: 2);      // Poor servers (<40 score)
-  static const Duration _failureCacheTtl = Duration(minutes: 1);   // Failed pings (-1/9999)
-  static const int _defaultTimeoutSeconds = 60; // longer timeout for comprehensive testing
+  static const Duration _excellentCacheTtl =
+      Duration(minutes: 15); // Excellent servers (>80 score)
+  static const Duration _goodCacheTtl =
+      Duration(minutes: 10); // Good servers (60-80 score)
+  static const Duration _fairCacheTtl =
+      Duration(minutes: 5); // Fair servers (40-60 score)
+  static const Duration _poorCacheTtl =
+      Duration(minutes: 2); // Poor servers (<40 score)
+  static const Duration _failureCacheTtl =
+      Duration(minutes: 1); // Failed pings (-1/9999)
+  static const int _defaultTimeoutSeconds =
+      60; // longer timeout for comprehensive testing
   // Single reliable probe endpoint for all tests
   static const String _probeUrl = 'https://www.google.com/generate_204';
 
@@ -56,7 +62,8 @@ class FlutterV2rayPingService {
       }
 
       while (_configCache.length >= _maxConfigCacheEntries) {
-        final oldestKey = _configCache.keys.isEmpty ? null : _configCache.keys.first;
+        final oldestKey =
+            _configCache.keys.isEmpty ? null : _configCache.keys.first;
         if (oldestKey == null) {
           break;
         }
@@ -69,7 +76,7 @@ class FlutterV2rayPingService {
       return null;
     }
   }
-  
+
   // Server quality tracking
   final Map<String, ServerQualityMetrics> _serverMetrics = {};
   String _currentRegion = 'global';
@@ -83,22 +90,25 @@ class FlutterV2rayPingService {
       // No special setup required for getServerDelay
     }
   }
-  
+
   /// Detect user region for analytics purposes
   void _detectRegion() {
     // Simple region detection based on system locale
     final locale = 'fa-IR'; // This could be dynamic
     if (locale.startsWith('fa') || locale.startsWith('ar')) {
       _currentRegion = 'middle_east';
-    } else if (locale.startsWith('zh') || locale.startsWith('ja') || locale.startsWith('ko')) {
+    } else if (locale.startsWith('zh') ||
+        locale.startsWith('ja') ||
+        locale.startsWith('ko')) {
       _currentRegion = 'asia';
-    } else if (locale.startsWith('ru') || locale.startsWith('de') || locale.startsWith('fr')) {
+    } else if (locale.startsWith('ru') ||
+        locale.startsWith('de') ||
+        locale.startsWith('fr')) {
       _currentRegion = 'europe';
     } else {
       _currentRegion = 'global';
     }
   }
-  
 
   /// Test ping for a single server using flutter_v2ray.getServerDelay with Google's probe URL.
   Future<int> testServerPing(
@@ -140,16 +150,17 @@ class FlutterV2rayPingService {
       () async {
         try {
           // Test server without any timeout - let V2Ray decide naturally
-          print('⏱️ شروع تست سرور: ${serverConfig.length > 50 ? serverConfig.substring(0, 50) + '...' : serverConfig}');
-          
+          print(
+              '⏱️ شروع تست سرور: ${serverConfig.length > 50 ? serverConfig.substring(0, 50) + '...' : serverConfig}');
+
           // Always use Google's reliable probe URL for all tests
-          int raw = await _v2ray
-              .getServerDelay(config: fullConfig, url: _probeUrl);
-              // No timeout() call - unlimited time for testing
-          
+          int raw =
+              await _v2ray.getServerDelay(config: fullConfig, url: _probeUrl);
+          // No timeout() call - unlimited time for testing
+
           // Update server metrics immediately
           _updateServerMetrics(serverConfig, raw, _probeUrl);
-          
+
           // Normalize values: <=0 => failed (-1); retain 9999 for timeout
           final int normalized = raw <= 0 ? -1 : raw;
           print('✅ نتیجه دریافت شد: ${normalized}ms - بازگشت فوری');
@@ -160,7 +171,7 @@ class FlutterV2rayPingService {
         } catch (e) {
           // Enhanced error logging
           print('❌ خطا در تست پینگ: $e');
-          
+
           // On error, mark as failed and complete immediately
           _setCache(cacheKey, -1);
           if (!completer.isCompleted) completer.complete(-1);
@@ -285,12 +296,13 @@ class FlutterV2rayPingService {
 
     return results;
   }
-  
+
   /// Update server quality metrics
   void _updateServerMetrics(String serverConfig, int ping, String probeUrl) {
     final existingMetrics = _serverMetrics[serverConfig];
     if (existingMetrics != null) {
-      _serverMetrics[serverConfig] = existingMetrics.withNewPing(ping, probeUrl);
+      _serverMetrics[serverConfig] =
+          existingMetrics.withNewPing(ping, probeUrl);
     } else {
       _serverMetrics[serverConfig] = ServerQualityMetrics(
         serverConfig: serverConfig,
@@ -304,12 +316,12 @@ class FlutterV2rayPingService {
       );
     }
   }
-  
+
   /// Get server quality score (0-100)
   double getServerQualityScore(String serverConfig) {
     return _serverMetrics[serverConfig]?.qualityScore ?? 50.0;
   }
-  
+
   /// Get servers sorted by quality
   List<String> getSortedServersByQuality(List<String> servers) {
     final sortedServers = List<String>.from(servers);
@@ -320,31 +332,31 @@ class FlutterV2rayPingService {
     });
     return sortedServers;
   }
-  
+
   /// Check if server needs retesting
   bool shouldRetestServer(String serverConfig) {
     return _serverMetrics[serverConfig]?.needsRetest ?? true;
   }
-  
+
   /// Calculate adaptive timeout based on server history and network conditions
   int _calculateAdaptiveTimeout(String serverConfig, int? baseTimeout) {
     final metrics = _serverMetrics[serverConfig];
     final base = baseTimeout ?? _defaultTimeoutSeconds;
-    
+
     if (metrics == null) {
       return base; // Default for new servers
     }
-    
+
     // Factor in server reliability and average response time
     double multiplier = 1.0;
-    
+
     // Adjust based on reliability
     if (metrics.reliability < 0.3) {
       multiplier = 1.5; // Give poor servers more time
     } else if (metrics.reliability > 0.8) {
       multiplier = 0.8; // Fast timeout for reliable servers
     }
-    
+
     // Adjust based on average ping
     if (metrics.averagePing > 0) {
       if (metrics.averagePing > 1000) {
@@ -353,21 +365,25 @@ class FlutterV2rayPingService {
         multiplier -= 0.2; // Fast servers can use shorter timeout
       }
     }
-    
+
     // Recent performance consideration
     final recentFailures = metrics.recentPings.length >= 3
-        ? metrics.recentPings.skip(metrics.recentPings.length - 3)
-            .where((p) => p <= 0 || p >= 9999).length
+        ? metrics.recentPings
+            .skip(metrics.recentPings.length - 3)
+            .where((p) => p <= 0 || p >= 9999)
+            .length
         : 0;
-    
+
     if (recentFailures >= 2) {
       multiplier += 0.3; // Recent failures suggest network issues
     }
-    
-    final adaptiveTimeout = (base * multiplier).round().clamp(3, 7); // 3-7 seconds for more reliable testing
+
+    final adaptiveTimeout = (base * multiplier)
+        .round()
+        .clamp(3, 7); // 3-7 seconds for more reliable testing
     return adaptiveTimeout;
   }
-  
+
   /// Test server with adaptive parameters (always uses Google probe URL)
   Future<int> testServerPingAdaptive(
     String serverConfig, {
@@ -376,7 +392,7 @@ class FlutterV2rayPingService {
     bool forceRetest = false,
   }) async {
     if (!_isInitialized) initialize();
-    
+
     // Check if we should skip testing based on recent results
     if (!forceRetest && !shouldRetestServer(serverConfig)) {
       final cached = _serverMetrics[serverConfig];
@@ -384,10 +400,11 @@ class FlutterV2rayPingService {
         return cached.recentPings.last;
       }
     }
-    
+
     // Calculate adaptive timeout
-    final adaptiveTimeout = _calculateAdaptiveTimeout(serverConfig, baseTimeoutSeconds);
-    
+    final adaptiveTimeout =
+        _calculateAdaptiveTimeout(serverConfig, baseTimeoutSeconds);
+
     // Always use Google's probe URL for all tests
     return await testServerPing(
       serverConfig,
@@ -417,7 +434,8 @@ class FlutterV2rayPingService {
     int completed = 0;
 
     Future<void> runOne(String s) async {
-      print('🔍 Testing server individually: ${s.length > 50 ? s.substring(0, 50) + '...' : s}');
+      print(
+          '🔍 Testing server individually: ${s.length > 50 ? s.substring(0, 50) + '...' : s}');
       final ping = await testServerPing(
         s,
         timeoutSeconds: null, // No timeout - let V2Ray decide naturally
@@ -451,13 +469,17 @@ class FlutterV2rayPingService {
       print('🏁 Parallel testing completed: ${results.length} total results');
     } else {
       // Sequential testing: Test each server one by one without timeout
-      print('🔄 Starting sequential server testing: ${serverConfigs.length} servers, one by one (no timeout)...');
+      print(
+          '🔄 Starting sequential server testing: ${serverConfigs.length} servers, one by one (no timeout)...');
 
       // Test servers one by one sequentially
-      for (int serverIndex = 0; serverIndex < serverConfigs.length; serverIndex++) {
+      for (int serverIndex = 0;
+          serverIndex < serverConfigs.length;
+          serverIndex++) {
         final s = serverConfigs[serverIndex];
         await runOne(s);
-        print('⚡ Server ${serverIndex + 1}/${serverConfigs.length}: ${results[s]}ms - Immediate UI update');
+        print(
+            '⚡ Server ${serverIndex + 1}/${serverConfigs.length}: ${results[s]}ms - Immediate UI update');
       }
 
       print('🏁 Sequential testing completed: ${results.length} total results');
@@ -478,9 +500,8 @@ class FlutterV2rayPingService {
     final timeouts = results.values.where((p) => p >= 9999).length;
     final total = results.length;
     final valid = results.values.where((p) => p > 0 && p < 9999).toList();
-    final avg = valid.isNotEmpty
-        ? valid.reduce((a, b) => a + b) / valid.length
-        : 0.0;
+    final avg =
+        valid.isNotEmpty ? valid.reduce((a, b) => a + b) / valid.length : 0.0;
     return {
       'total': total,
       'successful': successful,
@@ -544,7 +565,7 @@ class FlutterV2rayPingService {
     if (serverConfigs.isEmpty) return results;
 
     // Sort servers by quality if requested
-    final serversToTest = prioritizeByQuality 
+    final serversToTest = prioritizeByQuality
         ? getSortedServersByQuality(serverConfigs)
         : List<String>.from(serverConfigs);
 
@@ -589,7 +610,8 @@ class FlutterV2rayPingService {
             results[serverConfig] = ping;
             final currentCompleted = ++completed;
 
-            print('⚡ تست ${index + 1}/$total تکمیل شد: ${ping}ms - فراخوانی فوری callback');
+            print(
+                '⚡ تست ${index + 1}/$total تکمیل شد: ${ping}ms - فراخوانی فوری callback');
 
             // فراخوانی فوری callback بلافاصله بعد از دریافت نتیجه
             // بدون هیچ تاخیری
@@ -603,7 +625,7 @@ class FlutterV2rayPingService {
             print('❌ تست ${index + 1}/$total با خطا مواجه شد: $e');
             results[serverConfig] = -1;
             final currentCompleted = ++completed;
-            
+
             // فراخوانی فوری callback حتی در صورت خطا
             if (onServerComplete != null) {
               onServerComplete(serverConfig, -1);
@@ -623,45 +645,50 @@ class FlutterV2rayPingService {
       print('🏁 Parallel testing completed: ${results.length} total results');
     } else {
       // Sequential testing: Test each server one by one without timeout
-      print('🔄 Starting sequential server testing: ${serversToTest.length} servers, one by one (no timeout)...');
-      
-      // Test servers one by one sequentially 
-      for (int serverIndex = 0; serverIndex < serversToTest.length; serverIndex++) {
+      print(
+          '🔄 Starting sequential server testing: ${serversToTest.length} servers, one by one (no timeout)...');
+
+      // Test servers one by one sequentially
+      for (int serverIndex = 0;
+          serverIndex < serversToTest.length;
+          serverIndex++) {
         final serverConfig = serversToTest[serverIndex];
         try {
-          print('🔍 Testing server ${serverIndex + 1}/${serversToTest.length}: ${serverConfig.length > 50 ? serverConfig.substring(0, 50) + '...' : serverConfig}');
-          
+          print(
+              '🔍 Testing server ${serverIndex + 1}/${serversToTest.length}: ${serverConfig.length > 50 ? serverConfig.substring(0, 50) + '...' : serverConfig}');
+
           // Test individual server without timeout - let V2Ray decide naturally
           final ping = await testServerPing(
             serverConfig,
             timeoutSeconds: null, // No timeout - unlimited time
             enableRetry: false,
           );
-          
+
           results[serverConfig] = ping;
           completed++;
-          
-          print('⚡ Server ${serverIndex + 1}/${serversToTest.length}: ${ping}ms - Immediate UI update');
-          
+
+          print(
+              '⚡ Server ${serverIndex + 1}/${serversToTest.length}: ${ping}ms - Immediate UI update');
+
           // Immediate callback for real-time UI update
           onProgress?.call(completed, total);
           onServerComplete?.call(serverConfig, ping);
-          
         } catch (e) {
-          print('❌ Server ${serverIndex + 1}/${serversToTest.length} failed: $e');
+          print(
+              '❌ Server ${serverIndex + 1}/${serversToTest.length} failed: $e');
           results[serverConfig] = -1;
           completed++;
           onProgress?.call(completed, total);
           onServerComplete?.call(serverConfig, -1);
         }
       }
-      
+
       print('🏁 Sequential testing completed: ${results.length} total results');
     }
-    
+
     return results;
   }
-  
+
   /// Robust multi-server ping with individual testing (optionally parallel with bounded concurrency)
   Future<Map<String, int>> testMultipleServerPingsRobust(
     List<String> serverConfigs, {
@@ -708,7 +735,8 @@ class FlutterV2rayPingService {
         tasks.add(() async {
           await limiter.acquire();
           try {
-            print('🔍 Robust parallel test ${i + 1}/${total}: ${s.length > 40 ? s.substring(0, 40) + '...' : s}');
+            print(
+                '🔍 Robust parallel test ${i + 1}/${total}: ${s.length > 40 ? s.substring(0, 40) + '...' : s}');
             await runOne(s);
           } finally {
             limiter.release();
@@ -717,20 +745,24 @@ class FlutterV2rayPingService {
       }
 
       await Future.wait(tasks);
-      print('🏁 Robust parallel testing completed: ${results.length} comprehensive results');
+      print(
+          '🏁 Robust parallel testing completed: ${results.length} comprehensive results');
     } else {
       // Always use individual sequential testing for robust results
-      print('🛡️ Starting robust individual server testing for ${serverConfigs.length} servers...');
+      print(
+          '🛡️ Starting robust individual server testing for ${serverConfigs.length} servers...');
       for (int i = 0; i < serverConfigs.length; i++) {
         final s = serverConfigs[i];
-        print('🔍 Robust test ${i + 1}/${total}: ${s.length > 40 ? s.substring(0, 40) + '...' : s}');
+        print(
+            '🔍 Robust test ${i + 1}/${total}: ${s.length > 40 ? s.substring(0, 40) + '...' : s}');
         await runOne(s);
         // Longer delay for robust testing to ensure accuracy
         if (i < serverConfigs.length - 1) {
           await Future.delayed(Duration(milliseconds: 250));
         }
       }
-      print('🏁 Robust individual testing completed: ${results.length} comprehensive results');
+      print(
+          '🏁 Robust individual testing completed: ${results.length} comprehensive results');
     }
     return results;
   }
@@ -756,7 +788,7 @@ class FlutterV2rayPingService {
   /// Assess server quality with detailed metrics
   Map<String, dynamic> assessServerQuality(String serverConfig) {
     final metrics = _serverMetrics[serverConfig];
-    
+
     if (metrics == null) {
       return {
         'quality': 'Unknown',
@@ -769,10 +801,10 @@ class FlutterV2rayPingService {
         'preferred_probe': 'None',
       };
     }
-    
+
     String qualityLevel;
     String recommendation;
-    
+
     if (metrics.qualityScore >= 80) {
       qualityLevel = 'Excellent';
       recommendation = 'Highly Recommended';
@@ -786,18 +818,24 @@ class FlutterV2rayPingService {
       qualityLevel = 'Poor';
       recommendation = 'Not Recommended';
     }
-    
+
     return {
       'quality': qualityLevel,
       'score': metrics.qualityScore,
       'reliability': (metrics.reliability * 100).toStringAsFixed(1) + '%',
       'avgPing': metrics.averagePing.toStringAsFixed(0) + 'ms',
-      'stability': metrics.reliability > 0.8 ? 'Excellent' : 
-                   metrics.reliability > 0.6 ? 'Good' : 
-                   metrics.reliability > 0.4 ? 'Fair' : 'Poor',
+      'stability': metrics.reliability > 0.8
+          ? 'Excellent'
+          : metrics.reliability > 0.6
+              ? 'Good'
+              : metrics.reliability > 0.4
+                  ? 'Fair'
+                  : 'Poor',
       'recommendation': recommendation,
       'tests_count': metrics.totalTests,
-      'preferred_probe': metrics.preferredProbeUrl.isNotEmpty ? metrics.preferredProbeUrl : 'Auto',
+      'preferred_probe': metrics.preferredProbeUrl.isNotEmpty
+          ? metrics.preferredProbeUrl
+          : 'Auto',
       'last_test': metrics.lastTest.toIso8601String(),
     };
   }
@@ -805,15 +843,15 @@ class FlutterV2rayPingService {
   /// Get intelligent server recommendations based on quality metrics
   List<Map<String, dynamic>> getServerRecommendations(List<String> servers) {
     final recommendations = <Map<String, dynamic>>[];
-    
+
     // Sort servers by quality score
     final sortedServers = getSortedServersByQuality(servers);
-    
+
     for (int i = 0; i < sortedServers.length; i++) {
       final server = sortedServers[i];
       final quality = assessServerQuality(server);
       final metrics = _serverMetrics[server];
-      
+
       String priority;
       if (i < 3) {
         priority = 'High'; // Top 3 servers
@@ -822,7 +860,7 @@ class FlutterV2rayPingService {
       } else {
         priority = 'Low';
       }
-      
+
       recommendations.add({
         'server': server,
         'rank': i + 1,
@@ -836,20 +874,24 @@ class FlutterV2rayPingService {
         'needs_retest': metrics?.needsRetest ?? true,
       });
     }
-    
+
     return recommendations;
   }
 
   Map<String, dynamic> getServiceInfo() {
     final totalServers = _serverMetrics.length;
-    final avgQuality = totalServers > 0 
-        ? _serverMetrics.values.map((m) => m.qualityScore).reduce((a, b) => a + b) / totalServers
+    final avgQuality = totalServers > 0
+        ? _serverMetrics.values
+                .map((m) => m.qualityScore)
+                .reduce((a, b) => a + b) /
+            totalServers
         : 0.0;
-    
+
     return {
       'service': 'FlutterV2rayPingService',
       'status': 'All operations use flutter_v2ray.getServerDelay',
-      'performance': 'Direct V2Ray delay measurement with intelligent optimization',
+      'performance':
+          'Direct V2Ray delay measurement with intelligent optimization',
       'v2ray_dependency': 'ENABLED',
       'region': _currentRegion,
       'tracked_servers': totalServers,
@@ -874,20 +916,27 @@ class FlutterV2rayPingService {
         'region': _currentRegion,
       };
     }
-    
+
     final qualities = _serverMetrics.values.map((m) => m.qualityScore).toList();
-    final reliabilities = _serverMetrics.values.map((m) => m.reliability).toList();
-    final avgPings = _serverMetrics.values.where((m) => m.averagePing > 0).map((m) => m.averagePing).toList();
-    
+    final reliabilities =
+        _serverMetrics.values.map((m) => m.reliability).toList();
+    final avgPings = _serverMetrics.values
+        .where((m) => m.averagePing > 0)
+        .map((m) => m.averagePing)
+        .toList();
+
     final excellentCount = qualities.where((q) => q >= 80).length;
     final goodCount = qualities.where((q) => q >= 60 && q < 80).length;
     final poorCount = qualities.where((q) => q < 40).length;
-    
+
     return {
       'total_servers': totalServers,
       'average_quality': qualities.reduce((a, b) => a + b) / totalServers,
-      'average_reliability': reliabilities.reduce((a, b) => a + b) / totalServers * 100,
-      'average_ping': avgPings.isNotEmpty ? avgPings.reduce((a, b) => a + b) / avgPings.length : 0.0,
+      'average_reliability':
+          reliabilities.reduce((a, b) => a + b) / totalServers * 100,
+      'average_ping': avgPings.isNotEmpty
+          ? avgPings.reduce((a, b) => a + b) / avgPings.length
+          : 0.0,
       'excellent_servers': excellentCount,
       'good_servers': goodCount,
       'poor_servers': poorCount,
@@ -895,29 +944,30 @@ class FlutterV2rayPingService {
       'cache_hit_rate': _cache.length > 0 ? 85.0 : 0.0, // Estimated
     };
   }
-  
+
   /// Clean up expired cache entries and optimize memory usage
   void performMaintenance() {
     if (!_isInitialized) return;
     _cleanExpiredCache();
-    
+
     // Clean up old server metrics (older than 24 hours)
     final cutoff = DateTime.now().subtract(Duration(hours: 24));
     final keysToRemove = <String>[];
-    
+
     for (final entry in _serverMetrics.entries) {
       if (entry.value.lastTest.isBefore(cutoff) && entry.value.totalTests < 3) {
         keysToRemove.add(entry.key);
       }
     }
-    
+
     for (final key in keysToRemove) {
       _serverMetrics.remove(key);
     }
-    
-    print('🧹 Cache maintenance completed: ${_cache.length} cached entries, ${_serverMetrics.length} tracked servers');
+
+    print(
+        '🧹 Cache maintenance completed: ${_cache.length} cached entries, ${_serverMetrics.length} tracked servers');
   }
-  
+
   /// Dispose resources and save metrics
   void dispose() {
     _isInitialized = false;
@@ -983,7 +1033,7 @@ class ServerQualityMetrics {
   final double reliability;
   final DateTime lastTest;
   final String preferredProbeUrl;
-  
+
   ServerQualityMetrics({
     required this.serverConfig,
     this.recentPings = const [],
@@ -995,30 +1045,33 @@ class ServerQualityMetrics {
     DateTime? lastTest,
     this.preferredProbeUrl = '',
   }) : lastTest = lastTest ?? DateTime.now();
-  
+
   /// Create updated metrics with new ping result
   ServerQualityMetrics withNewPing(int ping, String probeUrl) {
     final newRecentPings = List<int>.from(recentPings);
     final newTestTimes = List<DateTime>.from(testTimes);
     final now = DateTime.now();
-    
+
     newRecentPings.add(ping);
     newTestTimes.add(now);
-    
+
     // Keep only last 20 results
     if (newRecentPings.length > 20) {
       newRecentPings.removeAt(0);
       newTestTimes.removeAt(0);
     }
-    
-    final newSuccessCount = ping > 0 && ping < 9999 ? successCount + 1 : successCount;
+
+    final newSuccessCount =
+        ping > 0 && ping < 9999 ? successCount + 1 : successCount;
     final newTotalTests = totalTests + 1;
-    final successfulPings = newRecentPings.where((p) => p > 0 && p < 9999).toList();
-    final newAveragePing = successfulPings.isNotEmpty 
-        ? successfulPings.reduce((a, b) => a + b) / successfulPings.length 
+    final successfulPings =
+        newRecentPings.where((p) => p > 0 && p < 9999).toList();
+    final newAveragePing = successfulPings.isNotEmpty
+        ? successfulPings.reduce((a, b) => a + b) / successfulPings.length
         : averagePing;
-    final newReliability = newTotalTests > 0 ? newSuccessCount / newTotalTests : 0.0;
-    
+    final newReliability =
+        newTotalTests > 0 ? newSuccessCount / newTotalTests : 0.0;
+
     return ServerQualityMetrics(
       serverConfig: serverConfig,
       recentPings: newRecentPings,
@@ -1031,35 +1084,45 @@ class ServerQualityMetrics {
       preferredProbeUrl: ping > 0 && ping < 9999 ? probeUrl : preferredProbeUrl,
     );
   }
-  
+
   /// Get quality score (0-100)
   double get qualityScore {
     if (totalTests == 0) return 50.0; // Neutral for new servers
-    
+
     double score = reliability * 50.0; // Reliability weight: 50%
-    
+
     // Average ping bonus (lower is better)
     if (averagePing > 0) {
-      if (averagePing < 100) score += 25.0;
-      else if (averagePing < 200) score += 15.0;
-      else if (averagePing < 500) score += 10.0;
-      else score += 5.0;
+      if (averagePing < 100)
+        score += 25.0;
+      else if (averagePing < 200)
+        score += 15.0;
+      else if (averagePing < 500)
+        score += 10.0;
+      else
+        score += 5.0;
     }
-    
+
     // Recent performance bonus
-    final recentSuccess = recentPings.length >= 5 
-        ? recentPings.skip(recentPings.length - 5).where((p) => p > 0 && p < 9999).length / 5.0
+    final recentSuccess = recentPings.length >= 5
+        ? recentPings
+                .skip(recentPings.length - 5)
+                .where((p) => p > 0 && p < 9999)
+                .length /
+            5.0
         : reliability;
     score += recentSuccess * 25.0; // Recent performance weight: 25%
-    
+
     return score.clamp(0.0, 100.0);
   }
-  
+
   /// Check if server needs retesting
   bool get needsRetest {
     final timeSinceLastTest = DateTime.now().difference(lastTest);
-    if (reliability < 0.5) return timeSinceLastTest.inMinutes > 2; // Test poor servers more often
-    if (reliability > 0.8) return timeSinceLastTest.inMinutes > 10; // Test good servers less often
+    if (reliability < 0.5)
+      return timeSinceLastTest.inMinutes > 2; // Test poor servers more often
+    if (reliability > 0.8)
+      return timeSinceLastTest.inMinutes > 10; // Test good servers less often
     return timeSinceLastTest.inMinutes > 5; // Default interval
   }
 }
@@ -1072,7 +1135,7 @@ extension on FlutterV2rayPingService {
     final entry = _cache[key];
     if (entry == null) return null;
     final now = DateTime.now();
-    
+
     // Determine TTL based on ping quality and server metrics
     Duration ttl;
     if (entry.value <= 0 || entry.value >= 9999) {
@@ -1081,7 +1144,7 @@ extension on FlutterV2rayPingService {
       // Extract server config from cache key to check quality
       final serverConfig = key.split('|').first;
       final metrics = _serverMetrics[serverConfig];
-      
+
       if (metrics != null) {
         final qualityScore = metrics.qualityScore;
         if (qualityScore >= 80) {
@@ -1104,7 +1167,7 @@ extension on FlutterV2rayPingService {
         }
       }
     }
-    
+
     if (now.difference(entry.ts) <= ttl) {
       return entry.value;
     }
@@ -1118,53 +1181,57 @@ extension on FlutterV2rayPingService {
     while (_cache.length >= FlutterV2rayPingService._maxCacheEntries) {
       String? keyToRemove;
       double lowestScore = double.infinity;
-      
+
       // Find the lowest quality server to remove
       for (final cacheKey in _cache.keys) {
         final serverConfig = cacheKey.split('|').first;
         final metrics = _serverMetrics[serverConfig];
         final score = metrics?.qualityScore ?? 0.0;
-        
+
         if (score < lowestScore) {
           lowestScore = score;
           keyToRemove = cacheKey;
         }
       }
-      
+
       // Fallback to LRU if no quality-based removal
       keyToRemove ??= _cache.keys.first;
       _cache.remove(keyToRemove);
     }
     _cache[key] = _CachedPing(value, DateTime.now());
   }
-  
+
   /// Clean expired cache entries
   void _cleanExpiredCache() {
     final now = DateTime.now();
     final keysToRemove = <String>[];
-    
+
     for (final entry in _cache.entries) {
       final serverConfig = entry.key.split('|').first;
       final metrics = _serverMetrics[serverConfig];
-      
+
       Duration ttl;
       if (entry.value.value <= 0 || entry.value.value >= 9999) {
         ttl = FlutterV2rayPingService._failureCacheTtl;
       } else if (metrics != null) {
         final score = metrics.qualityScore;
-        if (score >= 80) ttl = FlutterV2rayPingService._excellentCacheTtl;
-        else if (score >= 60) ttl = FlutterV2rayPingService._goodCacheTtl;
-        else if (score >= 40) ttl = FlutterV2rayPingService._fairCacheTtl;
-        else ttl = FlutterV2rayPingService._poorCacheTtl;
+        if (score >= 80)
+          ttl = FlutterV2rayPingService._excellentCacheTtl;
+        else if (score >= 60)
+          ttl = FlutterV2rayPingService._goodCacheTtl;
+        else if (score >= 40)
+          ttl = FlutterV2rayPingService._fairCacheTtl;
+        else
+          ttl = FlutterV2rayPingService._poorCacheTtl;
       } else {
         ttl = FlutterV2rayPingService._fairCacheTtl; // Default
       }
-      
+
       if (now.difference(entry.value.ts) > ttl) {
         keysToRemove.add(entry.key);
       }
     }
-    
+
     for (final key in keysToRemove) {
       _cache.remove(key);
     }

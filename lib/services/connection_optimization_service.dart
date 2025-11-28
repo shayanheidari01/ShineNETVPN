@@ -33,7 +33,6 @@ class ConnectionOptimizationService {
     return value;
   }
 
-
   // State management
   bool _isConnecting = false;
   bool _isTestingServers = false;
@@ -106,7 +105,8 @@ class ConnectionOptimizationService {
     } else if (s == 'DISCONNECTED' || s == 'STOPPED') {
       // Assume a manual disconnect (e.g., from notification). Suppress auto-reconnect for 2 minutes.
       _manualDisconnectUntil = DateTime.now().add(Duration(minutes: 2));
-      print('⏸️ Auto-reconnect suppressed until ${_manualDisconnectUntil} due to disconnect event');
+      print(
+          '⏸️ Auto-reconnect suppressed until ${_manualDisconnectUntil} due to disconnect event');
     }
   }
 
@@ -124,9 +124,11 @@ class ConnectionOptimizationService {
   /// Start connection quality monitoring with adaptive intervals
   void _startQualityMonitoring() {
     _qualityMonitor?.cancel();
-    _qualityMonitor = Timer.periodic(Duration(seconds: 30), (timer) { // Check more frequently
+    _qualityMonitor = Timer.periodic(Duration(seconds: 30), (timer) {
+      // Check more frequently
       // Skip monitoring during manual disconnect suppression window
-      if (_manualDisconnectUntil != null && DateTime.now().isBefore(_manualDisconnectUntil!)) {
+      if (_manualDisconnectUntil != null &&
+          DateTime.now().isBefore(_manualDisconnectUntil!)) {
         return;
       }
       if (_lastConnectedServer != null) {
@@ -417,7 +419,8 @@ class ConnectionOptimizationService {
   /// Enhanced automatic reconnection with intelligent server selection and adaptive retry
   Future<void> _attemptAutoReconnection() async {
     // Respect manual disconnect window
-    if (_manualDisconnectUntil != null && DateTime.now().isBefore(_manualDisconnectUntil!)) {
+    if (_manualDisconnectUntil != null &&
+        DateTime.now().isBefore(_manualDisconnectUntil!)) {
       print('⏸️ Auto-reconnect attempt suppressed (manual disconnect active)');
       return;
     }
@@ -793,7 +796,8 @@ class ConnectionOptimizationService {
       print('🔍 Performing connection health check...');
 
       // Skip health checks during manual disconnect suppression window
-      if (_manualDisconnectUntil != null && DateTime.now().isBefore(_manualDisconnectUntil!)) {
+      if (_manualDisconnectUntil != null &&
+          DateTime.now().isBefore(_manualDisconnectUntil!)) {
         print('⏸️ Skipping health check due to manual disconnect window');
         return;
       }
@@ -850,7 +854,8 @@ class ConnectionOptimizationService {
 
       // Skip TCP filtering; rely solely on V2Ray delay during testing
       List<String> filteredServers = servers;
-      onStatusUpdate?.call('📡 Skipping TCP filtering; using V2Ray delay tests');
+      onStatusUpdate
+          ?.call('📡 Skipping TCP filtering; using V2Ray delay tests');
 
       // Test servers in parallel with limited concurrency
       final testResults = await _testServersOptimized(
@@ -949,7 +954,8 @@ class ConnectionOptimizationService {
           int batchSuccessCount = 0;
 
           for (final server in batch) {
-            final result = await _testSingleServerEnhanced(server, adaptiveTimeout);
+            final result =
+                await _testSingleServerEnhanced(server, adaptiveTimeout);
             results.add(result);
             if (result.success) batchSuccessCount++;
             allResults.add(result);
@@ -966,7 +972,8 @@ class ConnectionOptimizationService {
 
           // Early termination with sufficient good servers (optimization)
           if (successfulResults.length >= 5 && batchIndex >= 2) {
-            print('🚀 Early termination: Found ${successfulResults.length} good servers');
+            print(
+                '🚀 Early termination: Found ${successfulResults.length} good servers');
             break;
           }
 
@@ -993,50 +1000,6 @@ class ConnectionOptimizationService {
       return successfulResults;
     } finally {
       _isTestingServers = false;
-    }
-  }
-
-
-  /// Perform enhanced connection test with quality assessment
-  Future<int> _performEnhancedConnectionTest(
-      Map<String, dynamic> serverDetails) async {
-    final startTime = DateTime.now();
-
-    try {
-      // Simulate realistic connection test with variable performance
-      final address = serverDetails['address'] as String? ?? 'unknown';
-      final port = serverDetails['port'] as int? ?? 443;
-
-      // Base delay influenced by server characteristics
-      int baseDelay = 80 + Random().nextInt(150);
-
-      // Simulate network conditions
-      if (address.contains('cloudflare') || address.contains('104.21')) {
-        baseDelay = 50 + Random().nextInt(100); // Faster for CDN servers
-      } else if (address.contains('amazonaws') || address.contains('52.')) {
-        baseDelay = 70 + Random().nextInt(120); // AWS servers
-      }
-
-      // Add some realistic jitter
-      final jitter = Random().nextInt(50);
-      final totalDelay = baseDelay + jitter;
-
-      await Future.delayed(Duration(milliseconds: totalDelay));
-
-      // Return the actual measured time as ping
-      final ping = DateTime.now().difference(startTime).inMilliseconds;
-
-      // Ensure ping is within reasonable range
-      if (ping > 0 && ping <= 10000) {
-        return ping;
-      } else if (ping > 10000) {
-        return 9999; // Timeout
-      } else {
-        return 50 + Random().nextInt(200); // Return a reasonable default ping
-      }
-    } catch (e) {
-      // Return high latency for failed tests
-      return 9999;
     }
   }
 
@@ -1196,8 +1159,6 @@ class ConnectionOptimizationService {
 
     return score.clamp(0.0, 500.0);
   }
-
-
 
   /// Get recent successful connections for a server
   int _getRecentSuccesses(String serverId) {
@@ -1575,7 +1536,6 @@ class ConnectionOptimizationService {
     }
   }
 
-
   /// Sort all servers for display (returns ALL servers, not limited)
   List<String> sortServersForDisplay(List<String> servers) {
     if (servers.isEmpty) return [];
@@ -1644,7 +1604,6 @@ class ConnectionOptimizationService {
     }
   }
 
-
   /// Enhanced server selection for testing with intelligent prioritization
   List<String> _selectServersForTestingEnhanced(List<String> servers) {
     if (servers.isEmpty) return servers;
@@ -1680,7 +1639,8 @@ class ConnectionOptimizationService {
       selectedServers.addAll(regularServers.take(remainingSlots));
     }
 
-    final totalPrioritized = min(prioritizedServers.length, maxPrioritizedServers);
+    final totalPrioritized =
+        min(prioritizedServers.length, maxPrioritizedServers);
     final totalRegular = max(0, selectedServers.length - totalPrioritized);
 
     print(

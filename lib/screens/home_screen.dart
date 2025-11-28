@@ -19,7 +19,6 @@ import 'package:shinenet_vpn/services/flutter_v2ray_ping_service.dart';
 import 'package:shinenet_vpn/services/unified_ping_manager.dart'; // V2Ray delay ping service
 import 'package:flutter/material.dart';
 import 'package:flutter_v2ray_client/flutter_v2ray.dart';
-import 'package:flutter_v2ray_client/model/v2ray_status.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -40,21 +39,24 @@ class _HomePageState extends State<HomePage> {
   ValueNotifier<V2RayStatus> get v2rayStatus => _v2rayManager.statusNotifier;
 
   static const String _lastSuccessfulServerKey = 'last_successful_server';
-  static const String _lastSuccessfulTimestampKey = 'last_successful_server_time';
+  static const String _lastSuccessfulTimestampKey =
+      'last_successful_server_time';
   static const Duration _fastReconnectValidity = Duration(minutes: 45);
 
   // Optimization services
   final ServerOptimizationService _serverService = ServerOptimizationService();
-  final ConnectionOptimizationService _connectionService = ConnectionOptimizationService();
+  final ConnectionOptimizationService _connectionService =
+      ConnectionOptimizationService();
   final ServerCacheManager _cacheManager = ServerCacheManager();
-  final IntelligentServerSelector _intelligentSelector = IntelligentServerSelector();
+  final IntelligentServerSelector _intelligentSelector =
+      IntelligentServerSelector();
 
   // UI State
   bool isLoading = false;
   String loadingStatus = '';
   int serversBeingTested = 0;
   int serversTestCompleted = 0;
-  
+
   // Individual server test results
   List<Map<String, dynamic>> serverTestResults = <Map<String, dynamic>>[];
   bool isTestingServers = false;
@@ -77,15 +79,16 @@ class _HomePageState extends State<HomePage> {
   // Server management - unified with ServerCacheManager
   List<String> cachedServers = <String>[];
   List<Map<String, dynamic>> processedServers = <Map<String, dynamic>>[];
-  Map<String, int> serverPings = <String, int>{}; // Legacy ping results (deprecated)
+  Map<String, int> serverPings =
+      <String, int>{}; // Legacy ping results (deprecated)
   DateTime? lastServerFetch;
   String? _lastSuccessfulServer;
   DateTime? _lastSuccessfulServerTime;
-  
+
   // Unified ping management system
   final UnifiedPingManager _unifiedPingManager = UnifiedPingManager();
   StreamSubscription<Map<String, PingResult>>? _pingUpdateSubscription;
-  
+
   // Background health monitoring
   Timer? _healthCheckTimer;
   final FlutterV2rayPingService _pingService = FlutterV2rayPingService();
@@ -93,23 +96,22 @@ class _HomePageState extends State<HomePage> {
   int connectionRetryCount = 0;
   static const int maxRetries = 5;
   static const Duration initialRetryDelay = Duration(seconds: 2);
-  
+
   // Add server testing protection flag
   bool _isServerTestingInProgress = false;
-  
+
   // Add a queue for server testing to prevent resource exhaustion
   final List<Map<String, dynamic>> _serverTestQueue = <Map<String, dynamic>>[];
   bool _isProcessingServerQueue = false;
-  
+
   // Connection analytics
   int _totalConnectionAttempts = 0;
   int _successfulConnections = 0;
   int _failedConnections = 0;
   double _averageConnectionTime = 0.0;
-  
+
   // User IP Information
   String? _userIP;
-  
 
   Future<void> _initializeServices() async {
     try {
@@ -117,7 +119,7 @@ class _HomePageState extends State<HomePage> {
       await _connectionService.initialize();
       await _intelligentSelector.initialize();
       await _loadConnectionAnalytics();
-      
+
       // Background testing removed for optimization
     } catch (e) {
       print('Error initializing optimization services: $e');
@@ -129,7 +131,8 @@ class _HomePageState extends State<HomePage> {
     try {
       final timestamp = DateTime.now();
       await _prefs.setString(_lastSuccessfulServerKey, serverConfig);
-      await _prefs.setString(_lastSuccessfulTimestampKey, timestamp.toIso8601String());
+      await _prefs.setString(
+          _lastSuccessfulTimestampKey, timestamp.toIso8601String());
       _lastSuccessfulServer = serverConfig;
       _lastSuccessfulServerTime = timestamp;
     } catch (e) {
@@ -144,7 +147,8 @@ class _HomePageState extends State<HomePage> {
     if (_lastSuccessfulServerTime == null) {
       return true;
     }
-    return DateTime.now().difference(_lastSuccessfulServerTime!) <= _fastReconnectValidity;
+    return DateTime.now().difference(_lastSuccessfulServerTime!) <=
+        _fastReconnectValidity;
   }
 
   Future<bool> _tryReconnectUsingLastSuccessfulServer() async {
@@ -279,7 +283,7 @@ class _HomePageState extends State<HomePage> {
     }
     return message;
   }
-  
+
   /// Load connection analytics from storage
   Future<void> _loadConnectionAnalytics() async {
     try {
@@ -287,12 +291,13 @@ class _HomePageState extends State<HomePage> {
       _totalConnectionAttempts = prefs.getInt('total_connection_attempts') ?? 0;
       _successfulConnections = prefs.getInt('successful_connections') ?? 0;
       _failedConnections = prefs.getInt('failed_connections') ?? 0;
-      _averageConnectionTime = prefs.getDouble('average_connection_time') ?? 0.0;
+      _averageConnectionTime =
+          prefs.getDouble('average_connection_time') ?? 0.0;
     } catch (e) {
       print('Error loading connection analytics: $e');
     }
   }
-  
+
   /// Save connection analytics to storage
   Future<void> _saveConnectionAnalytics() async {
     try {
@@ -305,32 +310,33 @@ class _HomePageState extends State<HomePage> {
       print('Error saving connection analytics: $e');
     }
   }
-  
+
   /// Record connection attempt
   void _recordConnectionAttempt(bool success, int connectionTime) {
     _totalConnectionAttempts++;
-    
+
     if (success) {
       _successfulConnections++;
       // Update average connection time
       if (_averageConnectionTime == 0.0) {
         _averageConnectionTime = connectionTime.toDouble();
       } else {
-        _averageConnectionTime = (_averageConnectionTime + connectionTime) / 2.0;
+        _averageConnectionTime =
+            (_averageConnectionTime + connectionTime) / 2.0;
       }
     } else {
       _failedConnections++;
     }
-    
+
     _saveConnectionAnalytics();
   }
-  
+
   /// Get connection success rate
   double get connectionSuccessRate {
     if (_totalConnectionAttempts == 0) return 0.0;
     return _successfulConnections / _totalConnectionAttempts;
   }
-  
+
   /// Get connection analytics summary
   Map<String, dynamic> getConnectionAnalytics() {
     return {
@@ -343,40 +349,41 @@ class _HomePageState extends State<HomePage> {
       'blockedApps': blockedApps,
     };
   }
-  
+
   /// Start background server health monitoring
   void _startBackgroundHealthCheck() {
     _healthCheckTimer?.cancel();
-    
+
     // Run health check every 5 minutes
     _healthCheckTimer = Timer.periodic(Duration(minutes: 5), (timer) async {
       if (!mounted) {
         timer.cancel();
         return;
       }
-      
+
       await _performBackgroundHealthCheck();
     });
-    
+
     print('🔍 Background health monitoring started (5-minute intervals)');
   }
-  
+
   /// Perform background health check on top servers
   Future<void> _performBackgroundHealthCheck() async {
     try {
       if (processedServers.isEmpty) return;
-      
+
       // Test top 5 servers for health monitoring
       final topServers = processedServers
           .where((s) => s['config'] != 'Automatic')
           .take(5)
           .map((s) => s['config'] as String)
           .toList();
-      
+
       if (topServers.isEmpty) return;
-      
-      print('🔍 Running background health check for ${topServers.length} servers...');
-      
+
+      print(
+          '🔍 Running background health check for ${topServers.length} servers...');
+
       final results = await _pingService.testMultipleServerPingsIntelligent(
         topServers,
         baseTimeoutSeconds: 2, // Faster timeout for background checks
@@ -384,7 +391,7 @@ class _HomePageState extends State<HomePage> {
         maxConcurrent: 3,
         prioritizeByQuality: false, // Don't re-sort during background check
       );
-      
+
       // Update server pings with fresh results
       int healthyCount = 0;
       results.forEach((server, ping) {
@@ -393,12 +400,12 @@ class _HomePageState extends State<HomePage> {
           healthyCount++;
         }
       });
-      
+
       // Perform maintenance
       _pingService.performMaintenance();
-      
-      print('🔍 Background health check completed: $healthyCount/${topServers.length} healthy servers');
-      
+
+      print(
+          '🔍 Background health check completed: $healthyCount/${topServers.length} healthy servers');
     } catch (e) {
       print('⚠️ Background health check failed: $e');
     }
@@ -422,19 +429,19 @@ class _HomePageState extends State<HomePage> {
     // Attach shared V2ray instance to services BEFORE initializing them
     _initializeServices();
     _loadServerSelection();
-    
+
     // Initialize ping service
     _pingService.initialize();
-    
+
     // Initialize unified ping manager
     _initializeUnifiedPingManager();
-    
+
     // Fetch servers once on app startup
     _fetchAndCacheServersOnStartup();
-    
+
     // Start background health monitoring
     _startBackgroundHealthCheck();
-    
+
     _v2rayManager
         .ensureInitialized(
       notificationIconResourceType: "notification_icon_type".tr(),
@@ -464,14 +471,18 @@ class _HomePageState extends State<HomePage> {
               builder: (context, status, _) {
                 // Normalize plugin status and map to display states (case-insensitive)
                 final String normalizedState = status.state.toUpperCase();
-                final bool isExplicitConnecting = normalizedState == 'CONNECTING' || normalizedState == 'STARTING';
+                final bool isExplicitConnecting =
+                    normalizedState == 'CONNECTING' ||
+                        normalizedState == 'STARTING';
                 // Treat common plugin variants as connected
-                final bool isConnected = normalizedState == 'CONNECTED' || normalizedState == 'RUNNING' || normalizedState == 'STARTED';
+                final bool isConnected = normalizedState == 'CONNECTED' ||
+                    normalizedState == 'RUNNING' ||
+                    normalizedState == 'STARTED';
                 final bool isConnecting = isLoading || isExplicitConnecting;
                 final String displayStatus = isConnected
                     ? 'CONNECTED'
                     : (isConnecting ? 'CONNECTING' : 'DISCONNECTED');
-                
+
                 return CustomScrollView(
                   slivers: [
                     // Modern app bar (simplified to avoid FlexibleSpaceBar null settings)
@@ -491,26 +502,27 @@ class _HomePageState extends State<HomePage> {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    
+
                     // Main content
                     SliverPadding(
                       padding: EdgeInsets.all(ThemeColor.mediumSpacing),
                       sliver: SliverList(
                         delegate: SliverChildListDelegate([
                           // Simplified connection section (pass displayStatus explicitly)
-                          _buildSimplifiedConnectionSection(status, isConnected, isConnecting, displayStatus),
+                          _buildSimplifiedConnectionSection(
+                              status, isConnected, isConnecting, displayStatus),
                           SizedBox(height: ThemeColor.largeSpacing),
-                          
+
                           // Server selection (simplified)
                           _buildSimplifiedServerSelection(),
                           SizedBox(height: ThemeColor.largeSpacing),
-                          
+
                           // Statistics (only when connected)
                           if (isConnected) ...[
                             _buildSimplifiedStats(status),
                             SizedBox(height: ThemeColor.largeSpacing),
                           ],
-                          
+
                           // Quick actions (simplified)
                           _buildSimplifiedQuickActions(),
                         ]),
@@ -525,7 +537,6 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
-
 
   Widget _buildLiquidBackground() {
     return Container(
@@ -547,8 +558,8 @@ class _HomePageState extends State<HomePage> {
             child: _buildGlowBlob(
               diameter: 260,
               colors: [
-                ThemeColor.primaryColor.withOpacity(0.28),
-                ThemeColor.primaryColor.withOpacity(0.05),
+                ThemeColor.primaryColor.withValues(alpha: 0.28),
+                ThemeColor.primaryColor.withValues(alpha: 0.05),
               ],
             ),
           ),
@@ -558,8 +569,8 @@ class _HomePageState extends State<HomePage> {
             child: _buildGlowBlob(
               diameter: 300,
               colors: [
-                ThemeColor.connectedColor.withOpacity(0.24),
-                ThemeColor.connectedColor.withOpacity(0.04),
+                ThemeColor.connectedColor.withValues(alpha: 0.24),
+                ThemeColor.connectedColor.withValues(alpha: 0.04),
               ],
             ),
           ),
@@ -569,8 +580,8 @@ class _HomePageState extends State<HomePage> {
             child: _buildGlowBlob(
               diameter: 220,
               colors: [
-                ThemeColor.warningColor.withOpacity(0.18),
-                ThemeColor.warningColor.withOpacity(0.04),
+                ThemeColor.warningColor.withValues(alpha: 0.18),
+                ThemeColor.warningColor.withValues(alpha: 0.04),
               ],
             ),
           ),
@@ -595,10 +606,11 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  List<Color> _neutralGlassGradient({double highlight = 0.14, double lowlight = 0.04}) {
+  List<Color> _neutralGlassGradient(
+      {double highlight = 0.14, double lowlight = 0.04}) {
     return [
-      Colors.white.withOpacity(highlight.clamp(0.0, 1.0)),
-      Colors.white.withOpacity(lowlight.clamp(0.0, 1.0)),
+      Colors.white.withValues(alpha: highlight.clamp(0.0, 1.0)),
+      Colors.white.withValues(alpha: lowlight.clamp(0.0, 1.0)),
     ];
   }
 
@@ -608,11 +620,10 @@ class _HomePageState extends State<HomePage> {
     double lowlight = 0.06,
   }) {
     return [
-      tint.withOpacity(highlight.clamp(0.0, 1.0)),
-      Colors.white.withOpacity(lowlight.clamp(0.0, 1.0)),
+      tint.withValues(alpha: highlight.clamp(0.0, 1.0)),
+      Colors.white.withValues(alpha: lowlight.clamp(0.0, 1.0)),
     ];
   }
-
 
   // Simplified connection section
   Widget _buildSimplifiedConnectionSection(
@@ -645,7 +656,7 @@ class _HomePageState extends State<HomePage> {
             SizedBox(height: ThemeColor.mediumSpacing),
             _buildSimplifiedStatusInfo(status),
           ],
-          if (isLoading && loadingStatus.isNotEmpty) ...[
+          if (_shouldShowLoadingStatus()) ...[
             SizedBox(height: ThemeColor.mediumSpacing),
             _buildSimplifiedLoadingStatus(),
           ],
@@ -728,6 +739,12 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  bool _shouldShowLoadingStatus() {
+    return isLoading &&
+        loadingStatus.isNotEmpty &&
+        (isTestingServers || _isServerTestingInProgress);
+  }
+
   // Simplified loading status
   Widget _buildSimplifiedLoadingStatus() {
     return LiquidGlassContainer(
@@ -768,12 +785,13 @@ class _HomePageState extends State<HomePage> {
       // Extract numeric value from string like "1234567 B"
       final match = RegExp(r'(\d+)').firstMatch(bytesStr);
       if (match == null) return bytesStr;
-      
+
       final bytes = int.parse(match.group(1)!);
-      
+
       if (bytes < 1024) return '${bytes} B';
       if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-      if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+      if (bytes < 1024 * 1024 * 1024)
+        return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
       return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
     } catch (e) {
       return bytesStr;
@@ -786,12 +804,14 @@ class _HomePageState extends State<HomePage> {
       // Extract numeric value from string like "1234567 B/s"
       final match = RegExp(r'(\d+)').firstMatch(speedStr);
       if (match == null) return speedStr;
-      
+
       final bytesPerSec = int.parse(match.group(1)!);
-      
+
       if (bytesPerSec < 1024) return '${bytesPerSec} B/s';
-      if (bytesPerSec < 1024 * 1024) return '${(bytesPerSec / 1024).toStringAsFixed(1)} KB/s';
-      if (bytesPerSec < 1024 * 1024 * 1024) return '${(bytesPerSec / (1024 * 1024)).toStringAsFixed(1)} MB/s';
+      if (bytesPerSec < 1024 * 1024)
+        return '${(bytesPerSec / 1024).toStringAsFixed(1)} KB/s';
+      if (bytesPerSec < 1024 * 1024 * 1024)
+        return '${(bytesPerSec / (1024 * 1024)).toStringAsFixed(1)} MB/s';
       return '${(bytesPerSec / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB/s';
     } catch (e) {
       return speedStr;
@@ -928,7 +948,7 @@ class _HomePageState extends State<HomePage> {
   }) {
     // Format the value for better readability
     String formattedValue = _formatBytes(value);
-    
+
     return LiquidGlassContainer(
       borderRadius: ThemeColor.largeRadius,
       padding: EdgeInsets.all(ThemeColor.mediumSpacing),
@@ -1199,12 +1219,12 @@ class _HomePageState extends State<HomePage> {
     // Treat any other state as disconnected and attempt connection
     if (!isLoading) {
       connectionRetryCount = 0; // Reset retry count for new connection attempt
-      
+
       // Check if we have servers available (use actual server lists instead of test results)
       final hasProcessedServers = processedServers.isNotEmpty;
       final hasCachedServers = cachedServers.isNotEmpty;
       final hasAnyServers = hasProcessedServers || hasCachedServers;
-      
+
       if (!hasAnyServers) {
         // No servers available at all, need to fetch
         print('No servers available, fetching new servers...');
@@ -1218,10 +1238,13 @@ class _HomePageState extends State<HomePage> {
         }
       } else {
         // We have servers available, proceed with connection
-        final serverCount = hasProcessedServers ? processedServers.length : cachedServers.length;
-        print('Found $serverCount available servers, proceeding with connection...');
+        final serverCount = hasProcessedServers
+            ? processedServers.length
+            : cachedServers.length;
+        print(
+            'Found $serverCount available servers, proceeding with connection...');
       }
-      
+
       // Always proceed with connection attempt (the connection methods handle server fetching if needed)
       await _connectWithRetry();
     }
@@ -1236,16 +1259,15 @@ class _HomePageState extends State<HomePage> {
 
       // Try simple automatic connection first
       await _connectAutomaticSimple();
-      
     } catch (e) {
       print('Simple automatic connection failed: $e');
-      
+
       // Fallback to enhanced method
       try {
         await _connectAutomaticSmart();
       } catch (e2) {
         print('Enhanced automatic connection also failed: $e2');
-        
+
         // Final fallback to original method
         await _connectWithFallbackRetry();
       }
@@ -1258,41 +1280,41 @@ class _HomePageState extends State<HomePage> {
       }
     }
   }
-  
+
   /// Enhanced automatic connection method with intelligent retry
   Future<void> _connectAutomaticSimple() async {
     int retryCount = 0;
     const maxRetries = 3;
-    
+
     while (retryCount < maxRetries) {
       try {
         setState(() {
-          loadingStatus = retryCount == 0 
-              ? '🚀 Starting automatic connection...' 
+          loadingStatus = retryCount == 0
+              ? '🚀 Starting automatic connection...'
               : '🔄 Retrying automatic connection (${retryCount + 1}/$maxRetries)...';
         });
-        
+
         // Add overall timeout for the entire connection process
         await Future.any([
           _performSimpleConnection(),
           Future.delayed(Duration(seconds: 30), () {
-            throw TimeoutException('Connection process timed out', Duration(seconds: 30));
+            throw TimeoutException(
+                'Connection process timed out', Duration(seconds: 30));
           }),
         ]);
-        
+
         // If we reach here, connection was successful
         print('✅ Automatic connection successful on attempt ${retryCount + 1}');
         return;
-        
       } catch (e) {
         retryCount++;
         print('❌ Automatic connection attempt $retryCount failed: $e');
-        
+
         if (retryCount >= maxRetries) {
           print('🚫 All automatic connection attempts failed');
           rethrow;
         }
-        
+
         // Wait before retry with exponential backoff
         final delaySeconds = retryCount * 2;
         setState(() {
@@ -1302,7 +1324,7 @@ class _HomePageState extends State<HomePage> {
       }
     }
   }
-  
+
   /// Perform the actual simple connection with improved logic
   Future<void> _performSimpleConnection() async {
     setState(() {
@@ -1321,7 +1343,7 @@ class _HomePageState extends State<HomePage> {
         setState(() {
           loadingStatus = '📡 Testing servers for immediate connection...';
         });
-        
+
         final immediateCompleter = Completer<Map<String, dynamic>?>();
         final bestServer = await _selectBestServerSmart(
           servers.take(8).toList(),
@@ -1331,12 +1353,12 @@ class _HomePageState extends State<HomePage> {
           print('Immediate connection mode timed out');
           return null;
         });
-        
+
         // If immediate connection was successful, we're done
         if (bestServer == null && immediateCompleter.isCompleted) {
           return;
         }
-        
+
         // If we got a best server but didn't connect immediately, connect now
         if (bestServer != null && bestServer['server'] != null) {
           setState(() {
@@ -1393,26 +1415,30 @@ class _HomePageState extends State<HomePage> {
     // Step 1: Try to use processed servers with ping data
     if (processedServers.isNotEmpty) {
       print('📋 Using processed servers (${processedServers.length} servers)');
-      
+
       // Filter and sort healthy servers by ping (best first)
       final healthyServers = processedServers
-          .where((server) => (server['ping'] as int) > 0 && (server['ping'] as int) < 5000)
+          .where((server) =>
+              (server['ping'] as int) > 0 && (server['ping'] as int) < 5000)
           .toList();
-      
+
       // Sort by ping (ascending - best ping first)
-      healthyServers.sort((a, b) => (a['ping'] as int).compareTo(b['ping'] as int));
-      
+      healthyServers
+          .sort((a, b) => (a['ping'] as int).compareTo(b['ping'] as int));
+
       if (healthyServers.isNotEmpty) {
         // Try top 3 servers for better reliability
         for (int i = 0; i < healthyServers.length && i < 3; i++) {
           final server = healthyServers[i];
           try {
             setState(() {
-              loadingStatus = '🚀 Connecting to server ${i + 1} (${server['ping']}ms)...';
+              loadingStatus =
+                  '🚀 Connecting to server ${i + 1} (${server['ping']}ms)...';
             });
-            
+
             await _connectToServer(server['config'] as String);
-            print('✅ Successfully connected to server with ${server['ping']}ms ping');
+            print(
+                '✅ Successfully connected to server with ${server['ping']}ms ping');
             return;
           } catch (e) {
             print('❌ Failed to connect to server ${i + 1}: $e');
@@ -1426,12 +1452,12 @@ class _HomePageState extends State<HomePage> {
         }
       }
     }
-    
+
     // Step 2: Fetch fresh servers and test them with immediate connection
     setState(() {
       loadingStatus = '📡 Fetching fresh servers...';
     });
-    
+
     try {
       final freshServers = await _fetchServersWithFallback();
       if (freshServers.isNotEmpty) {
@@ -1445,15 +1471,16 @@ class _HomePageState extends State<HomePage> {
           print('Server selection timed out');
           return null;
         });
-        
+
         // If immediate connection was successful, we're done
         if (bestServer == null && immediateCompleter.isCompleted) {
           return;
         }
-        
+
         // Fallback to old method if immediate connection didn't happen
         if (bestServer == null) {
-          final fallbackServer = await findAndTestBestServer(freshServers.take(5).toList());
+          final fallbackServer =
+              await findAndTestBestServer(freshServers.take(5).toList());
           if (fallbackServer != null) {
             setState(() {
               loadingStatus = '🚀 Connecting to optimal server...';
@@ -1473,15 +1500,15 @@ class _HomePageState extends State<HomePage> {
     } catch (e) {
       print('Failed to fetch fresh servers: $e');
     }
-    
+
     // Step 3: Fallback to cached servers
     if (cachedServers.isNotEmpty) {
       print('📋 Using cached servers as fallback');
-      
+
       setState(() {
         loadingStatus = '🚀 Connecting to cached server...';
       });
-      
+
       // Try first few cached servers
       for (int i = 0; i < cachedServers.length && i < 3; i++) {
         try {
@@ -1496,14 +1523,15 @@ class _HomePageState extends State<HomePage> {
         }
       }
     }
-    
+
     // Step 4: Ultimate fallback - use optimization service
     setState(() {
       loadingStatus = '🔧 Using optimization service...';
     });
-    
+
     try {
-      final optimizedServers = await _serverService.getOptimizedServerList(forceRefresh: true);
+      final optimizedServers =
+          await _serverService.getOptimizedServerList(forceRefresh: true);
       if (optimizedServers.isNotEmpty) {
         await _connectToServer(optimizedServers.first);
         return;
@@ -1511,10 +1539,10 @@ class _HomePageState extends State<HomePage> {
     } catch (e) {
       print('Optimization service failed: $e');
     }
-    
+
     throw Exception('All automatic connection methods failed');
   }
-  
+
   /// Enhanced automatic connection with smart server selection
   Future<void> _connectAutomaticSmart() async {
     try {
@@ -1538,12 +1566,12 @@ class _HomePageState extends State<HomePage> {
         print('Server selection timed out, using first available server');
         return null;
       });
-      
+
       // If immediate connection was successful, we're done
       if (bestServer == null && immediateCompleter.isCompleted) {
         return;
       }
-      
+
       if (bestServer == null) {
         // Fallback: try direct connection with first server
         print('No healthy servers found, trying direct connection...');
@@ -1557,13 +1585,12 @@ class _HomePageState extends State<HomePage> {
 
       // Step 3: Connect to the selected server (if immediate connection didn't happen)
       await _connectToSelectedServer(bestServer);
-      
     } catch (e) {
       print('Smart automatic connection failed: $e');
       rethrow;
     }
   }
-  
+
   /// Fetch servers with multiple fallback methods
   Future<List<String>> _fetchServersWithMultipleFallbacks() async {
     final fallbackMethods = [
@@ -1572,16 +1599,18 @@ class _HomePageState extends State<HomePage> {
       _fetchServersFromAllOrigins,
       _fetchServersFromAlternative,
     ];
-    
+
     for (int i = 0; i < fallbackMethods.length; i++) {
       try {
         setState(() {
-          loadingStatus = '📡 Fetching servers (method ${i + 1}/${fallbackMethods.length})...';
+          loadingStatus =
+              '📡 Fetching servers (method ${i + 1}/${fallbackMethods.length})...';
         });
-        
+
         final servers = await fallbackMethods[i]();
         if (servers.isNotEmpty) {
-          print('✅ Successfully fetched ${servers.length} servers using method ${i + 1}');
+          print(
+              '✅ Successfully fetched ${servers.length} servers using method ${i + 1}');
           return servers;
         }
       } catch (e) {
@@ -1591,30 +1620,32 @@ class _HomePageState extends State<HomePage> {
         }
       }
     }
-    
+
     throw Exception('All server fetching methods failed');
   }
-  
+
   /// Select the best server using smart algorithm with immediate connection option
   Future<Map<String, dynamic>?> _selectBestServerSmart(
     List<String> servers, {
-    bool connectImmediately = false, // If true, connect immediately after first valid ping
-    Completer<Map<String, dynamic>?>? immediateCompleter, // Completer for immediate connection
+    bool connectImmediately =
+        false, // If true, connect immediately after first valid ping
+    Completer<Map<String, dynamic>?>?
+        immediateCompleter, // Completer for immediate connection
   }) async {
     final testResults = <Map<String, dynamic>>[];
     final serversToTest = servers.take(8).toList(); // Test first 8 servers
-    
+
     setState(() {
       loadingStatus = '🚀 Parallel testing ${serversToTest.length} servers...';
     });
-    
+
     // Use parallel testing for faster server selection
     final v2rayPing = FlutterV2rayPingService();
     v2rayPing.initialize();
-    
+
     // Flag to track if we've already connected
     bool hasConnectedImmediately = false;
-    
+
     final results = await v2rayPing.testMultipleServerPingsIntelligent(
       serversToTest,
       baseTimeoutSeconds: 60,
@@ -1623,7 +1654,7 @@ class _HomePageState extends State<HomePage> {
       prioritizeByQuality: true,
       onServerComplete: (server, ping) async {
         if (!mounted) return;
-        
+
         final effectiveDelay = ping <= 0 ? -1 : ping;
         final responseTime = ping; // Use ping as response time
 
@@ -1633,7 +1664,8 @@ class _HomePageState extends State<HomePage> {
             final v2rayURL = V2ray.parseFromURL(server);
             final config = v2rayURL.getFullConfiguration();
             if (config.isNotEmpty) {
-              final score = _calculateServerScore(effectiveDelay, responseTime, testResults.length);
+              final score = _calculateServerScore(
+                  effectiveDelay, responseTime, testResults.length);
               final serverData = {
                 'server': server,
                 'config': config,
@@ -1643,31 +1675,38 @@ class _HomePageState extends State<HomePage> {
                 'index': testResults.length + 1,
               };
               testResults.add(serverData);
-              print('⚡ Real-time result ${testResults.length}: ${effectiveDelay}ms (score: ${score.toStringAsFixed(1)})');
-              
+              print(
+                  '⚡ Real-time result ${testResults.length}: ${effectiveDelay}ms (score: ${score.toStringAsFixed(1)})');
+
               // Update UI immediately with current results count
               if (mounted) {
                 setState(() {
-                  loadingStatus = '⚡ Real-time testing: ${testResults.length} results found...';
+                  loadingStatus =
+                      '⚡ Real-time testing: ${testResults.length} results found...';
                 });
               }
-              
+
               // ⚡️ If in immediate connection mode and this is the first valid result, connect immediately
-              if (connectImmediately && !hasConnectedImmediately && testResults.length == 1) {
+              if (connectImmediately &&
+                  !hasConnectedImmediately &&
+                  testResults.length == 1) {
                 hasConnectedImmediately = true;
-                print('🚀 اتصال فوری به اولین سرور با پینگ معتبر: ${effectiveDelay}ms');
-                
+                print(
+                    '🚀 اتصال فوری به اولین سرور با پینگ معتبر: ${effectiveDelay}ms');
+
                 // Complete the completer immediately with the first valid server
-                if (immediateCompleter != null && !immediateCompleter.isCompleted) {
+                if (immediateCompleter != null &&
+                    !immediateCompleter.isCompleted) {
                   immediateCompleter.complete(serverData);
                 }
-                
+
                 // Connect immediately in background (don't await to allow other pings to continue)
                 if (mounted) {
                   setState(() {
-                    loadingStatus = '🚀 در حال اتصال فوری به سرور (${effectiveDelay}ms)...';
+                    loadingStatus =
+                        '🚀 در حال اتصال فوری به سرور (${effectiveDelay}ms)...';
                   });
-                  
+
                   // Start connection without awaiting to allow other operations to continue
                   _connectToServer(server).then((_) {
                     if (mounted) {
@@ -1695,58 +1734,59 @@ class _HomePageState extends State<HomePage> {
         }
       },
     );
-    
+
     // If immediate connection was attempted, return null (connection already done)
     if (connectImmediately && hasConnectedImmediately) {
       return null;
     }
-    
+
     if (testResults.isEmpty) return null;
-    
+
     // Sort by score (highest first)
     testResults.sort((a, b) => b['score'].compareTo(a['score']));
-    
+
     final bestServer = testResults.first;
-    print('🏆 Best server selected: ${bestServer['delay']}ms (score: ${bestServer['score'].toStringAsFixed(1)})');
-    
+    print(
+        '🏆 Best server selected: ${bestServer['delay']}ms (score: ${bestServer['score'].toStringAsFixed(1)})');
+
     return bestServer;
   }
-  
+
   /// Calculate server score for selection
   double _calculateServerScore(int delay, int responseTime, int index) {
     double score = 100.0;
-    
+
     // Delay penalty (lower is better)
     score -= (delay / 10.0);
-    
+
     // Response time penalty
     score -= (responseTime / 20.0);
-    
+
     // Priority bonus (earlier servers get slight bonus)
     score += (8 - index) * 0.5;
-    
+
     // Stability bonus (if delay is very low)
     if (delay < 200) {
       score += 10.0;
     } else if (delay < 500) {
       score += 5.0;
     }
-    
+
     return score.clamp(0.0, 100.0);
   }
-  
+
   /// Connect to the selected server
   Future<void> _connectToSelectedServer(Map<String, dynamic> serverData) async {
     try {
       final config = serverData['config'] as String;
       final delay = serverData['delay'] as int;
-      
+
       // Request VPN permission
       final hasPermission = await _v2rayManager.requestPermission();
       if (!hasPermission) {
         throw Exception('VPN permission denied');
       }
-      
+
       // Start V2Ray connection (remove await as startV2Ray is not async)
       await _v2rayManager.start(
         remark: 'ShineNET VPN - Auto',
@@ -1756,26 +1796,15 @@ class _HomePageState extends State<HomePage> {
         notificationDisconnectButtonName: 'DISCONNECT',
         blockedApps: blockedApps,
       );
-      
+
       // Record successful connection
       _recordConnectionAttempt(true, delay);
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('connecting_to_optimal_server'.tr().replaceAll('{{delay}}', delay.toString())),
-            behavior: SnackBarBehavior.floating,
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-      
     } catch (e) {
       _recordConnectionAttempt(false, 0);
       throw Exception('Failed to connect to selected server: $e');
     }
   }
-  
+
   /// Fetch servers using optimized service
   Future<List<String>> _fetchServersOptimized() async {
     try {
@@ -1795,7 +1824,7 @@ class _HomePageState extends State<HomePage> {
       rethrow;
     }
   }
-  
+
   /// Fallback connection with retry
   Future<void> _connectWithFallbackRetry() async {
     for (int attempt = 0; attempt <= maxRetries; attempt++) {
@@ -1808,7 +1837,8 @@ class _HomePageState extends State<HomePage> {
         if (attempt < maxRetries) {
           // Calculate exponential backoff delay
           final delaySeconds = initialRetryDelay.inSeconds * (1 << attempt);
-          final delay = Duration(seconds: delaySeconds > 30 ? 30 : delaySeconds);
+          final delay =
+              Duration(seconds: delaySeconds > 30 ? 30 : delaySeconds);
 
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -1829,7 +1859,7 @@ class _HomePageState extends State<HomePage> {
             setState(() {
               isLoading = false;
             });
-            
+
             // Show option to try direct connection
             final bool tryDirect = await _showDirectConnectionDialog();
             if (tryDirect) {
@@ -1845,27 +1875,28 @@ class _HomePageState extends State<HomePage> {
       }
     }
   }
-  
+
   Future<bool> _showDirectConnectionDialog() async {
     return await showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('connection_failed'.tr()),
-          content: Text('standard_connection_failed_dialog'.tr()),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text('cancel'.tr()),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: Text('try_direct_connection'.tr()),
-            ),
-          ],
-        );
-      },
-    ) ?? false;
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: Text('connection_failed'.tr()),
+              content: Text('standard_connection_failed_dialog'.tr()),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: Text('cancel'.tr()),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: Text('try_direct_connection'.tr()),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
   }
 
   void _showServerSelectionModal(BuildContext context) async {
@@ -1880,8 +1911,9 @@ class _HomePageState extends State<HomePage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(25.0)),
       ),
       builder: (BuildContext context) {
-        print('📊 Total servers available for modal: ${availableServers.length}');
-        
+        print(
+            '📊 Total servers available for modal: ${availableServers.length}');
+
         return ServerSelectionModal(
           selectedServer: selectedServer,
           onServerSelected: (server) async {
@@ -1898,10 +1930,11 @@ class _HomePageState extends State<HomePage> {
               }
               return;
             }
-            
+
             // Allow selection when not connected or connecting
             final String currentState = v2rayStatus.value.state.toUpperCase();
-            final bool canChangeServer = currentState != 'CONNECTED' && currentState != 'CONNECTING';
+            final bool canChangeServer =
+                currentState != 'CONNECTED' && currentState != 'CONNECTING';
             if (canChangeServer) {
               // If the selected server is 'Automatic', perform automatic connection
               if (server == 'Automatic') {
@@ -1910,7 +1943,7 @@ class _HomePageState extends State<HomePage> {
                 });
                 _saveServerSelection(server);
                 Navigator.pop(context);
-                
+
                 // Perform automatic connection to best available server
                 try {
                   setState(() {
@@ -1925,7 +1958,8 @@ class _HomePageState extends State<HomePage> {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('connection_failed_error_details'.tr(namedArgs: {'error': e.toString()})),
+                        content: Text('connection_failed_error_details'
+                            .tr(namedArgs: {'error': e.toString()})),
                         behavior: SnackBarBehavior.floating,
                         backgroundColor: Colors.red,
                         duration: Duration(seconds: 5),
@@ -1944,13 +1978,13 @@ class _HomePageState extends State<HomePage> {
                 // If a specific healthy server config is selected, connect to it immediately
                 // Extract a descriptive name for the server
                 String serverName = _generateServerNameFromConfig(server);
-                
+
                 setState(() {
                   selectedServer = serverName;
                 });
                 _saveServerSelection(serverName);
                 Navigator.pop(context);
-                
+
                 // Connect to the specific server configuration
                 try {
                   setState(() {
@@ -2046,7 +2080,7 @@ class _HomePageState extends State<HomePage> {
       return <ServerInfo>[];
     }
   }
-  
+
   // Generate a descriptive server name without IP to hide server IPs as requested
   String _generateServerName(String config, String? ip, int index) {
     // Try to extract protocol information
@@ -2060,11 +2094,11 @@ class _HomePageState extends State<HomePage> {
     } else if (config.startsWith('ss://')) {
       protocol = 'Shadowsocks';
     }
-    
+
     // Return server name without IP as requested
     return '$protocol $index';
   }
-  
+
   // Generate a descriptive server name from config for direct selection
   String _generateServerNameFromConfig(String config) {
     // Try to extract protocol information
@@ -2078,10 +2112,10 @@ class _HomePageState extends State<HomePage> {
     } else if (config.startsWith('ss://')) {
       protocol = 'Shadowsocks Server';
     }
-    
+
     return protocol;
   }
-  
+
   // Extract IP address from server configuration
   String? _extractIPFromConfig(String config) {
     try {
@@ -2092,7 +2126,9 @@ class _HomePageState extends State<HomePage> {
         final decoded = utf8.decode(base64.decode(base64Part));
         final json = jsonDecode(decoded);
         return json['add'] as String?; // 'add' field contains the address
-      } else if (config.startsWith('vless://') || config.startsWith('trojan://') || config.startsWith('ss://')) {
+      } else if (config.startsWith('vless://') ||
+          config.startsWith('trojan://') ||
+          config.startsWith('ss://')) {
         // For other protocols, parse as URI
         final uri = Uri.parse(config);
         return uri.host;
@@ -2100,18 +2136,18 @@ class _HomePageState extends State<HomePage> {
     } catch (e) {
       print('Error extracting IP from config: $e');
     }
-    
+
     // Fallback to regex extraction
     final ipRegex = RegExp(r'(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})');
     final match = ipRegex.firstMatch(config);
     return match?.group(1);
   }
-  
+
   // Synchronous version for immediate display
   String? _getCountryCodeFromIPSync(String? ip) {
     // Simple mapping for immediate display
     if (ip == null || ip.isEmpty) return null;
-    
+
     if (ip.startsWith('1.1.1')) return 'AU'; // Cloudflare DNS
     if (ip.startsWith('8.8.8')) return 'US'; // Google DNS
     if (ip.startsWith('208.67.222')) return 'US'; // OpenDNS
@@ -2134,13 +2170,12 @@ class _HomePageState extends State<HomePage> {
     if (ip.startsWith('172.67')) return 'US'; // Cloudflare
     if (ip.startsWith('172.68')) return 'US'; // Cloudflare
     if (ip.startsWith('172.69')) return 'US'; // Cloudflare
-    
+
     // Add more common IP to country mappings here
     // This is a simplified approach for immediate display
-    
+
     return 'US'; // Default fallback
   }
-  
 
   String getServerParam() {
     // Only return 'auto' since we're removing Server 1 and Server 2
@@ -2151,7 +2186,8 @@ class _HomePageState extends State<HomePage> {
     _prefs = await SharedPreferences.getInstance();
     setState(() {
       selectedServer = _prefs.getString('selectedServers') ?? 'Automatic';
-      selectedServerType = _prefs.getString('selectedServerTypes') ?? 'Automatic';
+      selectedServerType =
+          _prefs.getString('selectedServerTypes') ?? 'Automatic';
       _lastSuccessfulServer = _prefs.getString(_lastSuccessfulServerKey);
       final storedTimestamp = _prefs.getString(_lastSuccessfulTimestampKey);
       if (storedTimestamp != null) {
@@ -2188,9 +2224,9 @@ class _HomePageState extends State<HomePage> {
       }
       return;
     }
-    
+
     _isServerTestingInProgress = true;
-    
+
     try {
       setState(() {
         isLoading = true;
@@ -2201,7 +2237,7 @@ class _HomePageState extends State<HomePage> {
 
       // Get server list
       List<String> servers = await _fetchServersWithFallback();
-      
+
       if (servers.isEmpty) {
         // Show user-friendly message instead of throwing exception
         if (mounted) {
@@ -2216,11 +2252,12 @@ class _HomePageState extends State<HomePage> {
       }
 
       print('Testing all ${servers.length} servers...');
-      
+
       setState(() {
         serversBeingTested = servers.length;
         serversTestCompleted = 0;
-        loadingStatus = 'Testing all servers (this may take several minutes)...';
+        loadingStatus =
+            'Testing all servers (this may take several minutes)...';
       });
 
       // Test all servers without limit
@@ -2236,15 +2273,21 @@ class _HomePageState extends State<HomePage> {
           'maxServers': maxServersToTest,
         });
       }
-      
+
       await _processServerTestQueue();
-      
-      print('Complete server testing completed. Results: ${serverTestResults.length} servers tested');
-      
+
+      print(
+          'Complete server testing completed. Results: ${serverTestResults.length} servers tested');
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('server_testing_complete'.tr().replaceAll('{{count}}', serverTestResults.where((r) => r['delay'] > 0).length.toString())),
+            content: Text('server_testing_complete'.tr().replaceAll(
+                '{{count}}',
+                serverTestResults
+                    .where((r) => r['delay'] > 0)
+                    .length
+                    .toString())),
             behavior: SnackBarBehavior.floating,
             duration: Duration(seconds: 4),
           ),
@@ -2255,7 +2298,9 @@ class _HomePageState extends State<HomePage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('error_testing_servers'.tr().replaceAll('{{error}}', e.toString())),
+            content: Text('error_testing_servers'
+                .tr()
+                .replaceAll('{{error}}', e.toString())),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -2287,9 +2332,9 @@ class _HomePageState extends State<HomePage> {
       }
       return;
     }
-    
+
     _isServerTestingInProgress = true;
-    
+
     try {
       setState(() {
         isLoading = true;
@@ -2300,7 +2345,7 @@ class _HomePageState extends State<HomePage> {
 
       // Get server list
       List<String> servers = await _fetchServersWithFallback();
-      
+
       if (servers.isEmpty) {
         // Show user-friendly message instead of throwing exception
         if (mounted) {
@@ -2315,30 +2360,39 @@ class _HomePageState extends State<HomePage> {
       }
 
       print('Manually testing ${servers.length} servers...');
-      
+
       setState(() {
         serversBeingTested = servers.length; // Test all available servers
         serversTestCompleted = 0;
-        loadingStatus = 'Testing all ${servers.length} servers with optimized method...';
+        loadingStatus =
+            'Testing all ${servers.length} servers with optimized method...';
       });
 
       // Use optimized testing method
       final testResults = await _testServersOptimized(servers);
-      
+
       // Convert results to the expected format
-      serverTestResults = testResults.map((result) => {
-        'index': result['index'],
-        'config': result['config'],
-        'delay': result['delay'],
-        'status': result['status'],
-      }).toList();
-      
-      print('Manual server testing completed. Results: ${serverTestResults.length} servers tested');
-      
+      serverTestResults = testResults
+          .map((result) => {
+                'index': result['index'],
+                'config': result['config'],
+                'delay': result['delay'],
+                'status': result['status'],
+              })
+          .toList();
+
+      print(
+          'Manual server testing completed. Results: ${serverTestResults.length} servers tested');
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('server_testing_completed'.tr().replaceAll('{{count}}', serverTestResults.where((r) => r['delay'] > 0).length.toString())),
+            content: Text('server_testing_completed'.tr().replaceAll(
+                '{{count}}',
+                serverTestResults
+                    .where((r) => r['delay'] > 0)
+                    .length
+                    .toString())),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -2348,7 +2402,9 @@ class _HomePageState extends State<HomePage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('server_testing_failed'.tr().replaceAll('{{error}}', e.toString())),
+            content: Text('server_testing_failed'
+                .tr()
+                .replaceAll('{{error}}', e.toString())),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -2366,19 +2422,19 @@ class _HomePageState extends State<HomePage> {
   // Process server test queue to prevent resource exhaustion
   Future<void> _processServerTestQueue() async {
     if (_isProcessingServerQueue) return;
-    
+
     _isProcessingServerQueue = true;
-    
+
     try {
       while (_serverTestQueue.isNotEmpty && mounted) {
         final serverInfo = _serverTestQueue.removeAt(0);
         final int i = serverInfo['index'];
         final String serverUrl = serverInfo['serverUrl'];
         final int maxServers = serverInfo['maxServers'];
-        
+
         try {
           print('Testing server ${i + 1}/$maxServers...');
-          
+
           // Parse the server configuration for potential connection usage
           final V2RayURL v2rayURL = V2ray.parseFromURL(serverUrl);
           final config = v2rayURL.getFullConfiguration();
@@ -2403,7 +2459,7 @@ class _HomePageState extends State<HomePage> {
             print('Server ${i + 1} test failed with error: $e');
             delay = -1;
           }
-          
+
           // Add result to list only if mounted
           if (mounted) {
             setState(() {
@@ -2419,22 +2475,26 @@ class _HomePageState extends State<HomePage> {
               loadingStatus = 'Testing server ${i + 1}/$maxServers...';
             });
           }
-          
-          print('Server ${i + 1} result: ${delay > 0 ? '${delay}ms' : (delay == 9999 ? 'timeout'.tr() : 'error'.tr())}');
-          
+
+          print(
+              'Server ${i + 1} result: ${delay > 0 ? '${delay}ms' : (delay == 9999 ? 'timeout'.tr() : 'error'.tr())}');
+
           // If in Automatic mode and this is the first healthy server, connect automatically
-          if (selectedServer == 'Automatic' && delay > 0 && serversTestCompleted == 1) {
+          if (selectedServer == 'Automatic' &&
+              delay > 0 &&
+              serversTestCompleted == 1) {
             print('Automatic mode: Connecting to first healthy server');
             // Add a small delay to prevent race conditions
             await Future.delayed(Duration(milliseconds: 500));
-            await _connectToServer(serverUrl); // Use original server URL for connection
+            await _connectToServer(
+                serverUrl); // Use original server URL for connection
             // Clear the queue since we're connecting
             _serverTestQueue.clear();
             return; // Exit after connecting to the first healthy server
           }
         } catch (e) {
           print('Server ${i + 1} test failed: $e');
-          
+
           // Add error result only if mounted
           if (mounted) {
             setState(() {
@@ -2448,7 +2508,7 @@ class _HomePageState extends State<HomePage> {
             });
           }
         }
-        
+
         // Increased delay between tests to avoid overwhelming the system and prevent crashes
         await Future.delayed(Duration(milliseconds: 400)); // Optimized delay
       }
@@ -2481,7 +2541,6 @@ class _HomePageState extends State<HomePage> {
 
       // Enhanced server list fetching with multiple fallbacks
       await _getServerListEnhanced();
-
     } on TimeoutException catch (e) {
       print('Timeout error: ${e.message}');
       if (mounted) {
@@ -2509,18 +2568,21 @@ class _HomePageState extends State<HomePage> {
         setState(() {
           isLoading = false;
         });
-        
+
         String errorMessage;
         if (e.toString().contains('No valid server configurations')) {
-          errorMessage = 'Server configuration error. Please contact support if this persists.';
+          errorMessage =
+              'Server configuration error. Please contact support if this persists.';
         } else if (e.toString().contains('endpoint')) {
-          errorMessage = 'All server endpoints are currently unavailable. Please try again later.';
+          errorMessage =
+              'All server endpoints are currently unavailable. Please try again later.';
         } else if (e.toString().contains('Failed to decode')) {
           errorMessage = 'Server data is corrupted. Please try again later.';
         } else {
-          errorMessage = 'Unable to connect to servers. Please check your internet connection and try again.';
+          errorMessage =
+              'Unable to connect to servers. Please check your internet connection and try again.';
         }
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(errorMessage),
@@ -2531,7 +2593,7 @@ class _HomePageState extends State<HomePage> {
       }
     }
   }
-  
+
   /// Enhanced server list fetching with multiple fallbacks
   Future<void> _getServerListEnhanced() async {
     final fallbackMethods = [
@@ -2541,13 +2603,14 @@ class _HomePageState extends State<HomePage> {
       _tryAlternativeEndpoint,
       _tryCachedServers,
     ];
-    
+
     for (int i = 0; i < fallbackMethods.length; i++) {
       try {
         setState(() {
-          loadingStatus = ' Trying connection method ${i + 1}/${fallbackMethods.length}...';
+          loadingStatus =
+              ' Trying connection method ${i + 1}/${fallbackMethods.length}...';
         });
-        
+
         final success = await fallbackMethods[i]();
         if (success) {
           print(' Successfully connected using method ${i + 1}');
@@ -2560,10 +2623,10 @@ class _HomePageState extends State<HomePage> {
         }
       }
     }
-    
+
     throw Exception('All connection methods failed');
   }
-  
+
   /// Try optimized services first
   Future<bool> _tryOptimizedServices() async {
     try {
@@ -2620,7 +2683,7 @@ class _HomePageState extends State<HomePage> {
       return false;
     }
   }
-  
+
   /// Try direct connection
   Future<bool> _tryDirectConnection() async {
     try {
@@ -2635,7 +2698,7 @@ class _HomePageState extends State<HomePage> {
       return false;
     }
   }
-  
+
   /// Try AllOrigins proxy
   Future<bool> _tryAllOriginsProxy() async {
     try {
@@ -2650,7 +2713,7 @@ class _HomePageState extends State<HomePage> {
       return false;
     }
   }
-  
+
   /// Try alternative endpoint
   Future<bool> _tryAlternativeEndpoint() async {
     try {
@@ -2665,7 +2728,7 @@ class _HomePageState extends State<HomePage> {
       return false;
     }
   }
-  
+
   /// Try cached servers as last resort
   Future<bool> _tryCachedServers() async {
     try {
@@ -2681,16 +2744,15 @@ class _HomePageState extends State<HomePage> {
       return false;
     }
   }
-  
+
   /// Process server list and connect
   Future<void> _processServerList(List<String> servers) async {
     if (servers.isEmpty) return;
-    
+
     setState(() {
       loadingStatus = ' Processing ${servers.length} servers...';
     });
-    
-    
+
     // If in automatic mode, test and connect to best server
     if (selectedServer == 'Automatic') {
       // Automatic connection logic simplified for optimization
@@ -2706,8 +2768,6 @@ class _HomePageState extends State<HomePage> {
       });
     }
   }
-  
-  
 
   // Cache management methods for server list
 
@@ -2749,14 +2809,14 @@ class _HomePageState extends State<HomePage> {
 
         if (cachedServers.isNotEmpty) {
           await _processServersWithLocation(cachedServers);
-          
+
           // Trigger UI update to show cached servers immediately
           if (mounted) {
             setState(() {
               loadingStatus = '';
             });
           }
-          
+
           print(
               ' Using cached servers (${cachedServers.length} servers) with ${serverPings.length} ping results');
           return;
@@ -2792,15 +2852,17 @@ class _HomePageState extends State<HomePage> {
 
         // Process servers immediately with ping = 0 for immediate display
         await _processServersWithLocation(servers);
-        
+
         if (mounted) {
           setState(() {
             loadingStatus = ' Testing server performance...';
           });
         }
 
-        print('🏓 Starting immediate ping tests for ALL ${servers.length} servers...');
-        await _testAllServersOnStartupUnified(servers); // Use enhanced unified ping manager
+        print(
+            '🏓 Starting immediate ping tests for ALL ${servers.length} servers...');
+        await _testAllServersOnStartupUnified(
+            servers); // Use enhanced unified ping manager
 
         // Cache ping results
         await _cacheManager.cachePingResults(serverPings);
@@ -2838,9 +2900,10 @@ class _HomePageState extends State<HomePage> {
   Future<void> _initializeUnifiedPingManager() async {
     try {
       await _unifiedPingManager.initialize();
-      
+
       // Set up real-time ping update listener
-      _pingUpdateSubscription = _unifiedPingManager.pingUpdates.listen((updates) {
+      _pingUpdateSubscription =
+          _unifiedPingManager.pingUpdates.listen((updates) {
         if (mounted) {
           setState(() {
             // Update legacy serverPings map for backward compatibility
@@ -2853,14 +2916,14 @@ class _HomePageState extends State<HomePage> {
               } else {
                 serverPings[entry.key] = -1;
               }
-              
+
               // Update processed servers with new ping data
               _updateProcessedServerPing(entry.key, serverPings[entry.key]!);
             }
           });
         }
       });
-      
+
       print('🔧 Unified ping manager initialized successfully');
     } catch (e) {
       print('❌ Failed to initialize unified ping manager: $e');
@@ -2871,30 +2934,32 @@ class _HomePageState extends State<HomePage> {
   /// یکپارچه سازی تست فوری تمام سرورها بلافاصله بعد از اجرای نرم افزار
   Future<void> _testAllServersOnStartupUnified(List<String> servers) async {
     try {
-      print('🚀 Starting immediate server ping testing for ${servers.length} servers...');
-      
+      print(
+          '🚀 Starting immediate server ping testing for ${servers.length} servers...');
+
       // Clear legacy ping results
       serverPings.clear();
-      
+
       // Initialize processedServers with all servers (ping = 0 initially)
       await _processServersWithLocation(servers);
-      
+
       if (mounted) {
         setState(() {
           loadingStatus = 'شروع تست فوری پینگ ${servers.length} سرور...';
         });
       }
-      
+
       // Subscribe to progress updates
       StreamSubscription<PingTestProgress>? progressSubscription;
-      progressSubscription = _unifiedPingManager.progressUpdates.listen((progress) {
+      progressSubscription =
+          _unifiedPingManager.progressUpdates.listen((progress) {
         if (mounted) {
           setState(() {
             loadingStatus = progress.message;
           });
         }
       });
-      
+
       // Test all servers immediately on startup with enhanced method
       final results = await _unifiedPingManager.testAllServersOnStartup(
         servers,
@@ -2909,10 +2974,10 @@ class _HomePageState extends State<HomePage> {
             } else {
               serverPings[server] = -1;
             }
-            
+
             // Update processed servers immediately
             _updateProcessedServerPing(server, serverPings[server]!);
-            
+
             // Trigger UI update every few servers for performance
             if (serverPings.length % 3 == 0) {
               setState(() {});
@@ -2927,10 +2992,10 @@ class _HomePageState extends State<HomePage> {
           }
         },
       );
-      
+
       // Cancel progress subscription
       await progressSubscription.cancel();
-      
+
       // Final update of all results
       for (final entry in results.entries) {
         final result = entry.value;
@@ -2942,19 +3007,22 @@ class _HomePageState extends State<HomePage> {
           serverPings[entry.key] = -1;
         }
       }
-      
+
       // Get comprehensive statistics
       final stats = _unifiedPingManager.getStatistics(servers);
-      
+
       if (mounted) {
         setState(() {
-          loadingStatus = 'تست پینگ تکمیل شد - ${stats.successfulPings}/${stats.totalServers} موفق، میانگین: ${stats.averagePing.round()}ms';
+          loadingStatus =
+              'تست پینگ تکمیل شد - ${stats.successfulPings}/${stats.totalServers} موفق، میانگین: ${stats.averagePing.round()}ms';
         });
       }
-      
-      print('✅ Immediate startup ping testing completed: ${stats.successfulPings}/${stats.totalServers} successful, avg: ${stats.averagePing.round()}ms');
-      print('📊 Server quality distribution: Excellent: ${stats.excellentServers}, Good: ${stats.goodServers}, Fair: ${stats.fairServers}, Poor: ${stats.poorServers}');
-      
+
+      print(
+          '✅ Immediate startup ping testing completed: ${stats.successfulPings}/${stats.totalServers} successful, avg: ${stats.averagePing.round()}ms');
+      print(
+          '📊 Server quality distribution: Excellent: ${stats.excellentServers}, Good: ${stats.goodServers}, Fair: ${stats.fairServers}, Poor: ${stats.poorServers}');
+
       // Clear loading status after a short delay
       Future.delayed(Duration(seconds: 2), () {
         if (mounted) {
@@ -2963,7 +3031,6 @@ class _HomePageState extends State<HomePage> {
           });
         }
       });
-      
     } catch (e) {
       print('❌ Error in immediate startup ping testing: $e');
       if (mounted) {
@@ -2974,107 +3041,6 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-
-  /// Test server pings one by one with immediate display updates
-  Future<void> _testServerPings(List<String> servers) async {
-    try {
-      print(' Testing ping for ${servers.length} servers one by one...');
-      serverPings.clear();
-      
-      // Initialize processedServers with all servers (ping = 0 initially)
-      await _processServersWithLocation(servers);
-      
-      // Test servers one by one to avoid interference
-      for (int i = 0; i < servers.length; i++) {
-        final server = servers[i];
-        print(' Testing server ${i + 1}/${servers.length}...');
-        
-        await _testSingleServerPing(server, i);
-        
-        // Immediately update the processed server with new ping data
-        await _updateSingleServerInProcessedList(server, i);
-        
-        // Small delay between each test to prevent system overload
-        if (i < servers.length - 1) {
-          await Future.delayed(Duration(milliseconds: 200));
-        }
-      }
-      
-      await _savePingCache();
-      print(' Serial ping testing completed for ${serverPings.length} servers');
-    } catch (e) {
-      print('Error testing server pings: $e');
-    }
-  }
-
-  /// Test ping for a single server with improved error handling
-  Future<void> _testSingleServerPing(String server, int index) async {
-    try {
-      // Use centralized robust ping helper to avoid duplicate logic
-      final v2rayPing = FlutterV2rayPingService()..initialize();
-      // Use adaptive ping testing for server selection (60s timeout)
-      final ping = await v2rayPing.testServerPingAdaptive(
-        server,
-        baseTimeoutSeconds: 60,
-        useCache: false,
-        forceRetest: true,
-      );
-
-      final delay = ping >= 9999 ? 9999 : (ping <= 0 ? -1 : ping);
-
-      if (delay > 0 && delay < 9999) {
-        serverPings[server] = delay;
-        print(' Server ${index + 1}: ${delay}ms');
-      } else if (delay == 9999) {
-        serverPings[server] = 9999; // Timeout but reachable
-        print(' Server ${index + 1}: Timeout (9999ms)');
-      } else {
-        serverPings[server] = -1; // Failed
-        print(' Server ${index + 1}: Failed (${delay}ms)');
-      }
-    } catch (e) {
-      serverPings[server] = -1; // Error
-      print(' Server ${index + 1}: Exception - $e');
-    }
-  }
-
-  /// Update a single server in processedServers list with new ping data
-  Future<void> _updateSingleServerInProcessedList(String server, int index) async {
-    try {
-      // Find the server in processedServers and update its ping
-      for (int i = 0; i < processedServers.length; i++) {
-        if (processedServers[i]['config'] == server) {
-          final ping = serverPings[server] ?? -1;
-          processedServers[i]['ping'] = ping;
-          
-          // Trigger UI update
-          if (mounted) {
-            setState(() {
-              // Sort servers by ping after each update (best first)
-              processedServers.sort((a, b) {
-                final pingA = a['ping'] as int;
-                final pingB = b['ping'] as int;
-                int cat(int p) {
-                  if (p > 0 && p < 9999) return 0;
-                  if (p == 0) return 1;
-                  if (p >= 9999) return 2;
-                  return 3;
-                }
-                final cA = cat(pingA);
-                final cB = cat(pingB);
-                if (cA != cB) return cA.compareTo(cB);
-                return pingA.compareTo(pingB);
-              });
-            });
-          }
-          break;
-        }
-      }
-    } catch (e) {
-      print('Error updating server in processed list: $e');
-    }
-  }
-
   /// Update processedServers list immediately when ping result comes in (for real-time display)
   void _updateProcessedServerPing(String serverConfig, int ping) {
     try {
@@ -3082,7 +3048,8 @@ class _HomePageState extends State<HomePage> {
       for (int i = 0; i < processedServers.length; i++) {
         if (processedServers[i]['config'] == serverConfig) {
           processedServers[i]['ping'] = ping;
-          print('🔄 Updated server ${i + 1} ping to ${ping}ms in processedServers list');
+          print(
+              '🔄 Updated server ${i + 1} ping to ${ping}ms in processedServers list');
           break;
         }
       }
@@ -3091,44 +3058,35 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  /// Save ping results to cache
-  Future<void> _savePingCache() async {
-    try {
-      // Use unified ServerCacheManager for ping cache
-      await _cacheManager.cachePingResults(serverPings);
-      print(' Ping cache saved via ServerCacheManager');
-    } catch (e) {
-      print('Error saving ping cache: $e');
-    }
-  }
-
   /// Process servers with real location parsing for enhanced display
   Future<void> _processServersWithLocation(List<String> servers) async {
     try {
       processedServers.clear();
-      
+
       for (int i = 0; i < servers.length; i++) {
         final server = servers[i];
-        
+
         // Extract server information
         final ip = _extractIPFromConfig(server);
         final serverName = _generateServerName(server, ip, i + 1);
         final remark = _extractRemark(server);
         final countryCode = _getCountryCodeFromIPSync(ip);
         final ping = serverPings[server] ?? 0;
-        
+
         // Parse real location from server configuration
-        final locationInfo = await ServerLocationParser.parseServerLocation(server);
-        final realCountryCode = locationInfo['countryCode']?.isNotEmpty == true 
-            ? locationInfo['countryCode']! 
+        final locationInfo =
+            await ServerLocationParser.parseServerLocation(server);
+        final realCountryCode = locationInfo['countryCode']?.isNotEmpty == true
+            ? locationInfo['countryCode']!
             : countryCode;
-        final realCountryName = locationInfo['country']?.isNotEmpty == true 
-            ? locationInfo['country']! 
+        final realCountryName = locationInfo['country']?.isNotEmpty == true
+            ? locationInfo['country']!
             : serverName;
         final cityName = locationInfo['city'] ?? '';
-        
-        final locationLabel =
-            cityName.isNotEmpty ? '$cityName, $realCountryName' : realCountryName;
+
+        final locationLabel = cityName.isNotEmpty
+            ? '$cityName, $realCountryName'
+            : realCountryName;
 
         final serverData = {
           'name': locationLabel,
@@ -3139,10 +3097,10 @@ class _HomePageState extends State<HomePage> {
           'countryCode': realCountryCode,
           'ping': ping,
         };
-        
+
         processedServers.add(serverData);
       }
-      
+
       // Sort servers by ping with categories:
       // 0=success (1..9998), 1=not tested (0), 2=timeout (>=9999), 3=failed (-1)
       processedServers.sort((a, b) {
@@ -3154,12 +3112,13 @@ class _HomePageState extends State<HomePage> {
           if (p >= 9999) return 2;
           return 3; // -1 or other negatives
         }
+
         final cA = cat(pingA);
         final cB = cat(pingB);
         if (cA != cB) return cA.compareTo(cB);
         return pingA.compareTo(pingB);
       });
-      
+
       print(' Processed ${processedServers.length} servers for display');
     } catch (e) {
       print('Error processing servers: $e');
@@ -3227,14 +3186,22 @@ class _HomePageState extends State<HomePage> {
           throw Exception('No valid server configuration available');
         }
       }
-      
+
       // Normalize server config format
       String normalizedServer = server.trim();
-      
+
       // More flexible protocol validation
-      final validProtocols = ['vmess://', 'vless://', 'trojan://', 'ss://', 'http://', 'https://'];
-      bool isValidProtocol = validProtocols.any((protocol) => normalizedServer.startsWith(protocol));
-      
+      final validProtocols = [
+        'vmess://',
+        'vless://',
+        'trojan://',
+        'ss://',
+        'http://',
+        'https://'
+      ];
+      bool isValidProtocol = validProtocols
+          .any((protocol) => normalizedServer.startsWith(protocol));
+
       if (!isValidProtocol) {
         print(' Invalid protocol, trying to fix server config...');
         // Try to fix common config issues
@@ -3247,11 +3214,11 @@ class _HomePageState extends State<HomePage> {
 
       final v2rayURL = V2ray.parseFromURL(normalizedServer);
       final config = v2rayURL.getFullConfiguration();
-      
+
       // Enhanced configuration validation
       if (config.isEmpty || config.length < 50) {
         print(' Generated config is too short or empty, trying fallback...');
-        
+
         // Try with different server from cache
         if (cachedServers.length > 1) {
           for (int i = 1; i < cachedServers.length && i < 3; i++) {
@@ -3269,20 +3236,21 @@ class _HomePageState extends State<HomePage> {
             }
           }
         }
-        
+
         // If still empty, use emergency servers
         if (config.isEmpty) {
           print('🆘 Using emergency server configuration');
-          normalizedServer = 'vmess://eyJ2IjoiMiIsInBzIjoiRW1lcmdlbmN5IFNlcnZlciIsImFkZCI6IjEwNC4yMS41NS4yMzQiLCJwb3J0IjoiNDQzIiwidHlwZSI6Im5vbmUiLCJpZCI6Ijk1ZmVkZDNkLWE3NDMtNDlkYS04Yjg2LTlmM2U3Mzk3MjJkNyIsImFpZCI6IjAiLCJuZXQiOiJ3cyIsInBhdGgiOiIvIiwiaG9zdCI6IiIsInRscyI6InRscyJ9';
+          normalizedServer =
+              'vmess://eyJ2IjoiMiIsInBzIjoiRW1lcmdlbmN5IFNlcnZlciIsImFkZCI6IjEwNC4yMS41NS4yMzQiLCJwb3J0IjoiNDQzIiwidHlwZSI6Im5vbmUiLCJpZCI6Ijk1ZmVkZDNkLWE3NDMtNDlkYS04Yjg2LTlmM2U3Mzk3MjJkNyIsImFpZCI6IjAiLCJuZXQiOiJ3cyIsInBhdGgiOiIvIiwiaG9zdCI6IiIsInRscyI6InRscyJ9';
         }
       }
 
       // Re-parse with final server config
       final finalV2rayURL = V2ray.parseFromURL(normalizedServer);
       final finalConfig = finalV2rayURL.getFullConfiguration();
-      
+
       print('✅ Final config length: ${finalConfig.length} characters');
-      
+
       // Request VPN permission first
       final hasPermission = await _v2rayManager.requestPermission();
       if (!hasPermission) {
@@ -3292,7 +3260,9 @@ class _HomePageState extends State<HomePage> {
       // Start V2Ray connection with enhanced logging
       print('🚀 Starting V2Ray connection...');
       await _v2rayManager.start(
-        remark: finalV2rayURL.remark.isNotEmpty ? finalV2rayURL.remark : 'Auto Server',
+        remark: finalV2rayURL.remark.isNotEmpty
+            ? finalV2rayURL.remark
+            : 'Auto Server',
         config: finalConfig,
         proxyOnly: false,
         bypassSubnets: null,
@@ -3307,7 +3277,9 @@ class _HomePageState extends State<HomePage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('connection_failed_error_details'.tr().replaceAll('{{error}}', e.toString())),
+            content: Text('connection_failed_error_details'
+                .tr()
+                .replaceAll('{{error}}', e.toString())),
             behavior: SnackBarBehavior.floating,
             backgroundColor: Colors.red,
           ),
@@ -3330,12 +3302,13 @@ class _HomePageState extends State<HomePage> {
     try {
       // First try to get cached servers
       List<String> servers = await _getCachedServerList();
-      
+
       // If no cached servers, try to fetch fresh ones
       if (servers.isEmpty) {
-        servers = await _serverService.getOptimizedServerList(forceRefresh: true);
+        servers =
+            await _serverService.getOptimizedServerList(forceRefresh: true);
       }
-      
+
       return servers;
     } catch (e) {
       print('Error fetching servers: $e');
@@ -3360,7 +3333,8 @@ class _HomePageState extends State<HomePage> {
     _connectToServer(server);
   }
 
-  Future<List<Map<String, dynamic>>> _testServersOptimized(List<String> servers) async {
+  Future<List<Map<String, dynamic>>> _testServersOptimized(
+      List<String> servers) async {
     try {
       if (servers.isEmpty) return [];
       final v2rayPing = FlutterV2rayPingService();
@@ -3384,9 +3358,8 @@ class _HomePageState extends State<HomePage> {
           'index': i + 1,
           'config': server,
           'delay': delay,
-          'status': delay > 0
-              ? 'success'
-              : (delay == 9999 ? 'timeout' : 'error'),
+          'status':
+              delay > 0 ? 'success' : (delay == 9999 ? 'timeout' : 'error'),
         });
       }
       return results;
@@ -3395,5 +3368,4 @@ class _HomePageState extends State<HomePage> {
       return [];
     }
   }
-
 }

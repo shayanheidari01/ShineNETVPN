@@ -35,31 +35,31 @@ class _SimpleServerListWidgetState extends State<SimpleServerListWidget>
     with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
-  
+
   // Unified ping manager for real-time ping updates
   final UnifiedPingManager _pingManager = UnifiedPingManager();
   StreamSubscription<Map<String, PingResult>>? _pingUpdateSubscription;
-  
+
   // Real-time ping results cache
   Map<String, PingResult> _livePingResults = {};
-  
+
   @override
   void initState() {
     super.initState();
     _initializePingSystem();
   }
-  
+
   @override
   void dispose() {
     _pingUpdateSubscription?.cancel();
     super.dispose();
   }
-  
+
   /// Initialize ping system with real-time updates
   void _initializePingSystem() {
     // Initialize ping manager
     _pingManager.initialize();
-    
+
     // Subscribe to real-time ping updates
     _pingUpdateSubscription = _pingManager.pingUpdates.listen((updates) {
       if (mounted) {
@@ -68,18 +68,18 @@ class _SimpleServerListWidgetState extends State<SimpleServerListWidget>
         });
       }
     });
-    
+
     // Load cached ping results
     _loadCachedPingResults();
   }
-  
+
   /// Load cached ping results for immediate display
   void _loadCachedPingResults() {
     final serverConfigs = widget.servers
         .map((server) => server['config'] as String? ?? '')
         .where((config) => config.isNotEmpty && config != 'Automatic')
         .toList();
-    
+
     final cachedResults = _pingManager.getCachedResults(serverConfigs);
     if (cachedResults.isNotEmpty && mounted) {
       setState(() {
@@ -165,7 +165,8 @@ class _SimpleServerListWidgetState extends State<SimpleServerListWidget>
               GestureDetector(
                 onTap: widget.onRefresh,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
@@ -208,23 +209,26 @@ class _SimpleServerListWidgetState extends State<SimpleServerListWidget>
   }
 
   /// Liquid Glass server tile with beautiful glass morphism effects
-  Widget _buildGlassServerTile(BuildContext context, Map<String, dynamic> server, int index) {
+  Widget _buildGlassServerTile(
+      BuildContext context, Map<String, dynamic> server, int index) {
     final config = server['config'] as String? ?? '';
-    final displayName = (server['location'] as String?)?.trim().isNotEmpty == true
-        ? server['location'] as String
-        : (server['name'] as String?) ?? 'Unknown Server';
+    final displayName =
+        (server['location'] as String?)?.trim().isNotEmpty == true
+            ? server['location'] as String
+            : (server['name'] as String?) ?? 'Unknown Server';
     final description = (server['remark'] as String?)?.trim();
-    
+
     // Get ping from unified ping manager (priority) or fallback to server data
     final pingResult = _livePingResults[config];
     final ping = pingResult?.pingMs ?? (server['ping'] as int? ?? 0);
-    
+
     final overrideSelected = server['isSelected'] as bool?;
     final selectedServer = widget.selectedServer;
-    final isSelected = overrideSelected ?? (selectedServer != null &&
-        (selectedServer == config ||
-            selectedServer == displayName ||
-            selectedServer == (server['name'] as String?)));
+    final isSelected = overrideSelected ??
+        (selectedServer != null &&
+            (selectedServer == config ||
+                selectedServer == displayName ||
+                selectedServer == (server['name'] as String?)));
 
     return GestureDetector(
       onTap: () {
@@ -320,8 +324,12 @@ class _SimpleServerListWidgetState extends State<SimpleServerListWidget>
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Icon(
-                      isSelected ? Icons.check_rounded : Icons.radio_button_unchecked_rounded,
-                      color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.6),
+                      isSelected
+                          ? Icons.check_rounded
+                          : Icons.radio_button_unchecked_rounded,
+                      color: isSelected
+                          ? Colors.white
+                          : Colors.white.withValues(alpha: 0.6),
                       size: 16,
                     ),
                   ),
@@ -353,17 +361,16 @@ class _SimpleServerListWidgetState extends State<SimpleServerListWidget>
       ),
       child: Icon(
         Icons.dns_rounded,
-        color: isSelected
-            ? Colors.white
-            : Colors.white.withValues(alpha: 0.8),
+        color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.8),
         size: 18,
       ),
     );
   }
 
   Widget _buildGlassPingBadge(int ping, {String? serverConfig}) {
-    final pingResult = serverConfig != null ? _livePingResults[serverConfig] : null;
-    
+    final pingResult =
+        serverConfig != null ? _livePingResults[serverConfig] : null;
+
     // Determine ping status and display
     final isLiveTesting = pingResult == null && ping == 0;
     final label = _pingLabel(ping, isLiveTesting: isLiveTesting);
@@ -385,13 +392,15 @@ class _SimpleServerListWidgetState extends State<SimpleServerListWidget>
           width: 1,
         ),
         // Add subtle glow effect for excellent servers
-        boxShadow: quality == PingQuality.excellent ? [
-          BoxShadow(
-            color: color.withValues(alpha: 0.3),
-            blurRadius: 4,
-            spreadRadius: 1,
-          ),
-        ] : null,
+        boxShadow: quality == PingQuality.excellent
+            ? [
+                BoxShadow(
+                  color: color.withValues(alpha: 0.3),
+                  blurRadius: 4,
+                  spreadRadius: 1,
+                ),
+              ]
+            : null,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -454,7 +463,7 @@ class _SimpleServerListWidgetState extends State<SimpleServerListWidget>
     if (isLiveTesting) {
       return ThemeColor.primaryColor;
     }
-    
+
     if (ping < 0) {
       return ThemeColor.errorColor;
     }
@@ -492,5 +501,4 @@ class _SimpleServerListWidgetState extends State<SimpleServerListWidget>
     if (ping < 1000) return PingQuality.poor;
     return PingQuality.bad;
   }
-
 }
