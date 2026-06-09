@@ -19,8 +19,7 @@ class ServerOptimizationService {
 
   late final Dio _dio;
   final List<String> _serverEndpoints = [
-    'https://v2ray.shayanheidari01.workers.dev/',
-    'https://far-sheep-86.shayanheidari01.deno.net/',
+    'https://raw.githubusercontent.com/shayanheidari01/ShineNETConfigs/refs/heads/main/configs.txt',
   ];
 
   // Fallback server configurations
