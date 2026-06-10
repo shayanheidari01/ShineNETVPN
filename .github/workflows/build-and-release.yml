@@ -5,6 +5,16 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      increment_version:
+        description: 'Increment version type (patch, minor, major)'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
 
 permissions:
   contents: write
@@ -33,6 +43,74 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      - name: Extract current version from pubspec.yaml
+        id: current_version
+        run: |
+          VERSION_LINE=$(grep '^version:' pubspec.yaml)
+          VERSION_FULL=$(echo "$VERSION_LINE" | sed 's/version: //')
+          VERSION_NAME=$(echo "$VERSION_FULL" | cut -d'+' -f1)
+          BUILD_NUMBER=$(echo "$VERSION_FULL" | cut -d'+' -f2)
+          
+          MAJOR=$(echo "$VERSION_NAME" | cut -d'.' -f1)
+          MINOR=$(echo "$VERSION_NAME" | cut -d'.' -f2)
+          PATCH=$(echo "$VERSION_NAME" | cut -d'.' -f3)
+          
+          echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
+          echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+          echo "major=$MAJOR" >> $GITHUB_OUTPUT
+          echo "minor=$MINOR" >> $GITHUB_OUTPUT
+          echo "patch=$PATCH" >> $GITHUB_OUTPUT
+          echo "Current version: $VERSION_NAME+$BUILD_NUMBER"
+
+      - name: Calculate new version
+        id: new_version
+        run: |
+          MAJOR=${{ steps.current_version.outputs.major }}
+          MINOR=${{ steps.current_version.outputs.minor }}
+          PATCH=${{ steps.current_version.outputs.patch }}
+          BUILD=${{ steps.current_version.outputs.build_number }}
+          
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            case "${{ github.event.inputs.increment_version }}" in
+              major)
+                MAJOR=$((MAJOR + 1))
+                MINOR=0
+                PATCH=0
+                ;;
+              minor)
+                MINOR=$((MINOR + 1))
+                PATCH=0
+                ;;
+              patch)
+                PATCH=$((PATCH + 1))
+                ;;
+            esac
+          fi
+          
+          # Always increment build number
+          BUILD=$((BUILD + 1))
+          
+          NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+          
+          echo "new_version_name=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "new_build_number=$BUILD" >> $GITHUB_OUTPUT
+          echo "New version: $NEW_VERSION+$BUILD"
+
+      - name: Update pubspec.yaml with new version
+        run: |
+          sed -i "s/^version: .*/version: ${{ steps.new_version.outputs.new_version_name }}+${{ steps.new_version.outputs.new_build_number }}/" pubspec.yaml
+          echo "Updated pubspec.yaml to version: ${{ steps.new_version.outputs.new_version_name }}+${{ steps.new_version.outputs.new_build_number }}"
+
+      - name: Commit and push version update
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add pubspec.yaml
+          git commit -m "Bump version to ${{ steps.new_version.outputs.new_version_name }}+${{ steps.new_version.outputs.new_build_number }} [skip ci]"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Decode Keystore securely
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
@@ -56,15 +134,6 @@ jobs:
           chmod 600 android/key.properties
           echo "key.properties created successfully"
 
-      - name: Extract version from pubspec.yaml
-        id: version
-        run: |
-          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | cut -d'+' -f1)
-          BUILD_NUMBER=$(grep '^version:' pubspec.yaml | sed 's/version: .*+//')
-          echo "version_name=$VERSION" >> $GITHUB_OUTPUT
-          echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
-          echo "Version: $VERSION+$BUILD_NUMBER"
-
       - name: Build APK
         env:
           KEYALIAS: ${{ secrets.KEYALIAS }}
@@ -75,11 +144,11 @@ jobs:
           cd android && ./gradlew clean && cd ..
           
           flutter build apk --release \
-            --build-name=${{ steps.version.outputs.version_name }} \
-            --build-number=${{ steps.version.outputs.build_number }}
+            --build-name=${{ steps.new_version.outputs.new_version_name }} \
+            --build-number=${{ steps.new_version.outputs.new_build_number }}
           
           # Rename APK with version
-          APK_NAME="ShineNET_v${{ steps.version.outputs.version_name }}_${{ steps.version.outputs.build_number }}.apk"
+          APK_NAME="ShineNET_v${{ steps.new_version.outputs.new_version_name }}_${{ steps.new_version.outputs.new_build_number }}.apk"
           mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/$APK_NAME
           echo "APK_NAME=$APK_NAME" >> $GITHUB_ENV
 
@@ -93,17 +162,18 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.version.outputs.version_name }}+${{ steps.version.outputs.build_number }}
-          name: ShineNET VPN v${{ steps.version.outputs.version_name }}
+          tag_name: v${{ steps.new_version.outputs.new_version_name }}+${{ steps.new_version.outputs.new_build_number }}
+          name: ShineNET VPN v${{ steps.new_version.outputs.new_version_name }}
           body: |
             ## ShineNET VPN Release
             
             ### Version Information
-            - **Version:** ${{ steps.version.outputs.version_name }}
-            - **Build Number:** ${{ steps.version.outputs.build_number }}
+            - **Version:** ${{ steps.new_version.outputs.new_version_name }}
+            - **Build Number:** ${{ steps.new_version.outputs.new_build_number }}
             
             ### Changes
             - Automated build via GitHub Actions
+            - Auto-incremented version
             
             ### Installation
             Download the APK file and install it on your Android device.
