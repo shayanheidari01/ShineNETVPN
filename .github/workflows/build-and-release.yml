@@ -1,0 +1,118 @@
+name: Build and Release APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: 'stable'
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Decode Keystore securely
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > android/app/keystore.jks
+          chmod 600 android/app/keystore.jks
+          echo "Keystore decoded successfully"
+
+      - name: Create key.properties securely
+        env:
+          KEYALIAS: ${{ secrets.KEYALIAS }}
+          KEYPASSWORD: ${{ secrets.KEYPASSWORD }}
+          STOREPASSWORD: ${{ secrets.STOREPASSWORD }}
+        run: |
+          cat > android/key.properties << EOF
+          keyAlias=$KEYALIAS
+          keyPassword=$KEYPASSWORD
+          storePassword=$STOREPASSWORD
+          storeFile=keystore.jks
+          EOF
+          chmod 600 android/key.properties
+          echo "key.properties created successfully"
+
+      - name: Extract version from pubspec.yaml
+        id: version
+        run: |
+          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | cut -d'+' -f1)
+          BUILD_NUMBER=$(grep '^version:' pubspec.yaml | sed 's/version: .*+//')
+          echo "version_name=$VERSION" >> $GITHUB_OUTPUT
+          echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION+$BUILD_NUMBER"
+
+      - name: Build APK
+        env:
+          KEYALIAS: ${{ secrets.KEYALIAS }}
+          KEYPASSWORD: ${{ secrets.KEYPASSWORD }}
+          STOREPASSWORD: ${{ secrets.STOREPASSWORD }}
+        run: |
+          flutter build apk --release \
+            --build-name=${{ steps.version.outputs.version_name }} \
+            --build-number=${{ steps.version.outputs.build_number }}
+          
+          # Rename APK with version
+          APK_NAME="ShineNET_v${{ steps.version.outputs.version_name }}_${{ steps.version.outputs.build_number }}.apk"
+          mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/$APK_NAME
+          echo "APK_NAME=$APK_NAME" >> $GITHUB_ENV
+
+      - name: Clean up sensitive files
+        if: always()
+        run: |
+          rm -f android/app/keystore.jks
+          rm -f android/key.properties
+          echo "Sensitive files cleaned up"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version_name }}+${{ steps.version.outputs.build_number }}
+          name: ShineNET VPN v${{ steps.version.outputs.version_name }}
+          body: |
+            ## ShineNET VPN Release
+            
+            ### Version Information
+            - **Version:** ${{ steps.version.outputs.version_name }}
+            - **Build Number:** ${{ steps.version.outputs.build_number }}
+            
+            ### Changes
+            - Automated build via GitHub Actions
+            
+            ### Installation
+            Download the APK file and install it on your Android device.
+          files: build/app/outputs/flutter-apk/${{ env.APK_NAME }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload APK as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ShineNET-APK
+          path: build/app/outputs/flutter-apk/*.apk
+          retention-days: 30
