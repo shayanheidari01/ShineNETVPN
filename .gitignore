@@ -1,38 +1,12 @@
-```yaml
-name: Build and Release
+```
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
 
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.19'
-        
-    - name: Install dependencies
-      run: |
-        go mod download
-        
-    - name: Build
-      run: |
-        CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o manager main.go
-        
-    - name: Test
-      run: |
-        go test -v ./...
-        
-    - name: Upload artifact
-      uses: actions/upload-artifact@v3
-      with:
-        name: manager-binary
-        path: ./manager
+# Android
+*.apk
+*.aar
+*.iml
+local.properties
 ```

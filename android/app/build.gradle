@@ -18,7 +18,7 @@ android {
     namespace = "com.shythonx.shinenet_vpn"
     // Compile against Android SDK 36 to satisfy plugin and Media3 requirements
     compileSdk = 36
-    ndkVersion = "27.0.12077973"
+    ndkVersion = "28.2.13676358"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
