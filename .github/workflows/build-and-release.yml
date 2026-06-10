@@ -71,6 +71,9 @@ jobs:
           KEYPASSWORD: ${{ secrets.KEYPASSWORD }}
           STOREPASSWORD: ${{ secrets.STOREPASSWORD }}
         run: |
+          # Clean project first
+          cd android && ./gradlew clean && cd ..
+          
           flutter build apk --release \
             --build-name=${{ steps.version.outputs.version_name }} \
             --build-number=${{ steps.version.outputs.build_number }}
