@@ -8,6 +8,7 @@ import 'package:shinenet_vpn/common/theme.dart';
 
 import 'package:shinenet_vpn/widgets/connection_widget.dart';
 import 'package:shinenet_vpn/widgets/server_selection_modal_widget.dart';
+import 'package:shinenet_vpn/widgets/ad_banner_widget.dart';
 import 'package:shinenet_vpn/services/server_optimization_service.dart';
 import 'package:shinenet_vpn/services/connection_optimization_service.dart';
 import 'package:shinenet_vpn/services/server_cache_manager.dart';
@@ -97,6 +98,10 @@ class _HomePageState extends State<HomePage> {
   static const int maxRetries = 5;
   static const Duration initialRetryDelay = Duration(seconds: 2);
 
+  // Add a throttled status update mechanism
+  Timer? _statusUpdateTimer;
+  String? _pendingLoadingStatus;
+
   // Add server testing protection flag
   bool _isServerTestingInProgress = false;
 
@@ -112,6 +117,8 @@ class _HomePageState extends State<HomePage> {
 
   // User IP Information
   String? _userIP;
+  String? _userCountryFlag;
+  String? _userCountryName;
 
   Future<void> _initializeServices() async {
     try {
@@ -189,8 +196,7 @@ class _HomePageState extends State<HomePage> {
     try {
       final dio = OptimizedHttpClient.instance;
       final response = await dio.get(
-        'https://api64.ipify.org',
-        queryParameters: {'format': 'json'},
+        'https://ipwho.is/',
         options: Options(responseType: ResponseType.json),
       );
 
@@ -203,14 +209,15 @@ class _HomePageState extends State<HomePage> {
       }
 
       String? ipAddress;
+      String? flagUrl;
+      String? countryName;
       final data = response.data;
       if (data is Map) {
-        final dynamic value = data['ip'];
-        if (value != null) {
-          ipAddress = value.toString();
+        if (data['success'] == true) {
+          ipAddress = data['ip']?.toString();
+          flagUrl = data['flag']?['img']?.toString();
+          countryName = data['country']?.toString();
         }
-      } else if (data is String) {
-        ipAddress = data.trim();
       }
 
       if (ipAddress == null || ipAddress.isEmpty) {
@@ -219,11 +226,15 @@ class _HomePageState extends State<HomePage> {
 
       if (!mounted) {
         _userIP = ipAddress;
+        _userCountryFlag = flagUrl;
+        _userCountryName = countryName;
         return;
       }
 
       setState(() {
         _userIP = ipAddress;
+        _userCountryFlag = flagUrl;
+        _userCountryName = countryName;
       });
 
       ScaffoldMessenger.of(context)
@@ -243,11 +254,10 @@ class _HomePageState extends State<HomePage> {
           ..showSnackBar(
             SnackBar(
               content: Text(
-                'failed_to_fetch_ip'.tr(
-                  namedArgs: {'error': readableError},
-                ),
+                'failed_to_fetch_ip'.tr(args: [readableError]),
               ),
               behavior: SnackBarBehavior.floating,
+              backgroundColor: ThemeColor.errorColor,
               duration: Duration(seconds: 4),
             ),
           );
@@ -449,6 +459,27 @@ class _HomePageState extends State<HomePage> {
     )
         .then((value) async {
       coreVersion = await _v2rayManager.getCoreVersion();
+      
+      // Listen for status changes to trigger IP fetch
+      _v2rayManager.addStatusListener((status) {
+        if (!mounted) return;
+        
+        final String state = status.state.toUpperCase();
+        final bool isConnected = state == 'CONNECTED' ||
+            state == 'RUNNING' ||
+            state == 'STARTED';
+            
+        if (isConnected && _userIP == null && !_isFetchingIP) {
+          _fetchUserIP();
+        } else if (!isConnected && _userIP != null) {
+          setState(() {
+            _userIP = null;
+            _userCountryFlag = null;
+            _userCountryName = null;
+          });
+        }
+      });
+      
       setState(() {});
     }).catchError((error) {
       print('V2Ray initialization failed: $error');
@@ -478,6 +509,7 @@ class _HomePageState extends State<HomePage> {
                 final bool isConnected = normalizedState == 'CONNECTED' ||
                     normalizedState == 'RUNNING' ||
                     normalizedState == 'STARTED';
+
                 final bool isConnecting = isLoading || isExplicitConnecting;
                 final String displayStatus = isConnected
                     ? 'CONNECTED'
@@ -511,6 +543,10 @@ class _HomePageState extends State<HomePage> {
                           // Simplified connection section (pass displayStatus explicitly)
                           _buildSimplifiedConnectionSection(
                               status, isConnected, isConnecting, displayStatus),
+                          SizedBox(height: ThemeColor.largeSpacing),
+
+                          // Ad Banner
+                          AdBannerWidget(),
                           SizedBox(height: ThemeColor.largeSpacing),
 
                           // Server selection (simplified)
@@ -1031,23 +1067,6 @@ class _HomePageState extends State<HomePage> {
             children: [
               Expanded(
                 child: _buildQuickActionButton(
-                  icon: Icons.refresh_rounded,
-                  label: 'refresh'.tr(),
-                  color: ThemeColor.successColor,
-                  onTap: isLoading
-                      ? null
-                      : () async {
-                          setState(() {
-                            isLoading = true;
-                            loadingStatus = 'refreshing'.tr();
-                          });
-                          await getServerList();
-                        },
-                ),
-              ),
-              SizedBox(width: ThemeColor.smallSpacing),
-              Expanded(
-                child: _buildQuickActionButton(
                   icon: _isFetchingIP
                       ? Icons.hourglass_top_rounded
                       : (_userIP != null ? null : Icons.public_rounded),
@@ -1060,7 +1079,8 @@ class _HomePageState extends State<HomePage> {
                       : () {
                           _fetchUserIP();
                         },
-                  flagImageUrl: null,
+                  flagImageUrl: _userCountryFlag,
+                  subtitle: _userCountryName,
                   isBusy: _isFetchingIP,
                 ),
               ),
@@ -1077,6 +1097,7 @@ class _HomePageState extends State<HomePage> {
     required Color color,
     required VoidCallback? onTap,
     String? flagImageUrl,
+    String? subtitle,
     bool isBusy = false,
   }) {
     final borderRadius = ThemeColor.mediumRadius;
@@ -1125,9 +1146,23 @@ class _HomePageState extends State<HomePage> {
                     fontWeight: FontWeight.w600,
                   ),
                   textAlign: TextAlign.center,
-                  maxLines: 2,
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
+                if (subtitle != null && subtitle.isNotEmpty) ...[
+                  SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: ThemeColor.captionStyle(
+                      fontSize: 10,
+                      color: ThemeColor.secondaryText,
+                      fontWeight: FontWeight.w400,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ],
             ),
           ),
@@ -1157,17 +1192,17 @@ class _HomePageState extends State<HomePage> {
     if (flagImageUrl != null && flagImageUrl.isNotEmpty) {
       // Show SVG flag image
       return Container(
-        width: 24,
+        width: 32,
         height: 24,
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(2),
           child: SvgPicture.network(
             flagImageUrl,
-            width: 24,
+            width: 32,
             height: 24,
-            fit: BoxFit.cover,
+            fit: BoxFit.contain,
             placeholderBuilder: (context) => Container(
-              width: 24,
+              width: 32,
               height: 24,
               child: CircularProgressIndicator(
                 strokeWidth: 2,
@@ -2122,7 +2157,27 @@ class _HomePageState extends State<HomePage> {
       // Handle different V2Ray protocols
       if (config.startsWith('vmess://')) {
         // VMess URL format
-        final base64Part = config.substring(8); // Remove 'vmess://'
+        String base64Part = config.substring(8); // Remove 'vmess://'
+        
+        // Remove remark/tag (everything after #) before decoding
+        if (base64Part.contains('#')) {
+          base64Part = base64Part.split('#')[0].trim();
+        }
+        
+        // Remove query parameters (everything after ?)
+        if (base64Part.contains('?')) {
+          base64Part = base64Part.split('?')[0].trim();
+        }
+        
+        // Remove any trailing/leading whitespace
+        base64Part = base64Part.trim();
+        
+        // Normalize base64 padding
+        int remainder = base64Part.length % 4;
+        if (remainder > 0) {
+          base64Part += '=' * (4 - remainder);
+        }
+        
         final decoded = utf8.decode(base64.decode(base64Part));
         final json = jsonDecode(decoded);
         return json['add'] as String?; // 'add' field contains the address
@@ -2134,13 +2189,18 @@ class _HomePageState extends State<HomePage> {
         return uri.host;
       }
     } catch (e) {
-      print('Error extracting IP from config: $e');
+      // Silently handle parsing errors - these are expected for some configs
+      // print('Error extracting IP from config: $e');
     }
 
     // Fallback to regex extraction
-    final ipRegex = RegExp(r'(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})');
-    final match = ipRegex.firstMatch(config);
-    return match?.group(1);
+    try {
+      final ipRegex = RegExp(r'(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})');
+      final match = ipRegex.firstMatch(config);
+      return match?.group(1);
+    } catch (e) {
+      return null;
+    }
   }
 
   // Synchronous version for immediate display
@@ -2945,18 +3005,16 @@ class _HomePageState extends State<HomePage> {
 
       if (mounted) {
         setState(() {
-          loadingStatus = 'شروع تست فوری پینگ ${servers.length} سرور...';
+          loadingStatus = 'testing_servers_unified'.tr(namedArgs: {'count': servers.length.toString()});
         });
       }
 
-      // Subscribe to progress updates
+      // Subscribe to progress updates with throttling
       StreamSubscription<PingTestProgress>? progressSubscription;
       progressSubscription =
           _unifiedPingManager.progressUpdates.listen((progress) {
         if (mounted) {
-          setState(() {
-            loadingStatus = progress.message;
-          });
+          _updateThrottledStatus(progress.message);
         }
       });
 
@@ -2986,9 +3044,10 @@ class _HomePageState extends State<HomePage> {
         },
         onProgressCount: (completed, total) {
           if (mounted) {
-            setState(() {
-              loadingStatus = 'تست شده: $completed از $total سرور';
-            });
+            _updateThrottledStatus('unified_testing_progress'.tr(namedArgs: {
+              'completed': completed.toString(),
+              'total': total.toString()
+            }));
           }
         },
       );
@@ -3013,8 +3072,11 @@ class _HomePageState extends State<HomePage> {
 
       if (mounted) {
         setState(() {
-          loadingStatus =
-              'تست پینگ تکمیل شد - ${stats.successfulPings}/${stats.totalServers} موفق، میانگین: ${stats.averagePing.round()}ms';
+          loadingStatus = 'ping_test_completed_unified'.tr(namedArgs: {
+            'successful': stats.successfulPings.toString(),
+            'total': stats.totalServers.toString(),
+            'average': stats.averagePing.round().toString()
+          });
         });
       }
 
@@ -3035,10 +3097,24 @@ class _HomePageState extends State<HomePage> {
       print('❌ Error in immediate startup ping testing: $e');
       if (mounted) {
         setState(() {
-          loadingStatus = 'خطا در تست پینگ سرورها';
+          loadingStatus = 'ping_test_failed'.tr();
         });
       }
     }
+  }
+
+  /// Helper to update state with a throttled approach for smoother UI performance
+  void _updateThrottledStatus(String statusText) {
+    _pendingLoadingStatus = statusText;
+    if (_statusUpdateTimer?.isActive ?? false) return;
+
+    _statusUpdateTimer = Timer(const Duration(milliseconds: 400), () {
+      if (mounted && _pendingLoadingStatus != null) {
+        setState(() {
+          loadingStatus = _pendingLoadingStatus!;
+        });
+      }
+    });
   }
 
   /// Update processedServers list immediately when ping result comes in (for real-time display)
@@ -3128,9 +3204,33 @@ class _HomePageState extends State<HomePage> {
   String _extractRemark(String config) {
     try {
       if (config.startsWith('vmess://')) {
-        final base64Part = config.substring(8);
-        final normalized = base64.normalize(base64Part);
-        final decoded = utf8.decode(base64.decode(normalized));
+        String base64Part = config.substring(8);
+        
+        // Remove remark/tag (everything after #) before decoding
+        if (base64Part.contains('#')) {
+          // The part after # is often the remark itself (URL encoded)
+          final remarkPart = base64Part.split('#')[1].trim();
+          if (remarkPart.isNotEmpty) {
+            return _decodeRemarkText(remarkPart);
+          }
+          base64Part = base64Part.split('#')[0].trim();
+        }
+        
+        // Remove query parameters (everything after ?)
+        if (base64Part.contains('?')) {
+          base64Part = base64Part.split('?')[0].trim();
+        }
+        
+        // Remove any trailing/leading whitespace
+        base64Part = base64Part.trim();
+        
+        // Normalize base64 padding
+        int remainder = base64Part.length % 4;
+        if (remainder > 0) {
+          base64Part += '=' * (4 - remainder);
+        }
+        
+        final decoded = utf8.decode(base64.decode(base64Part));
         final json = jsonDecode(decoded) as Map<String, dynamic>;
         final ps = json['ps'];
         if (ps is String && ps.trim().isNotEmpty) {
@@ -3146,7 +3246,8 @@ class _HomePageState extends State<HomePage> {
         }
       }
     } catch (e) {
-      print('Error extracting remark: $e');
+      // Silently handle parsing errors - these are expected for some configs
+      // print('Error extracting remark: $e');
     }
 
     return '';

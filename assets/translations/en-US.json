@@ -344,5 +344,11 @@
     "unified_testing_progress": "Unified testing progress: {{completed}}/{{total}}",
     "immediate_results_available": "Immediate results available",
     "background_testing_active": "Background testing active",
-    "real_time_ping_updates": "Real-time ping updates"
+    "real_time_ping_updates": "Real-time ping updates",
+    "using_cached_servers": "Using cached servers...",
+    "using_fallback_servers": "Using fallback servers...",
+    "connecting_to_endpoint": "Connecting to {name}...",
+    "processing_response_from": "Processing response from {name}...",
+    "found_valid_servers": "Found {count} valid servers from {name}",
+    "failed_to_process_endpoint": "Failed to process {name}"
 }

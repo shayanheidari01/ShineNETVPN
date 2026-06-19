@@ -53,6 +53,10 @@ class _ServerSelectionModalState extends State<ServerSelectionModal>
   final UnifiedPingManager _pingManager = UnifiedPingManager();
   StreamSubscription<Map<String, PingResult>>? _pingUpdateSubscription;
   
+  // Batching ping updates to prevent UI jank
+  Timer? _pingUpdateTimer;
+  final Map<String, PingResult> _pingUpdateBuffer = {};
+  
   // Real-time ping results
   Map<String, PingResult> _livePingResults = {};
   bool _isLivePingTesting = false;
@@ -100,6 +104,7 @@ class _ServerSelectionModalState extends State<ServerSelectionModal>
     _searchController.dispose();
     _animationController.dispose();
     _pingUpdateSubscription?.cancel();
+    _pingUpdateTimer?.cancel();
     super.dispose();
   }
   
@@ -111,31 +116,8 @@ class _ServerSelectionModalState extends State<ServerSelectionModal>
     // Subscribe to real-time ping updates
     _pingUpdateSubscription = _pingManager.pingUpdates.listen((updates) {
       if (mounted) {
-        setState(() {
-          _livePingResults.addAll(updates);
-          // Update server ping data
-          for (final server in _allServers) {
-            final pingResult = _livePingResults[server.config];
-            if (pingResult != null) {
-              // Update server ping data in place
-              final updatedServer = ServerInfo(
-                name: server.name,
-                config: server.config,
-                ip: server.ip,
-                countryCode: server.countryCode,
-                ping: pingResult.pingMs,
-                remark: server.remark,
-              );
-              final index = _allServers.indexOf(server);
-              if (index >= 0) {
-                _allServers[index] = updatedServer;
-              }
-            }
-          }
-          // Re-sort servers by updated ping
-          _allServers.sort(_compareByPing);
-          _handleSearchChanged(); // Refresh visible servers
-        });
+        _pingUpdateBuffer.addAll(updates);
+        _schedulePingUpdate();
       }
     });
     
@@ -144,6 +126,44 @@ class _ServerSelectionModalState extends State<ServerSelectionModal>
     
     // Start live ping testing
     _startLivePingTesting();
+  }
+
+  /// Schedule a UI update with batched ping results
+  void _schedulePingUpdate() {
+    if (_pingUpdateTimer?.isActive ?? false) return;
+
+    _pingUpdateTimer = Timer(const Duration(milliseconds: 600), () {
+      if (mounted && _pingUpdateBuffer.isNotEmpty) {
+        setState(() {
+          _livePingResults.addAll(_pingUpdateBuffer);
+          
+          // Update server ping data in bulk
+          for (final serverConfig in _pingUpdateBuffer.keys) {
+            final pingResult = _pingUpdateBuffer[serverConfig];
+            if (pingResult != null) {
+              // Find and update the server in the master list
+              final serverIndex = _allServers.indexWhere((s) => s.config == serverConfig);
+              if (serverIndex >= 0) {
+                final server = _allServers[serverIndex];
+                _allServers[serverIndex] = ServerInfo(
+                  name: server.name,
+                  config: server.config,
+                  ip: server.ip,
+                  countryCode: server.countryCode,
+                  ping: pingResult.pingMs,
+                  remark: server.remark,
+                );
+              }
+            }
+          }
+          
+          // Re-sort servers by updated ping
+          _allServers.sort(_compareByPing);
+          _handleSearchChanged(); // Refresh visible servers
+          _pingUpdateBuffer.clear();
+        });
+      }
+    });
   }
   
   /// Load cached ping results for immediate display
@@ -564,6 +584,7 @@ class _ServerSelectionModalState extends State<ServerSelectionModal>
       tween: Tween(begin: 0.0, end: 1.0),
       curve: Curves.easeOutCubic,
       builder: (context, value, child) {
+        final scaleValue = isSelected ? 1.02 : 1.0;
         return Transform.scale(
           scale: 0.8 + (0.2 * value),
           child: Opacity(
@@ -573,132 +594,122 @@ class _ServerSelectionModalState extends State<ServerSelectionModal>
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 curve: Curves.easeOutCubic,
-                transform: Matrix4.identity()..scale(isSelected ? 1.02 : 1.0),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                    child: Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        gradient: isSelected
-                            ? LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  ThemeColor.primaryColor.withValues(alpha: 0.25),
-                                  ThemeColor.primaryColor.withValues(alpha: 0.1),
-                                ],
-                              )
-                            : LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  Colors.white.withValues(alpha: 0.12),
-                                  Colors.white.withValues(alpha: 0.06),
-                                ],
-                              ),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: isSelected
-                              ? ThemeColor.primaryColor.withValues(alpha: 0.4)
-                              : Colors.white.withValues(alpha: 0.15),
-                          width: 1.5,
-                        ),
-                        boxShadow: isSelected
-                            ? [
-                                BoxShadow(
-                                  color: ThemeColor.primaryColor.withValues(alpha: 0.2),
-                                  blurRadius: 20,
-                                  spreadRadius: 0,
-                                  offset: const Offset(0, 8),
-                                ),
-                              ]
-                            : null,
-                      ),
-                      child: Row(
-                        children: [
-                          // Server icon
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: isSelected
-                                    ? [
-                                        ThemeColor.primaryColor.withValues(alpha: 0.8),
-                                        ThemeColor.primaryColor.withValues(alpha: 0.6),
-                                      ]
-                                    : [
-                                        Colors.white.withValues(alpha: 0.2),
-                                        Colors.white.withValues(alpha: 0.1),
-                                      ],
-                              ),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              Icons.dns_rounded,
-                              color: isSelected
-                                  ? Colors.white
-                                  : Colors.white.withValues(alpha: 0.8),
-                              size: 20,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          // Server info
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  server.name,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: ThemeColor.bodyStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-                                    context: context,
-                                  ),
-                                ),
-                                if (server.remark != null && server.remark!.isNotEmpty) ...[
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    server.remark!,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: ThemeColor.captionStyle(
-                                      fontSize: 13,
-                                      color: Colors.white.withValues(alpha: 0.7),
-                                      context: context,
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          // Ping indicator
-                          _buildGlassPingIndicator(ping),
-                          const SizedBox(width: 12),
-                          // Selection indicator
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? ThemeColor.primaryColor
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Icon(
-                              isSelected ? Icons.check_rounded : Icons.radio_button_unchecked_rounded,
-                              color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.6),
-                              size: 18,
-                            ),
-                          ),
-                        ],
-                      ),
+                transform: Matrix4.diagonal3Values(scaleValue, scaleValue, 1.0),
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: isSelected 
+                        ? ThemeColor.primaryColor.withValues(alpha: 0.15)
+                        : Colors.white.withValues(alpha: 0.08),
+                    gradient: isSelected
+                        ? LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              ThemeColor.primaryColor.withValues(alpha: 0.2),
+                              ThemeColor.primaryColor.withValues(alpha: 0.05),
+                            ],
+                          )
+                        : null,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isSelected
+                          ? ThemeColor.primaryColor.withValues(alpha: 0.4)
+                          : Colors.white.withValues(alpha: 0.12),
+                      width: 1.2,
                     ),
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                              color: ThemeColor.primaryColor.withValues(alpha: 0.2),
+                              blurRadius: 20,
+                              spreadRadius: 0,
+                              offset: const Offset(0, 8),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Row(
+                    children: [
+                      // Server icon
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: isSelected
+                                ? [
+                                    ThemeColor.primaryColor.withValues(alpha: 0.8),
+                                    ThemeColor.primaryColor.withValues(alpha: 0.6),
+                                  ]
+                                : [
+                                    Colors.white.withValues(alpha: 0.2),
+                                    Colors.white.withValues(alpha: 0.1),
+                                  ],
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          Icons.dns_rounded,
+                          color: isSelected
+                              ? Colors.white
+                              : Colors.white.withValues(alpha: 0.8),
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      // Server info
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              server.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: ThemeColor.bodyStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                                context: context,
+                              ),
+                            ),
+                            if (server.remark != null && server.remark!.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                server.remark!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: ThemeColor.captionStyle(
+                                  fontSize: 13,
+                                  color: Colors.white.withValues(alpha: 0.7),
+                                  context: context,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      // Ping indicator
+                      _buildGlassPingIndicator(ping),
+                      const SizedBox(width: 12),
+                      // Selection indicator
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? ThemeColor.primaryColor
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Icon(
+                          isSelected ? Icons.check_rounded : Icons.radio_button_unchecked_rounded,
+                          color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.6),
+                          size: 18,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -788,9 +799,9 @@ class _ServerSelectionModalState extends State<ServerSelectionModal>
   }
 
   String _getPingLabel(int ping) {
-    if (ping < 0) return 'خطا';
-    if (ping == 0) return 'تست';
-    if (ping >= 9999) return 'بالا';
+    if (ping < 0) return 'ping_error_short'.tr();
+    if (ping == 0) return 'testing_short'.tr();
+    if (ping >= 9999) return 'ping_high_short'.tr();
     return '${ping}ms';
   }
 

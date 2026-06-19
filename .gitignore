@@ -1,12 +1,68 @@
 ```
-# Gradle
+# Gradle / build outputs
 .gradle/
 build/
 !gradle/wrapper/gradle-wrapper.jar
+**/.gradle/
+**/build/
+**/captures/
+**/intermediates/
+**/outputs/
+**/tmp/
+**/generated/
+**/native/
+**/.cxx
+**/.cxx/
+**/.cxx/**
+/android/app/.cxx/
+/android/app/.cxx/**
+/android/app/.cxx
+**/android/app/.cxx/
+**/android/app/.cxx/**
 
-# Android
+# Flutter / Dart caches
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+coverage/
+
+# Android / signing and secrets
 *.apk
+*.aab
 *.aar
+*.ap_
+*.dex
+*.so
 *.iml
 local.properties
+key.properties
+*.jks
+*.keystore
+*.p12
+*.pem
+*.mobileprovision
+**/google-services.json
+**/Firebase*.json
+android/.gradle/
+android/app/.cxx/
+android/app/build/
+android/build/
+android/app/release/
+android/app/debug/
+
+# Environment / local config
+*.env
+*.env.*
+secrets/
+*.log
+*.tmp
+*.temp
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
 ```

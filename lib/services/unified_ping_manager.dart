@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'flutter_v2ray_ping_service.dart';
 
 /// Unified Ping Result Manager - Enhanced Version
@@ -126,7 +127,7 @@ class UnifiedPingManager {
         completed: 0,
         total: serverConfigs.length,
         phase: PingTestPhase.starting,
-        message: 'شروع تست پینگ ${serverConfigs.length} سرور...',
+        message: 'testing_servers_unified'.tr(namedArgs: {'count': serverConfigs.length.toString()}),
       ));
       
       int completedCount = 0;
@@ -145,7 +146,10 @@ class UnifiedPingManager {
             completed: completedCount,
             total: serverConfigs.length,
             phase: PingTestPhase.testing,
-            message: 'تست شده: $completedCount از ${serverConfigs.length}',
+            message: 'unified_testing_progress'.tr(namedArgs: {
+              'completed': completedCount.toString(),
+              'total': serverConfigs.length.toString()
+            }),
             currentServer: server,
             currentResult: result,
           ));
@@ -159,7 +163,11 @@ class UnifiedPingManager {
         completed: serverConfigs.length,
         total: serverConfigs.length,
         phase: PingTestPhase.completed,
-        message: 'تست پینگ تکمیل شد - ${results.length} نتیجه',
+        message: 'ping_test_completed_unified'.tr(namedArgs: {
+          'successful': results.values.where((r) => r.isSuccess).length.toString(),
+          'total': serverConfigs.length.toString(),
+          'average': getStatistics(serverConfigs).averagePing.round().toString(),
+        }),
       ));
       
       print('✅ Startup ping testing completed: ${results.length} results');

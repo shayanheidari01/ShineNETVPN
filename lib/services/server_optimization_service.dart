@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 // Helper function for fire-and-forget operations
 void unawaited(Future<void> future) {
@@ -17,16 +18,12 @@ class ServerOptimizationService {
   factory ServerOptimizationService() => _instance;
   ServerOptimizationService._internal();
 
-  late final Dio _dio;
+  Dio? _dio;
+  bool _isInitialized = false;
   final List<String> _serverEndpoints = [
-    'https://raw.githubusercontent.com/shayanheidari01/ShineNETConfigs/refs/heads/main/configs.txt',
-  ];
-
-  // Fallback server configurations
-  final List<String> _fallbackServers = [
-    'vmess://eyJ2IjoiMiIsInBzIjoiU2hpbmVORVQgU2VydmVyIDEiLCJhZGQiOiIxMDQuMjEuNTUuMjM0IiwicG9ydCI6IjQ0MyIsInR5cGUiOiJub25lIiwiaWQiOiI5NWZlZGQzZC1hNzQzLTQ5ZGEtOGI4Ni05ZjNlNzM5NzIyZDciLCJhaWQiOiIwIiwibmV0Ijoid3MiLCJwYXRoIjoiLyIsImhvc3QiOiIiLCJ0bHMiOiJ0bHMifQ==',
-    'vmess://eyJ2IjoiMiIsInBzIjoiU2hpbmVORVQgU2VydmVyIDIiLCJhZGQiOiIxNzIuNjcuMTMwLjE1NCIsInBvcnQiOiI0NDMiLCJ0eXBlIjoibm9uZSIsImlkIjoiOTVmZWRkM2QtYTc0My00OWRhLThiODYtOWYzZTczOTcyMmQ3IiwiYWlkIjoiMCIsIm5ldCI6IndzIiwicGF0aCI6Ii8iLCJob3N0IjoiIiwidGxzIjoidGxzIn0=',
-    'vmess://eyJ2IjoiMiIsInBzIjoiU2hpbmVORVQgU2VydmVyIDMiLCJhZGQiOiIxNzIuNjcuMTMwLjE1NSIsInBvcnQiOiI0NDMiLCJ0eXBlIjoibm9uZSIsImlkIjoiOTVmZWRkM2QtYTc0My00OWRhLThiODYtOWYzZTczOTcyMmQ3IiwiYWlkIjoiMCIsIm5ldCI6IndzIiwicGF0aCI6Ii8iLCJob3N0IjoiIiwidGxzIjoidGxzIn0=',
+    'https://raw.githubusercontent.com/shayanheidari01/ShineNETConfigs/main/configs.txt',
+    'https://cdn.jsdelivr.net/gh/shayanheidari01/ShineNETConfigs/configs.txt',
+    'https://api.allorigins.win/get?url=https%3A%2F%2Fraw.githubusercontent.com%2Fshayanheidari01%2FShineNETConfigs%2Fmain%2Fconfigs.txt'
   ];
 
   // Cache and storage keys
@@ -35,10 +32,10 @@ class ServerOptimizationService {
   static const String _serverHealthKey = 'server_health_data';
 
   // Connection configuration - Optimized for better performance
-  static const int _maxConcurrentRequests = 2; // Less concurrent requests for stability
-  static const Duration _requestTimeout = Duration(seconds: 5); // More time for slow networks
-  static const Duration _connectTimeout = Duration(seconds: 3); // Better for slow connections
-  static const Duration _pingTimeout = Duration(milliseconds: 2000); // More reasonable timeout
+  static const int _maxConcurrentRequests = 3; 
+  static const Duration _requestTimeout = Duration(seconds: 15); 
+  static const Duration _connectTimeout = Duration(seconds: 10); 
+  static const Duration _pingTimeout = Duration(milliseconds: 3000); 
 
   // Health monitoring
   Timer? _healthCheckTimer;
@@ -48,15 +45,27 @@ class ServerOptimizationService {
 
   /// Initialize the service
   Future<void> initialize() async {
+    if (_isInitialized) {
+      print('⚠️ ServerOptimizationService already initialized, skipping...');
+      return;
+    }
+    
     _initializeDio();
     await SharedPreferences.getInstance();
     await _loadCachedData();
     await _getUserLocation();
     _startHealthMonitoring();
+    _isInitialized = true;
+    print('✅ ServerOptimizationService initialized successfully');
   }
 
   /// Initialize Dio with optimized settings
   void _initializeDio() {
+    if (_dio != null) {
+      print('⚠️ Dio already initialized');
+      return;
+    }
+    
     _dio = Dio(BaseOptions(
       connectTimeout: _connectTimeout,
       receiveTimeout: _requestTimeout,
@@ -76,7 +85,7 @@ class ServerOptimizationService {
     ));
 
     // Add interceptors for better error handling and logging
-    _dio.interceptors.add(InterceptorsWrapper(
+    _dio!.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
         options.headers['Cache-Control'] =
             'no-cache, no-store, must-revalidate';
@@ -143,11 +152,11 @@ class ServerOptimizationService {
     Function(String)? onStatusUpdate,
   }) async {
     try {
-      onStatusUpdate?.call('Initializing server selection...');
+      onStatusUpdate?.call('finding_best_server'.tr());
 
       // Check cache first
       if (!forceRefresh && await _isCacheValid()) {
-        onStatusUpdate?.call('Using cached servers...');
+        onStatusUpdate?.call('using_cached_servers'.tr());
         final cachedServers = await _getCachedServers();
         if (cachedServers.isNotEmpty) {
           return _selectOptimalServers(cachedServers);
@@ -155,7 +164,7 @@ class ServerOptimizationService {
       }
 
       // Fetch fresh servers with parallel requests
-      onStatusUpdate?.call('Fetching server list...');
+      onStatusUpdate?.call('fetching_servers'.tr());
       final servers = await _fetchServersParallel(onStatusUpdate);
 
       if (servers.isEmpty) {
@@ -172,15 +181,12 @@ class ServerOptimizationService {
       // Fallback to cached servers
       final cachedServers = await _getCachedServers();
       if (cachedServers.isNotEmpty) {
-        onStatusUpdate?.call('Using fallback servers...');
+        onStatusUpdate?.call('using_fallback_servers'.tr());
         return _selectOptimalServers(cachedServers);
       }
 
-      // Ultimate fallback to hardcoded servers
-      onStatusUpdate?.call('Using emergency fallback servers...');
-      print('Using emergency fallback servers due to network issues');
-      await _cacheServers(_fallbackServers); // Cache the fallback servers
-      return _selectOptimalServers(_fallbackServers);
+      onStatusUpdate?.call('unable_connect_check_internet'.tr());
+      return [];
     }
   }
 
@@ -206,85 +212,84 @@ class ServerOptimizationService {
   /// Fetch servers using optimized parallel requests with better error handling
   Future<List<String>> _fetchServersParallel(
       Function(String)? onStatusUpdate) async {
-    final completer = Completer<List<String>>();
-    int completedRequests = 0;
-    final errors = <String, dynamic>{}; // Store errors with endpoint info
+    final allServers = <String>{}; // Use set to avoid duplicates
+    final List<Future<void>> requests = [];
+    int successfulRequests = 0;
 
-    // Start all requests concurrently with proper error handling
-    for (int i = 0;
-        i < _serverEndpoints.length && i < _maxConcurrentRequests;
-        i++) {
+    for (int i = 0; i < _serverEndpoints.length && i < _maxConcurrentRequests; i++) {
       final endpoint = _serverEndpoints[i];
       final endpointName = _getEndpointName(endpoint);
 
-      onStatusUpdate?.call('Trying $endpointName...');
-
-      unawaited(_fetchFromEndpoint(endpoint, onStatusUpdate).then((result) {
-        if (!completer.isCompleted) {
-          if (result.isNotEmpty) {
-            if (!completer.isCompleted) {
-              completer.complete(result);
-            }
-          } else {
-            errors[endpoint] = 'No valid servers found';
-            _checkAllRequestsCompleted(++completedRequests, completer, errors);
-          }
+      requests.add(_fetchFromEndpoint(endpoint, onStatusUpdate).then((result) {
+        if (result.isNotEmpty) {
+          allServers.addAll(result);
+          successfulRequests++;
         }
       }).catchError((error) {
-        final errorMessage = error.toString();
-        errors[endpoint] = errorMessage;
-        print('Error from $endpoint: $errorMessage');
-
-        if (!completer.isCompleted) {
-          _checkAllRequestsCompleted(++completedRequests, completer, errors);
-        }
+        print('Error from $endpointName: $error');
       }));
     }
 
-    // Add timeout for the entire operation
-    return completer.future.timeout(
-      Duration(seconds: 8), // Increased timeout for better reliability
-      onTimeout: () {
-        if (!completer.isCompleted) {
-          completer.completeError(
-            Exception('Server fetch timed out after 8 seconds'),
-            StackTrace.current,
-          );
-        }
-        return <String>[];
-      },
-    );
+    try {
+      // Wait for all requests to finish or timeout
+      await Future.wait(requests).timeout(Duration(seconds: 20));
+    } catch (e) {
+      print('Parallel fetch completed with some errors or timeout: $e');
+    }
+
+    final serversList = allServers.toList();
+    if (serversList.isEmpty && successfulRequests == 0) {
+      throw Exception('Failed to fetch servers from all endpoints');
+    }
+
+    return serversList;
   }
 
   /// Process server data with optimized parsing
   List<String> _processServerData(String data) {
     try {
-      // Handle both direct base64 and AllOrigins format
-      String base64Data = data.trim();
+      String textData = data.trim();
 
       // Check if it's AllOrigins format
-      if (base64Data.startsWith('{')) {
-        final jsonData = json.decode(base64Data);
+      if (textData.startsWith('{')) {
+        final jsonData = json.decode(textData);
         if (jsonData['contents'] != null) {
-          base64Data = jsonData['contents'].toString().trim();
+          textData = jsonData['contents'].toString().trim();
         }
       }
 
-      if (base64Data.isEmpty) {
-        throw Exception('Empty base64 data');
+      if (textData.isEmpty) {
+        throw Exception('Empty server data');
       }
 
-      // Decode base64 with error handling
-      late final String decodedString;
-      try {
-        final decodedBytes = base64.decode(base64Data);
-        decodedString = utf8.decode(decodedBytes);
-      } catch (e) {
-        throw Exception('Invalid base64 encoding: $e');
+      String decodedString = textData;
+
+      // Detect if it's a plain text format by searching for common protocol schemes
+      bool isPlainText = textData.contains('vmess://') ||
+                         textData.contains('vless://') ||
+                         textData.contains('trojan://') ||
+                         textData.contains('ss://');
+
+      if (!isPlainText) {
+        try {
+          // Normalize base64 text (remove any whitespace/newlines)
+          final normalizedBase64 = textData.replaceAll(RegExp(r'\s+'), '');
+          // Handle padding if needed
+          String paddedBase64 = normalizedBase64;
+          int remainder = paddedBase64.length % 4;
+          if (remainder > 0) {
+            paddedBase64 += '=' * (4 - remainder);
+          }
+          final decodedBytes = base64.decode(paddedBase64);
+          decodedString = utf8.decode(decodedBytes);
+        } catch (e) {
+          print('Failed to decode server data as base64, treating as plain text: $e');
+        }
       }
 
       // Parse server configurations with optimized filtering
-      final lines = decodedString.split('\n');
+      // Handle both windows (\r\n) and unix (\n) line endings
+      final lines = decodedString.split(RegExp(r'\r?\n'));
       final servers = <String>[];
 
       for (final line in lines) {
@@ -308,23 +313,27 @@ class ServerOptimizationService {
   /// Validate server configuration
   bool _isValidServerConfig(String config) {
     try {
-      // Check if it's a vmess:// URL format
-      if (config.startsWith('vmess://') ||
-          config.startsWith('vless://') ||
-          config.startsWith('trojan://') ||
-          config.startsWith('ss://')) {
+      final trimmed = config.trim();
+      // Check if it's a recognized protocol URL format
+      if (trimmed.startsWith('vmess://') ||
+          trimmed.startsWith('vless://') ||
+          trimmed.startsWith('trojan://') ||
+          trimmed.startsWith('ss://')) {
         return true;
       }
 
-      // Check if it's base64 encoded V2Ray config
-      final decoded = base64.decode(config);
-      final decodedString = utf8.decode(decoded);
-      final jsonData = json.decode(decodedString);
+      // Check if it's base64 encoded V2Ray config (JSON format)
+      try {
+        final decoded = base64.decode(trimmed);
+        final decodedString = utf8.decode(decoded);
+        final jsonData = json.decode(decodedString);
 
-      // Basic validation
-      return jsonData['outbounds'] != null &&
-          jsonData['outbounds'] is List &&
-          (jsonData['outbounds'] as List).isNotEmpty;
+        return jsonData['outbounds'] != null &&
+            jsonData['outbounds'] is List &&
+            (jsonData['outbounds'] as List).isNotEmpty;
+      } catch (_) {
+        return false;
+      }
     } catch (e) {
       return false;
     }
@@ -425,7 +434,15 @@ class ServerOptimizationService {
   /// Generate server ID for tracking
   String _getServerId(String server) {
     try {
-      final decoded = base64.decode(server);
+      final details = _extractServerDetails(server);
+      if (details != null &&
+          details['address'] != null &&
+          details['port'] != null) {
+        return '${details['address']}_${details['port']}';
+      }
+
+      // Try fallback if it's base64 encoded JSON outbound format
+      final decoded = base64.decode(server.trim());
       final decodedString = utf8.decode(decoded);
       final jsonData = json.decode(decodedString);
 
@@ -453,9 +470,9 @@ class ServerOptimizationService {
     final endpointName = _getEndpointName(endpoint);
 
     try {
-      onStatusUpdate?.call('Connecting to $endpointName...');
+      onStatusUpdate?.call('connecting_to_endpoint'.tr(namedArgs: {'name': endpointName}));
 
-      final response = await _dio.get<String>(
+      final response = await _dio!.get<String>(
         endpoint,
         options: Options(
           responseType: ResponseType.plain,
@@ -473,11 +490,11 @@ class ServerOptimizationService {
       print('Fetched from $endpointName in ${stopwatch.elapsedMilliseconds}ms');
 
       if (response.statusCode == 200 && response.data != null) {
-        onStatusUpdate?.call('Processing response from $endpointName...');
+        onStatusUpdate?.call('processing_response_from'.tr(namedArgs: {'name': endpointName}));
         final servers = _processServerData(response.data!);
         if (servers.isNotEmpty) {
           onStatusUpdate?.call(
-              'Found ${servers.length} valid servers from $endpointName');
+              'found_valid_servers'.tr(namedArgs: {'count': servers.length.toString(), 'name': endpointName}));
           return servers;
         }
         throw Exception('No valid servers found in response');
@@ -493,7 +510,7 @@ class ServerOptimizationService {
       rethrow;
     } catch (e, stackTrace) {
       stopwatch.stop();
-      onStatusUpdate?.call('Failed to process $endpointName');
+      onStatusUpdate?.call('failed_to_process_endpoint'.tr(namedArgs: {'name': endpointName}));
       print('Error processing $endpoint: $e\n$stackTrace');
       rethrow;
     } finally {
@@ -603,7 +620,27 @@ class ServerOptimizationService {
   Map<String, dynamic>? _parseVmessConfig(String config) {
     try {
       // Remove vmess:// prefix and decode base64
-      final base64Part = config.substring(8);
+      String base64Part = config.substring(8).trim();
+      
+      // Remove remark/tag (everything after #) before decoding
+      if (base64Part.contains('#')) {
+        base64Part = base64Part.split('#')[0].trim();
+      }
+      
+      // Remove query parameters (everything after ?)
+      if (base64Part.contains('?')) {
+        base64Part = base64Part.split('?')[0].trim();
+      }
+
+      // Remove any trailing/leading whitespace
+      base64Part = base64Part.trim();
+      
+      // Normalize base64 padding
+      int remainder = base64Part.length % 4;
+      if (remainder > 0) {
+        base64Part += '=' * (4 - remainder);
+      }
+
       final decoded = base64.decode(base64Part);
       final decodedString = utf8.decode(decoded);
       final jsonData = json.decode(decodedString);
@@ -636,14 +673,40 @@ class ServerOptimizationService {
   Map<String, dynamic>? _parseShadowsocksConfig(String config) {
     try {
       final uri = Uri.parse(config);
-      return {
-        'address': uri.host,
-        'port': uri.port,
-      };
+      if (uri.host.isNotEmpty) {
+        return {
+          'address': uri.host,
+          'port': uri.port,
+        };
+      }
+
+      // Handle legacy format ss://base64 or ss://base64#tag
+      String base64Part = config.substring(5).trim();
+      if (base64Part.contains('#')) {
+        base64Part = base64Part.split('#')[0].trim();
+      }
+      if (base64Part.contains('?')) {
+        base64Part = base64Part.split('?')[0].trim();
+      }
+
+      int remainder = base64Part.length % 4;
+      if (remainder > 0) {
+        base64Part += '=' * (4 - remainder);
+      }
+
+      final decoded = utf8.decode(base64.decode(base64Part));
+      // decoded could be method:password@host:port
+      if (decoded.contains('@')) {
+        final parts = decoded.split('@')[1].split(':');
+        return {
+          'address': parts[0],
+          'port': int.tryParse(parts[1]) ?? 0,
+        };
+      }
     } catch (e) {
       print('Error parsing Shadowsocks config: $e');
-      return null;
     }
+    return null;
   }
 
   /// Optimized ping test with connection pooling
@@ -805,16 +868,18 @@ class ServerOptimizationService {
 
   /// Utility methods
   String _getEndpointName(String endpoint) {
-    if (endpoint.contains('workers.dev')) return 'Primary Server';
-    if (endpoint.contains('deno.net')) return 'Alternative Server';
+    if (endpoint.contains('githubusercontent.com')) return 'GitHub';
+    if (endpoint.contains('jsdelivr.net')) return 'JSDelivr CDN';
+    if (endpoint.contains('allorigins.win')) return 'Proxy Server';
     return 'Server';
   }
 
   /// Cleanup resources
   void dispose() {
     _healthCheckTimer?.cancel();
-    _dio.close();
+    _dio?.close();
     _saveHealthData();
+    _isInitialized = false;
   }
 }
 

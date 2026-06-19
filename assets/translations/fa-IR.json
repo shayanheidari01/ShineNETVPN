@@ -340,5 +340,11 @@
     "unified_testing_progress": "پیشرفت تست یکپارچه: {{completed}}/{{total}}",
     "immediate_results_available": "نتایج فوری در دسترس است",
     "background_testing_active": "تست پس‌زمینه فعال است",
-    "real_time_ping_updates": "به‌روزرسانی لحظه‌ای پینگ"
+    "real_time_ping_updates": "به‌روزرسانی لحظه‌ای پینگ",
+    "using_cached_servers": "استفاده از سرورهای کش شده...",
+    "using_fallback_servers": "استفاده از سرورهای پشتیبان...",
+    "connecting_to_endpoint": "در حال اتصال به {name}...",
+    "processing_response_from": "در حال پردازش پاسخ از {name}...",
+    "found_valid_servers": "{count} سرور معتبر از {name} یافت شد",
+    "failed_to_process_endpoint": "خطا در پردازش {name}"
 }

@@ -471,7 +471,7 @@ class _AboutScreenState extends State<AboutScreen> {
                 child: _buildInfoItem(
                   icon: Icons.update_rounded,
                   title: 'version'.tr(),
-                  value: version ?? '1.1.3',
+                  value: version ?? '1.1.4',
                   color: ThemeColor.primaryColor,
                 ),
               ),

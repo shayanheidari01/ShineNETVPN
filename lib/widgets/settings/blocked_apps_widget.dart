@@ -35,6 +35,8 @@ class _BlockedAppsWidgetsState extends State<BlockedAppsWidgets>
     List<String>? savedBlockedApps = prefs.getStringList('blockedApps') ?? [];
     bool? savedIsLoadSystemApps = prefs.getBool('isLoadSystemApps');
 
+    if (!mounted) return;
+    
     setState(() {
       blockedApps = savedBlockedApps;
       isLoadSystemApps = savedIsLoadSystemApps ?? false;
@@ -44,6 +46,8 @@ class _BlockedAppsWidgetsState extends State<BlockedAppsWidgets>
   }
 
   Future<void> _loadApps() async {
+    if (!mounted) return;
+    
     setState(() {
       isLoading = true;
     });
@@ -51,6 +55,8 @@ class _BlockedAppsWidgetsState extends State<BlockedAppsWidgets>
     List<AppInfo> installedApps =
         await InstalledApps.getInstalledApps(!isLoadSystemApps, true);
 
+    if (!mounted) return;
+    
     setState(() {
       apps = installedApps;
 
@@ -62,16 +68,21 @@ class _BlockedAppsWidgetsState extends State<BlockedAppsWidgets>
 
       filteredApps = apps;
       isLoading = false;
+    });
 
-      Future.delayed(Duration(milliseconds: 500), () {
+    // Delay enabling search with mounted check
+    Future.delayed(Duration(milliseconds: 500), () {
+      if (mounted) {
         setState(() {
           isSearchReady = true;
         });
-      });
+      }
     });
   }
 
   void _filterApps() {
+    if (!mounted) return;
+    
     String query = searchController.text.toLowerCase();
     setState(() {
       filteredApps = apps?.where((app) {
@@ -94,6 +105,8 @@ class _BlockedAppsWidgetsState extends State<BlockedAppsWidgets>
   }
 
   void _toggleBlockedApp(String packageName) {
+    if (!mounted) return;
+    
     setState(() {
       if (blockedApps.contains(packageName)) {
         blockedApps.remove(packageName);
@@ -105,12 +118,21 @@ class _BlockedAppsWidgetsState extends State<BlockedAppsWidgets>
   }
 
   void _toggleSystemApps() {
+    if (!mounted) return;
+    
     setState(() {
       isLoading = true;
       isLoadSystemApps = !isLoadSystemApps;
     });
     _saveBlockedApps();
     _loadApps();
+  }
+
+  @override
+  void dispose() {
+    searchController.removeListener(_filterApps);
+    searchController.dispose();
+    super.dispose();
   }
 
   @override
