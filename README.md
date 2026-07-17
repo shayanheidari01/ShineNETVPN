@@ -34,7 +34,7 @@ ShineNET VPN is a **free, open-source** VPN application designed to provide secu
 
 ### 📥 Download
 
-**Latest Version: v1.1.4**
+**Latest Version: v1.2.1**
 
 [![Download APK](https://img.shields.io/badge/Download-APK-blue?style=for-the-badge&logo=android)](https://github.com/shayanheidari01/ShineNETVPN/releases/latest)
 
@@ -90,7 +90,7 @@ ShineNET VPN یک اپلیکیشن **رایگان و متن‌باز** است ک
 
 ### 📥 دانلود
 
-**آخرین نسخه: v1.1.4**
+**آخرین نسخه: v1.2.1**
 
 [![دانلود APK](https://img.shields.io/badge/دانلود-APK-blue?style=for-the-badge&logo=android)](https://github.com/shayanheidari01/ShineNETVPN/releases/latest)
 
@@ -128,7 +128,7 @@ ShineNET VPN 是一款**免费开源**的 VPN 应用程序，旨在提供安全�
 
 ### 📥 下载
 
-**最新版本: v1.1.4**
+**最新版本: v1.2.1**
 
 [![下载 APK](https://img.shields.io/badge/下载-APK-blue?style=for-the-badge&logo=android)](https://github.com/shayanheidari01/ShineNETVPN/releases/latest)
 
@@ -153,7 +153,7 @@ ShineNET VPN — это **бесплатное приложение с откр�
 
 ### 📥 Скачать
 
-**Последняя версия: v1.1.4**
+**Последняя версия: v1.2.1**
 
 [![Скачать APK](https://img.shields.io/badge/Скачать-APK-blue?style=for-the-badge&logo=android)](https://github.com/shayanheidari01/ShineNETVPN/releases/latest)
 
