@@ -447,9 +447,9 @@ class ConnectionOptimizationService {
               _lastConnectedServer != null &&
               _isRecentlySuccessful(_lastConnectedServer!)) {
             print('🔄 Attempting reconnection to last successful server');
-            final success = await _quickConnect(_lastConnectedServer!);
+            final success = await _fastReconnect(_lastConnectedServer!);
             if (success) {
-              print('✅ Quick reconnected to previous server successfully');
+              print('✅ Reconnected to previous server successfully');
               _recordReconnectionSuccess(reconnectionAttempts);
               return;
             }
@@ -463,7 +463,7 @@ class ConnectionOptimizationService {
                   '🎯 Trying ${reliableServers.length} reliable cached servers');
               for (final server in reliableServers.take(3)) {
                 try {
-                  final success = await _quickConnect(server);
+                  final success = await _fastReconnect(server);
                   if (success) {
                     print('✅ Reconnected to reliable cached server');
                     _lastConnectedServer = server;
@@ -620,7 +620,7 @@ class ConnectionOptimizationService {
     // Try servers until one connects
     for (final server in emergencyServers.take(5)) {
       try {
-        final success = await _quickConnect(server);
+        final success = await _fastReconnect(server);
         if (success) {
           _lastConnectedServer = server;
           print('✅ Emergency connection successful');
@@ -695,11 +695,11 @@ class ConnectionOptimizationService {
     // Could save to analytics or preferences
   }
 
-  /// Quick connection attempt with minimal overhead
-  Future<bool> _quickConnect(String serverConfig) async {
+  /// Fast reconnection attempt with minimal overhead
+  Future<bool> _fastReconnect(String serverConfig) async {
     try {
       await _v2rayManager.start(
-        remark: 'Quick Reconnect',
+        remark: 'Reconnect',
         config: serverConfig,
         proxyOnly: false,
         bypassSubnets: [],
@@ -712,7 +712,7 @@ class ConnectionOptimizationService {
       // Return true for now since getV2RayStatus is not available
       return true;
     } catch (e) {
-      print('❌ Quick connect failed: $e');
+      print('❌ Reconnect failed: $e');
       return false;
     }
   }

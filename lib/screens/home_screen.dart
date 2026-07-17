@@ -17,7 +17,8 @@ import 'package:shinenet_vpn/utils/server_location_parser.dart';
 import 'package:shinenet_vpn/screens/home_screen_helper.dart';
 import 'package:shinenet_vpn/services/flutter_v2ray_client_manager.dart';
 import 'package:shinenet_vpn/services/flutter_v2ray_ping_service.dart';
-import 'package:shinenet_vpn/services/unified_ping_manager.dart'; // V2Ray delay ping service
+import 'package:shinenet_vpn/services/aether_client_manager.dart';
+import 'package:shinenet_vpn/screens/scan_mode_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_v2ray_client/flutter_v2ray.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -37,7 +38,20 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final FlutterV2rayClientManager _v2rayManager = FlutterV2rayClientManager();
+  final AetherClientManager _aetherManager = AetherClientManager();
+  StreamSubscription<AetherState>? _aetherStateSub;
   ValueNotifier<V2RayStatus> get v2rayStatus => _v2rayManager.statusNotifier;
+
+  /// Selected VPN core: 'aether' or 'v2ray'.
+  String _selectedCore = 'aether';
+  static const String _selectedCoreKey = 'selected_vpn_core';
+
+  /// Whether the Aether native libs are physically present on this device.
+  bool _aetherAvailable = false;
+  AetherState _aetherState = AetherState.disconnected;
+  String _aetherProtocol = 'masque';
+  String _aetherScanMode = 'turbo';
+  String _aetherTransport = 'h3';
 
   static const String _lastSuccessfulServerKey = 'last_successful_server';
   static const String _lastSuccessfulTimestampKey =
@@ -86,21 +100,10 @@ class _HomePageState extends State<HomePage> {
   String? _lastSuccessfulServer;
   DateTime? _lastSuccessfulServerTime;
 
-  // Unified ping management system
-  final UnifiedPingManager _unifiedPingManager = UnifiedPingManager();
-  StreamSubscription<Map<String, PingResult>>? _pingUpdateSubscription;
-
-  // Background health monitoring
-  Timer? _healthCheckTimer;
-  final FlutterV2rayPingService _pingService = FlutterV2rayPingService();
   // Connection retry variables
   int connectionRetryCount = 0;
   static const int maxRetries = 5;
   static const Duration initialRetryDelay = Duration(seconds: 2);
-
-  // Add a throttled status update mechanism
-  Timer? _statusUpdateTimer;
-  String? _pendingLoadingStatus;
 
   // Add server testing protection flag
   bool _isServerTestingInProgress = false;
@@ -126,11 +129,148 @@ class _HomePageState extends State<HomePage> {
       await _connectionService.initialize();
       await _intelligentSelector.initialize();
       await _loadConnectionAnalytics();
+      await _initializeAether();
 
       // Background testing removed for optimization
     } catch (e) {
       print('Error initializing optimization services: $e');
       // Continue with original implementation if optimization services fail
+    }
+  }
+
+  Future<void> _initializeAether() async {
+    try {
+      _aetherAvailable = await _aetherManager.checkNativeLibs();
+      if (!_aetherAvailable) {
+        print('Aether native libs not available — V2Ray path remains active');
+      }
+
+      await _loadSelectedCore();
+
+      if (!_aetherAvailable) {
+        // Force v2ray if native libs are missing, regardless of saved preference
+        _selectedCore = 'v2ray';
+      }
+
+      if (_selectedCore != 'aether') return;
+
+      await _aetherManager.syncState();
+      await _loadAetherPreferences();
+
+      _aetherStateSub?.cancel();
+      _aetherStateSub = _aetherManager.stateStream.listen((state) {
+        if (!mounted) return;
+        setState(() {
+          _aetherState = state;
+          if (state == AetherState.connecting) {
+            isLoading = true;
+            loadingStatus = '';
+          } else if (state == AetherState.connected) {
+            isLoading = false;
+            loadingStatus = '';
+            if (_userIP == null && !_isFetchingIP) {
+              _fetchUserIP();
+            }
+          } else if (state == AetherState.failed) {
+            isLoading = false;
+            loadingStatus = '';
+          } else if (state == AetherState.disconnected) {
+            isLoading = false;
+            loadingStatus = '';
+            _userIP = null;
+            _userCountryFlag = null;
+            _userCountryName = null;
+          }
+        });
+
+        if (state == AetherState.failed) {
+          _aetherManager.stop();
+          _showAetherFailure();
+        }
+      });
+
+      if (mounted) {
+        setState(() {
+          _aetherState = _aetherManager.currentState;
+        });
+      }
+    } catch (e) {
+      print('Aether init failed: $e');
+      _aetherAvailable = false;
+    }
+  }
+
+  Future<void> _loadAetherPreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _aetherProtocol = prefs.getString('selected_aether_protocol') ?? 'masque';
+      _aetherScanMode = prefs.getString('selected_aether_scan_mode') ?? 'turbo';
+      _aetherTransport = prefs.getString('selected_aether_transport') ?? 'h3';
+    });
+  }
+
+  Future<void> _loadSelectedCore() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString(_selectedCoreKey) ?? '';
+    if (saved == 'aether' || saved == 'v2ray') {
+      _selectedCore = saved;
+    } else {
+      // Default: prefer aether if available, otherwise v2ray
+      _selectedCore = _aetherAvailable ? 'aether' : 'v2ray';
+    }
+  }
+
+  Future<void> _saveSelectedCore(String core) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_selectedCoreKey, core);
+  }
+
+  Future<void> _showAetherFailure() async {
+    final detail = await _aetherManager.getLastError();
+    if (!mounted) return;
+    final message = detail.isNotEmpty
+        ? detail
+        : 'aether_connection_failed'.tr();
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: ThemeColor.errorColor,
+          duration: const Duration(seconds: 5),
+        ),
+      );
+  }
+
+  bool get _isAetherConnected => _aetherState == AetherState.connected;
+  bool get _isAetherConnecting => _aetherState == AetherState.connecting;
+
+  /// Whether the Aether path is active (user chose Aether AND native libs exist).
+  bool get _useAether => _selectedCore == 'aether' && _aetherAvailable;
+
+  String _aetherProtocolLabel() {
+    switch (_aetherProtocol) {
+      case 'wireguard':
+        return 'protocol_wireguard'.tr();
+      case 'gool':
+        return 'protocol_gool'.tr();
+      default:
+        return 'protocol_masque'.tr();
+    }
+  }
+
+  String _aetherScanLabel() {
+    switch (_aetherScanMode) {
+      case 'balanced':
+        return 'scan_balanced'.tr();
+      case 'thorough':
+        return 'scan_thorough'.tr();
+      case 'stealth':
+        return 'scan_stealth'.tr();
+      default:
+        return 'scan_turbo'.tr();
     }
   }
 
@@ -355,79 +495,14 @@ class _HomePageState extends State<HomePage> {
       'successRate': connectionSuccessRate,
       'averageConnectionTime': _averageConnectionTime,
       'optimizationServiceStats': _connectionService.getConnectionStats(),
-      'pingServiceStats': _pingService.getPerformanceStats(),
       'blockedApps': blockedApps,
     };
   }
 
-  /// Start background server health monitoring
-  void _startBackgroundHealthCheck() {
-    _healthCheckTimer?.cancel();
-
-    // Run health check every 5 minutes
-    _healthCheckTimer = Timer.periodic(Duration(minutes: 5), (timer) async {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-
-      await _performBackgroundHealthCheck();
-    });
-
-    print('🔍 Background health monitoring started (5-minute intervals)');
-  }
-
-  /// Perform background health check on top servers
-  Future<void> _performBackgroundHealthCheck() async {
-    try {
-      if (processedServers.isEmpty) return;
-
-      // Test top 5 servers for health monitoring
-      final topServers = processedServers
-          .where((s) => s['config'] != 'Automatic')
-          .take(5)
-          .map((s) => s['config'] as String)
-          .toList();
-
-      if (topServers.isEmpty) return;
-
-      print(
-          '🔍 Running background health check for ${topServers.length} servers...');
-
-      final results = await _pingService.testMultipleServerPingsIntelligent(
-        topServers,
-        baseTimeoutSeconds: 2, // Faster timeout for background checks
-        parallel: true,
-        maxConcurrent: 3,
-        prioritizeByQuality: false, // Don't re-sort during background check
-      );
-
-      // Update server pings with fresh results
-      int healthyCount = 0;
-      results.forEach((server, ping) {
-        if (ping > 0 && ping < 9999) {
-          serverPings[server] = ping;
-          healthyCount++;
-        }
-      });
-
-      // Perform maintenance
-      _pingService.performMaintenance();
-
-      print(
-          '🔍 Background health check completed: $healthyCount/${topServers.length} healthy servers');
-    } catch (e) {
-      print('⚠️ Background health check failed: $e');
-    }
-  }
-
   @override
   void dispose() {
-    _healthCheckTimer?.cancel();
-    _pingUpdateSubscription?.cancel();
-    _pingService.dispose();
+    _aetherStateSub?.cancel();
     _intelligentSelector.dispose();
-    _unifiedPingManager.dispose();
     _v2rayManager.stop();
     super.dispose();
   }
@@ -440,17 +515,8 @@ class _HomePageState extends State<HomePage> {
     _initializeServices();
     _loadServerSelection();
 
-    // Initialize ping service
-    _pingService.initialize();
-
-    // Initialize unified ping manager
-    _initializeUnifiedPingManager();
-
     // Fetch servers once on app startup
     _fetchAndCacheServersOnStartup();
-
-    // Start background health monitoring
-    _startBackgroundHealthCheck();
 
     _v2rayManager
         .ensureInitialized(
@@ -500,24 +566,29 @@ class _HomePageState extends State<HomePage> {
             child: ValueListenableBuilder<V2RayStatus>(
               valueListenable: v2rayStatus,
               builder: (context, status, _) {
-                // Normalize plugin status and map to display states (case-insensitive)
+                // Prefer Aether tunnel state when native core is available
                 final String normalizedState = status.state.toUpperCase();
-                final bool isExplicitConnecting =
-                    normalizedState == 'CONNECTING' ||
-                        normalizedState == 'STARTING';
-                // Treat common plugin variants as connected
-                final bool isConnected = normalizedState == 'CONNECTED' ||
+                final bool v2rayConnecting = normalizedState == 'CONNECTING' ||
+                    normalizedState == 'STARTING';
+                final bool v2rayConnected = normalizedState == 'CONNECTED' ||
                     normalizedState == 'RUNNING' ||
                     normalizedState == 'STARTED';
 
-                final bool isConnecting = isLoading || isExplicitConnecting;
+                final bool isConnected =
+                    _useAether ? _isAetherConnected : v2rayConnected;
+                final bool isConnecting = _useAether
+                    ? (_isAetherConnecting || isLoading)
+                    : (isLoading || v2rayConnecting);
                 final String displayStatus = isConnected
                     ? 'CONNECTED'
-                    : (isConnecting ? 'CONNECTING' : 'DISCONNECTED');
+                    : (isConnecting
+                        ? 'CONNECTING'
+                        : (_aetherState == AetherState.failed
+                            ? 'FAILED'
+                            : 'DISCONNECTED'));
 
                 return CustomScrollView(
                   slivers: [
-                    // Modern app bar (simplified to avoid FlexibleSpaceBar null settings)
                     SliverAppBar(
                       backgroundColor: Colors.transparent,
                       elevation: 0,
@@ -534,33 +605,30 @@ class _HomePageState extends State<HomePage> {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-
-                    // Main content
                     SliverPadding(
                       padding: EdgeInsets.all(ThemeColor.mediumSpacing),
                       sliver: SliverList(
                         delegate: SliverChildListDelegate([
-                          // Simplified connection section (pass displayStatus explicitly)
+                          _buildCoreSelector(),
+                          SizedBox(height: ThemeColor.mediumSpacing),
                           _buildSimplifiedConnectionSection(
                               status, isConnected, isConnecting, displayStatus),
-                          SizedBox(height: ThemeColor.largeSpacing),
-
-                          // Ad Banner
+                          SizedBox(height: ThemeColor.mediumSpacing),
                           AdBannerWidget(),
-                          SizedBox(height: ThemeColor.largeSpacing),
-
-                          // Server selection (simplified)
-                          _buildSimplifiedServerSelection(),
-                          SizedBox(height: ThemeColor.largeSpacing),
-
-                          // Statistics (only when connected)
+                          SizedBox(height: ThemeColor.mediumSpacing),
+                          if (_useAether)
+                            _buildAetherModeCard()
+                          else
+                            _buildSimplifiedServerSelection(),
+                          SizedBox(height: ThemeColor.mediumSpacing),
                           if (isConnected) ...[
-                            _buildSimplifiedStats(status),
-                            SizedBox(height: ThemeColor.largeSpacing),
+                            if (_useAether)
+                              _buildAetherConnectedInfo()
+                            else
+                              _buildSimplifiedStats(status),
+                            SizedBox(height: ThemeColor.mediumSpacing),
                           ],
-
-                          // Quick actions (simplified)
-                          _buildSimplifiedQuickActions(),
+                           SizedBox(height: ThemeColor.largeSpacing),
                         ]),
                       ),
                     ),
@@ -703,6 +771,8 @@ class _HomePageState extends State<HomePage> {
 
   // Simplified status info
   Widget _buildSimplifiedStatusInfo(V2RayStatus status) {
+    final bool showV2RayStats = !_useAether;
+
     return LiquidGlassContainer(
       padding: EdgeInsets.all(ThemeColor.mediumSpacing),
       borderRadius: ThemeColor.largeRadius,
@@ -714,28 +784,67 @@ class _HomePageState extends State<HomePage> {
         highlight: 0.24,
         lowlight: 0.05,
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _buildSimpleStatItem(
-            icon: Icons.timer_rounded,
-            label: 'connection_time'.tr(),
-            value: status.duration,
-            color: ThemeColor.successColor,
-          ),
-          Container(
-            width: 1,
-            height: 40,
-            color: ThemeColor.successColor.withValues(alpha: 0.3),
-          ),
-          _buildSimpleStatItem(
-            icon: Icons.speed_rounded,
-            label: 'speed'.tr(),
-            value: _formatSpeed('${status.downloadSpeed} B/s'),
-            color: ThemeColor.primaryColor,
-          ),
-        ],
-      ),
+      child: showV2RayStats
+          ? Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildSimpleStatItem(
+                  icon: Icons.timer_rounded,
+                  label: 'connection_time'.tr(),
+                  value: status.duration,
+                  color: ThemeColor.successColor,
+                ),
+                Container(
+                  width: 1,
+                  height: 40,
+                  color: ThemeColor.successColor.withValues(alpha: 0.3),
+                ),
+                _buildSimpleStatItem(
+                  icon: Icons.arrow_downward_rounded,
+                  label: 'download'.tr(),
+                  value: _formatSpeed('${status.downloadSpeed} B/s'),
+                  color: ThemeColor.successColor,
+                ),
+                Container(
+                  width: 1,
+                  height: 40,
+                  color: ThemeColor.successColor.withValues(alpha: 0.3),
+                ),
+                _buildSimpleStatItem(
+                  icon: Icons.arrow_upward_rounded,
+                  label: 'upload'.tr(),
+                  value: _formatSpeed('${status.uploadSpeed} B/s'),
+                  color: ThemeColor.warningColor,
+                ),
+              ],
+            )
+          : Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                ValueListenableBuilder<String>(
+                  valueListenable: _aetherManager.durationNotifier,
+                  builder: (context, duration, _) {
+                    return _buildSimpleStatItem(
+                      icon: Icons.timer_rounded,
+                      label: 'connection_time'.tr(),
+                      value: duration,
+                      color: ThemeColor.successColor,
+                    );
+                  },
+                ),
+                Container(
+                  width: 1,
+                  height: 40,
+                  color: ThemeColor.successColor.withValues(alpha: 0.3),
+                ),
+                _buildSimpleStatItem(
+                  icon: Icons.language_rounded,
+                  label: 'ip_address'.tr(),
+                  value: _userIP ?? '—',
+                  color: ThemeColor.primaryColor,
+                ),
+              ],
+            ),
     );
   }
 
@@ -776,9 +885,368 @@ class _HomePageState extends State<HomePage> {
   }
 
   bool _shouldShowLoadingStatus() {
-    return isLoading &&
-        loadingStatus.isNotEmpty &&
-        (isTestingServers || _isServerTestingInProgress);
+    return isLoading && loadingStatus.isNotEmpty;
+  }
+
+  Widget _buildAetherModeCard() {
+    return LiquidGlassContainer(
+      borderRadius: ThemeColor.largeRadius,
+      padding: EdgeInsets.all(ThemeColor.mediumSpacing),
+      blurSigma: 20,
+      gradientColors: _tintedGlassGradient(
+        ThemeColor.primaryColor,
+        highlight: 0.18,
+        lowlight: 0.05,
+      ),
+      borderColor: ThemeColor.primaryColor.withValues(alpha: 0.28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: ThemeColor.primaryColor.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
+                ),
+                child: Icon(Icons.hub_rounded,
+                    color: ThemeColor.primaryColor, size: 22),
+              ),
+              SizedBox(width: ThemeColor.mediumSpacing),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'aether_edge_mode'.tr(),
+                      style: ThemeColor.bodyStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'aether_edge_mode_desc'.tr(),
+                      style: ThemeColor.captionStyle(
+                        color: ThemeColor.secondaryText,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: 'scan_mode'.tr(),
+                onPressed: () async {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ScanModeScreen(),
+                    ),
+                  );
+                  await _loadAetherPreferences();
+                },
+                icon: Icon(Icons.tune_rounded, color: ThemeColor.primaryColor),
+              ),
+            ],
+          ),
+          SizedBox(height: ThemeColor.mediumSpacing),
+          Row(
+            children: [
+              Expanded(
+                child: _buildAetherChip(
+                  icon: Icons.vpn_key_rounded,
+                  label: _aetherProtocolLabel(),
+                ),
+              ),
+              SizedBox(width: ThemeColor.smallSpacing),
+              Expanded(
+                child: _buildAetherChip(
+                  icon: Icons.bolt_rounded,
+                  label: _aetherScanLabel(),
+                ),
+              ),
+              SizedBox(width: ThemeColor.smallSpacing),
+              Expanded(
+                child: _buildAetherChip(
+                  icon: Icons.public_rounded,
+                  label: _aetherTransport.toUpperCase(),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAetherChip({required IconData icon, required String label}) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 14, color: ThemeColor.primaryColor),
+          SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              label,
+              overflow: TextOverflow.ellipsis,
+              style: ThemeColor.captionStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 11,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Core selector ──────────────────────────────────────────────
+
+  bool get _isVpnActive {
+    if (_useAether) return _isAetherConnected || _isAetherConnecting;
+    final state = v2rayStatus.value.state.toUpperCase();
+    return state == 'CONNECTED' ||
+        state == 'RUNNING' ||
+        state == 'STARTED' ||
+        state == 'CONNECTING' ||
+        state == 'STARTING';
+  }
+
+  void _onCoreSelected(String core) {
+    if (core == _selectedCore) return;
+
+    if (_isVpnActive) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text('switch_core_disconnect'.tr()),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: ThemeColor.warningColor,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      return;
+    }
+
+    setState(() {
+      _selectedCore = core;
+    });
+    _saveSelectedCore(core);
+
+    if (core == 'aether' && _aetherAvailable) {
+      _aetherManager.syncState().then((_) {
+        if (!mounted) return;
+        _loadAetherPreferences();
+      });
+    }
+  }
+
+  Widget _buildCoreSelector() {
+    final bool aetherDisabled = !_aetherAvailable;
+
+    return LiquidGlassContainer(
+      borderRadius: ThemeColor.xlRadius,
+      padding: EdgeInsets.zero,
+      blurSigma: 24,
+      enableBlur: false,
+      gradientColors: _neutralGlassGradient(highlight: 0.16, lowlight: 0.04),
+      borderColor: ThemeColor.borderColor.withValues(alpha: 0.2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              ThemeColor.mediumSpacing,
+              ThemeColor.mediumSpacing,
+              ThemeColor.mediumSpacing,
+              ThemeColor.smallSpacing,
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: ThemeColor.primaryColor.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
+                  ),
+                  child: Icon(Icons.memory_rounded,
+                      color: ThemeColor.primaryColor, size: 20),
+                ),
+                SizedBox(width: ThemeColor.smallSpacing),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'vpn_core'.tr(),
+                        style: ThemeColor.bodyStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'vpn_core_desc'.tr(),
+                        style: ThemeColor.captionStyle(
+                          color: ThemeColor.secondaryText,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              ThemeColor.mediumSpacing,
+              0,
+              ThemeColor.mediumSpacing,
+              ThemeColor.mediumSpacing,
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _buildCoreOption(
+                    icon: Icons.hub_rounded,
+                    label: 'core_aether'.tr(),
+                    isSelected: _selectedCore == 'aether',
+                    isDisabled: aetherDisabled,
+                    disabledLabel: 'core_not_available'.tr(),
+                    onTap: () => _onCoreSelected('aether'),
+                  ),
+                ),
+                SizedBox(width: ThemeColor.smallSpacing),
+                Expanded(
+                  child: _buildCoreOption(
+                    icon: Icons.public_rounded,
+                    label: 'core_v2ray'.tr(),
+                    isSelected: _selectedCore == 'v2ray',
+                    onTap: () => _onCoreSelected('v2ray'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCoreOption({
+    required IconData icon,
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+    bool isDisabled = false,
+    String? disabledLabel,
+  }) {
+    final Color activeColor = ThemeColor.primaryColor;
+    final Color color =
+        isSelected ? activeColor : (isDisabled ? ThemeColor.mutedText : ThemeColor.secondaryText);
+
+    return Material(
+      color: isSelected
+          ? activeColor.withValues(alpha: 0.14)
+          : Colors.white.withValues(alpha: 0.04),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
+        side: BorderSide(
+          color: isSelected
+              ? activeColor.withValues(alpha: 0.45)
+              : Colors.white.withValues(alpha: 0.08),
+          width: isSelected ? 1.5 : 0.5,
+        ),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
+        onTap: isDisabled ? null : onTap,
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                color: color,
+                size: 26,
+              ),
+              SizedBox(height: 6),
+              Text(
+                label,
+                style: ThemeColor.captionStyle(
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  color: color,
+                  fontSize: 12,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              if (isDisabled && disabledLabel != null) ...[
+                SizedBox(height: 2),
+                Text(
+                  disabledLabel,
+                  style: ThemeColor.captionStyle(
+                    color: ThemeColor.errorColor.withValues(alpha: 0.7),
+                    fontSize: 10,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAetherConnectedInfo() {
+    return LiquidGlassContainer(
+      padding: EdgeInsets.all(ThemeColor.mediumSpacing),
+      borderRadius: ThemeColor.largeRadius,
+      blurSigma: 20,
+      enableBlur: false,
+      showShadow: false,
+      gradientColors: _tintedGlassGradient(
+        ThemeColor.successColor,
+        highlight: 0.22,
+        lowlight: 0.05,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildSimpleStatItem(
+              icon: Icons.shield_rounded,
+              label: 'protocol_selection'.tr(),
+              value: _aetherProtocolLabel(),
+              color: ThemeColor.successColor,
+            ),
+          ),
+          Container(
+            width: 1,
+            height: 40,
+            color: ThemeColor.successColor.withValues(alpha: 0.3),
+          ),
+          Expanded(
+            child: _buildSimpleStatItem(
+              icon: Icons.language_rounded,
+              label: 'ip_address'.tr(),
+              value: _userIP ?? '—',
+              color: ThemeColor.primaryColor,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   // Simplified loading status
@@ -954,18 +1422,20 @@ class _HomePageState extends State<HomePage> {
             children: [
               Expanded(
                 child: _buildStatCard(
-                  icon: Icons.download_rounded,
-                  label: 'download'.tr(),
-                  value: '${status.download} B',
+                  icon: Icons.arrow_downward_rounded,
+                  label: '${'download'.tr()} / ${'speed'.tr()}',
+                  speedValue: _formatSpeed("${status.downloadSpeed} B/s"),
+                  sizeValue: _formatBytes("${status.download} B"),
                   color: ThemeColor.successColor,
                 ),
               ),
               SizedBox(width: ThemeColor.smallSpacing),
               Expanded(
                 child: _buildStatCard(
-                  icon: Icons.upload_rounded,
-                  label: 'upload'.tr(),
-                  value: '${status.upload} B',
+                  icon: Icons.arrow_upward_rounded,
+                  label: '${'upload'.tr()} / ${'speed'.tr()}',
+                  speedValue: _formatSpeed("${status.uploadSpeed} B/s"),
+                  sizeValue: _formatBytes("${status.upload} B"),
                   color: ThemeColor.warningColor,
                 ),
               ),
@@ -979,12 +1449,10 @@ class _HomePageState extends State<HomePage> {
   Widget _buildStatCard({
     required IconData icon,
     required String label,
-    required String value,
+    required String speedValue,
+    required String sizeValue,
     required Color color,
   }) {
-    // Format the value for better readability
-    String formattedValue = _formatBytes(value);
-
     return LiquidGlassContainer(
       borderRadius: ThemeColor.largeRadius,
       padding: EdgeInsets.all(ThemeColor.mediumSpacing),
@@ -998,7 +1466,6 @@ class _HomePageState extends State<HomePage> {
       ),
       child: Column(
         children: [
-          // Icon with background circle
           Container(
             padding: EdgeInsets.all(8),
             decoration: BoxDecoration(
@@ -1008,24 +1475,31 @@ class _HomePageState extends State<HomePage> {
             child: Icon(icon, color: color, size: 20),
           ),
           SizedBox(height: ThemeColor.smallSpacing),
-          // Value with better typography
           Text(
-            formattedValue,
+            speedValue,
             style: ThemeColor.bodyStyle(
               fontWeight: FontWeight.w800,
               color: color,
-              fontSize: 18,
+              fontSize: 16,
             ),
             textAlign: TextAlign.center,
           ),
           SizedBox(height: 2),
-          // Label
           Text(
-            label,
+            sizeValue,
             style: ThemeColor.captionStyle(
               color: color.withValues(alpha: 0.8),
               fontSize: 12,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w600,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          SizedBox(height: 2),
+          Text(
+            label,
+            style: ThemeColor.captionStyle(
+              color: color.withValues(alpha: 0.6),
+              fontSize: 11,
             ),
             textAlign: TextAlign.center,
           ),
@@ -1034,202 +1508,44 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // Simplified quick actions
-  Widget _buildSimplifiedQuickActions() {
-    return LiquidGlassContainer(
-      borderRadius: ThemeColor.xlRadius,
-      padding: EdgeInsets.all(ThemeColor.mediumSpacing),
-      blurSigma: 25,
-      enableBlur: false,
-      gradientColors: _neutralGlassGradient(highlight: 0.18, lowlight: 0.05),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.flash_on_rounded,
-                color: ThemeColor.warningColor,
-                size: 20,
-              ),
-              SizedBox(width: ThemeColor.smallSpacing),
-              Text(
-                'quick_actions'.tr(),
-                style: ThemeColor.bodyStyle(
-                  fontWeight: FontWeight.w600,
-                  color: ThemeColor.primaryText,
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: ThemeColor.mediumSpacing),
-          Row(
-            children: [
-              Expanded(
-                child: _buildQuickActionButton(
-                  icon: _isFetchingIP
-                      ? Icons.hourglass_top_rounded
-                      : (_userIP != null ? null : Icons.public_rounded),
-                  label: _isFetchingIP
-                      ? 'fetching_ip_info'.tr()
-                      : (_userIP != null ? _userIP! : 'get_my_ip'.tr()),
-                  color: ThemeColor.primaryColor,
-                  onTap: (isLoading || _isFetchingIP)
-                      ? null
-                      : () {
-                          _fetchUserIP();
-                        },
-                  flagImageUrl: _userCountryFlag,
-                  subtitle: _userCountryName,
-                  isBusy: _isFetchingIP,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildQuickActionButton({
-    IconData? icon,
-    required String label,
-    required Color color,
-    required VoidCallback? onTap,
-    String? flagImageUrl,
-    String? subtitle,
-    bool isBusy = false,
-  }) {
-    final borderRadius = ThemeColor.mediumRadius;
-
-    return LiquidGlassContainer(
-      borderRadius: borderRadius,
-      padding: EdgeInsets.zero,
-      blurSigma: 20,
-      enableBlur: false,
-      showShadow: false,
-      gradientColors: _tintedGlassGradient(
-        color,
-        highlight: 0.2,
-        lowlight: 0.05,
-      ),
-      child: Material(
-        color: Colors.transparent,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(borderRadius),
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(borderRadius),
-          onTap: onTap,
-          child: Padding(
-            padding: EdgeInsets.all(ThemeColor.mediumSpacing),
-            child: Column(
-              children: [
-                Container(
-                  padding: EdgeInsets.all(ThemeColor.smallSpacing),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.22),
-                    borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
-                  ),
-                  child: _buildButtonIcon(
-                    icon,
-                    flagImageUrl,
-                    color,
-                    isBusy: isBusy,
-                  ),
-                ),
-                SizedBox(height: ThemeColor.smallSpacing),
-                Text(
-                  label,
-                  style: ThemeColor.captionStyle(
-                    color: color,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (subtitle != null && subtitle.isNotEmpty) ...[
-                  SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: ThemeColor.captionStyle(
-                      fontSize: 10,
-                      color: ThemeColor.secondaryText,
-                      fontWeight: FontWeight.w400,
-                    ),
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Build button icon - either regular icon or SVG flag
-  Widget _buildButtonIcon(
-    IconData? icon,
-    String? flagImageUrl,
-    Color color, {
-    bool isBusy = false,
-  }) {
-    if (isBusy) {
-      return SizedBox(
-        width: 24,
-        height: 24,
-        child: CircularProgressIndicator(
-          strokeWidth: 2,
-          valueColor: AlwaysStoppedAnimation<Color>(color),
-        ),
-      );
-    }
-
-    if (flagImageUrl != null && flagImageUrl.isNotEmpty) {
-      // Show SVG flag image
-      return Container(
-        width: 32,
-        height: 24,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(2),
-          child: SvgPicture.network(
-            flagImageUrl,
-            width: 32,
-            height: 24,
-            fit: BoxFit.contain,
-            placeholderBuilder: (context) => Container(
-              width: 32,
-              height: 24,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(color),
-              ),
-            ),
-          ),
-        ),
-      );
-    } else if (icon != null) {
-      // Show regular icon
-      return Icon(
-        icon,
-        color: color,
-        size: 24,
-      );
-    } else {
-      // Fallback icon
-      return Icon(
-        Icons.public_rounded,
-        color: color,
-        size: 24,
-      );
-    }
-  }
 
   void _handleConnectionTap(V2RayStatus value) async {
+    // Aether-first path when Aether core is selected and available
+    if (_useAether) {
+      if (_isAetherConnected) {
+        setState(() {
+          isLoading = true;
+          loadingStatus = 'disconnecting'.tr();
+        });
+        await _aetherManager.stop();
+        if (mounted) {
+          setState(() {
+            isLoading = false;
+            loadingStatus = '';
+            _aetherState = AetherState.disconnected;
+          });
+        }
+        return;
+      }
+
+      if (_isAetherConnecting || isLoading) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('connecting_wait'.tr()),
+              behavior: SnackBarBehavior.floating,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+        return;
+      }
+
+      await _connectWithAether();
+      return;
+    }
+
     final current = value.state.toUpperCase();
     // Robust state handling: connect only when not connected/connecting
     if (current == 'CONNECTED') {
@@ -1282,6 +1598,59 @@ class _HomePageState extends State<HomePage> {
 
       // Always proceed with connection attempt (the connection methods handle server fetching if needed)
       await _connectWithRetry();
+    }
+  }
+
+  Future<void> _connectWithAether() async {
+    try {
+      setState(() {
+        isLoading = true;
+        loadingStatus = 'aether_preparing'.tr();
+      });
+
+      await _loadAetherPreferences();
+
+      final granted = await _aetherManager.requestVpnPermission();
+      if (!granted) {
+        throw Exception('vpn_permission_denied'.tr());
+      }
+
+      setState(() {
+        loadingStatus = '';
+      });
+
+      await _aetherManager.start(
+        protocol: _aetherProtocol,
+        scanMode: _aetherScanMode,
+        ipScan: (await SharedPreferences.getInstance())
+                .getString('selected_ip_version') ??
+            'v4',
+        obfuscation: (await SharedPreferences.getInstance())
+                .getString('selected_aether_obfuscation') ??
+            'firewall',
+        transport: _aetherTransport,
+      );
+
+      // State updates continue via _aetherStateSub
+    } catch (e) {
+      print('Aether connection failed: $e');
+      await _aetherManager.stop();
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+          loadingStatus = '';
+          _aetherState = AetherState.failed;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('connection_failed_error_details'
+                .tr()
+                .replaceAll('{{error}}', e.toString())),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: ThemeColor.errorColor,
+          ),
+        );
+      }
     }
   }
 
@@ -1934,9 +2303,9 @@ class _HomePageState extends State<HomePage> {
         false;
   }
 
-  void _showServerSelectionModal(BuildContext context) async {
-    // Prepare servers for modal (fallback to cached if processed list is empty)
-    final availableServers = await _prepareServersForModal();
+  void _showServerSelectionModal(BuildContext context) {
+    // Prepare servers synchronously - processedServers should be available immediately
+    final availableServers = _prepareServersForModal();
 
     showModalBottomSheet(
       context: context,
@@ -2056,8 +2425,8 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  /// Prepare servers for the selection modal with graceful fallbacks
-  Future<List<ServerInfo>> _prepareServersForModal() async {
+  /// Prepare servers for the selection modal (synchronous for instant display)
+  List<ServerInfo> _prepareServersForModal() {
     try {
       // 1) Preferred: use processedServers (already enriched with location + ping)
       if (processedServers.isNotEmpty) {
@@ -2074,19 +2443,7 @@ class _HomePageState extends State<HomePage> {
         }).toList();
       }
 
-      // 2) Fallback: use cachedServers + cached ping results (fast, no network)
-      if (cachedServers.isEmpty) {
-        try {
-          cachedServers = await _cacheManager.getCachedServers();
-        } catch (_) {}
-      }
-
-      if (serverPings.isEmpty) {
-        try {
-          serverPings = await _cacheManager.getCachedPingResults();
-        } catch (_) {}
-      }
-
+      // 2) Fallback: use cachedServers (populated during startup)
       if (cachedServers.isNotEmpty) {
         final list = <ServerInfo>[];
         for (int i = 0; i < cachedServers.length; i++) {
@@ -2094,7 +2451,7 @@ class _HomePageState extends State<HomePage> {
           final ip = _extractIPFromConfig(cfg);
           final name = _generateServerName(cfg, ip, i + 1);
           final cc = _getCountryCodeFromIPSync(ip);
-          final ping = serverPings[cfg] ?? 0; // 0 = not tested
+          final ping = serverPings[cfg] ?? 0;
           final remark = _extractRemark(cfg);
           list.add(ServerInfo(
             name: name,
@@ -2868,7 +3225,7 @@ class _HomePageState extends State<HomePage> {
         serverPings = await _cacheManager.getCachedPingResults();
 
         if (cachedServers.isNotEmpty) {
-          await _processServersWithLocation(cachedServers);
+          _processServersWithLocation(cachedServers);
 
           // Trigger UI update to show cached servers immediately
           if (mounted) {
@@ -2878,7 +3235,7 @@ class _HomePageState extends State<HomePage> {
           }
 
           print(
-              ' Using cached servers (${cachedServers.length} servers) with ${serverPings.length} ping results');
+              'Using cached servers (${cachedServers.length} servers) with ${serverPings.length} ping results');
           return;
         }
       }
@@ -2910,33 +3267,17 @@ class _HomePageState extends State<HomePage> {
           'source': 'optimization_service',
         });
 
-        // Process servers immediately with ping = 0 for immediate display
-        await _processServersWithLocation(servers);
-
-        if (mounted) {
-          setState(() {
-            loadingStatus = ' Testing server performance...';
-          });
-        }
-
-        print(
-            '🏓 Starting immediate ping tests for ALL ${servers.length} servers...');
-        await _testAllServersOnStartupUnified(
-            servers); // Use enhanced unified ping manager
-
-        // Cache ping results
-        await _cacheManager.cachePingResults(serverPings);
-
-        // Re-process servers with updated ping data and sort
-        await _processServersWithLocation(servers);
-        print(
-            ' Server startup completed with ${processedServers.length} processed servers');
+        // Process servers synchronously for immediate display
+        _processServersWithLocation(servers);
 
         if (mounted) {
           setState(() {
             loadingStatus = '';
           });
         }
+
+        print(
+            ' Server startup completed with ${processedServers.length} processed servers');
       }
     } catch (e) {
       print(' Failed to fetch servers on startup: $e');
@@ -2945,7 +3286,7 @@ class _HomePageState extends State<HomePage> {
       serverPings = await _cacheManager.getCachedPingResults();
 
       if (cachedServers.isNotEmpty) {
-        await _processServersWithLocation(cachedServers);
+        _processServersWithLocation(cachedServers);
       }
 
       if (mounted) {
@@ -2956,202 +3297,22 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  /// Initialize unified ping manager and set up listeners
-  Future<void> _initializeUnifiedPingManager() async {
+  /// Process servers for enhanced display (synchronous for instant rendering)
+  void _processServersWithLocation(List<String> servers) {
     try {
-      await _unifiedPingManager.initialize();
-
-      // Set up real-time ping update listener
-      _pingUpdateSubscription =
-          _unifiedPingManager.pingUpdates.listen((updates) {
-        if (mounted) {
-          setState(() {
-            // Update legacy serverPings map for backward compatibility
-            for (final entry in updates.entries) {
-              final result = entry.value;
-              if (result.isSuccess) {
-                serverPings[entry.key] = result.pingMs;
-              } else if (result.isTimeout) {
-                serverPings[entry.key] = 9999;
-              } else {
-                serverPings[entry.key] = -1;
-              }
-
-              // Update processed servers with new ping data
-              _updateProcessedServerPing(entry.key, serverPings[entry.key]!);
-            }
-          });
-        }
-      });
-
-      print('🔧 Unified ping manager initialized successfully');
-    } catch (e) {
-      print('❌ Failed to initialize unified ping manager: $e');
-    }
-  }
-
-  /// Test all servers immediately on startup using enhanced unified ping manager
-  /// یکپارچه سازی تست فوری تمام سرورها بلافاصله بعد از اجرای نرم افزار
-  Future<void> _testAllServersOnStartupUnified(List<String> servers) async {
-    try {
-      print(
-          '🚀 Starting immediate server ping testing for ${servers.length} servers...');
-
-      // Clear legacy ping results
-      serverPings.clear();
-
-      // Initialize processedServers with all servers (ping = 0 initially)
-      await _processServersWithLocation(servers);
-
-      if (mounted) {
-        setState(() {
-          loadingStatus = 'testing_servers_unified'.tr(namedArgs: {'count': servers.length.toString()});
-        });
-      }
-
-      // Subscribe to progress updates with throttling
-      StreamSubscription<PingTestProgress>? progressSubscription;
-      progressSubscription =
-          _unifiedPingManager.progressUpdates.listen((progress) {
-        if (mounted) {
-          _updateThrottledStatus(progress.message);
-        }
-      });
-
-      // Test all servers immediately on startup with enhanced method
-      final results = await _unifiedPingManager.testAllServersOnStartup(
-        servers,
-        timeoutSeconds: 2, // Faster timeout for startup
-        onProgress: (server, result) {
-          if (mounted) {
-            // Update legacy serverPings for backward compatibility
-            if (result.isSuccess) {
-              serverPings[server] = result.pingMs;
-            } else if (result.isTimeout) {
-              serverPings[server] = 9999;
-            } else {
-              serverPings[server] = -1;
-            }
-
-            // Update processed servers immediately
-            _updateProcessedServerPing(server, serverPings[server]!);
-
-            // Trigger UI update every few servers for performance
-            if (serverPings.length % 3 == 0) {
-              setState(() {});
-            }
-          }
-        },
-        onProgressCount: (completed, total) {
-          if (mounted) {
-            _updateThrottledStatus('unified_testing_progress'.tr(namedArgs: {
-              'completed': completed.toString(),
-              'total': total.toString()
-            }));
-          }
-        },
-      );
-
-      // Cancel progress subscription
-      await progressSubscription.cancel();
-
-      // Final update of all results
-      for (final entry in results.entries) {
-        final result = entry.value;
-        if (result.isSuccess) {
-          serverPings[entry.key] = result.pingMs;
-        } else if (result.isTimeout) {
-          serverPings[entry.key] = 9999;
-        } else {
-          serverPings[entry.key] = -1;
-        }
-      }
-
-      // Get comprehensive statistics
-      final stats = _unifiedPingManager.getStatistics(servers);
-
-      if (mounted) {
-        setState(() {
-          loadingStatus = 'ping_test_completed_unified'.tr(namedArgs: {
-            'successful': stats.successfulPings.toString(),
-            'total': stats.totalServers.toString(),
-            'average': stats.averagePing.round().toString()
-          });
-        });
-      }
-
-      print(
-          '✅ Immediate startup ping testing completed: ${stats.successfulPings}/${stats.totalServers} successful, avg: ${stats.averagePing.round()}ms');
-      print(
-          '📊 Server quality distribution: Excellent: ${stats.excellentServers}, Good: ${stats.goodServers}, Fair: ${stats.fairServers}, Poor: ${stats.poorServers}');
-
-      // Clear loading status after a short delay
-      Future.delayed(Duration(seconds: 2), () {
-        if (mounted) {
-          setState(() {
-            loadingStatus = '';
-          });
-        }
-      });
-    } catch (e) {
-      print('❌ Error in immediate startup ping testing: $e');
-      if (mounted) {
-        setState(() {
-          loadingStatus = 'ping_test_failed'.tr();
-        });
-      }
-    }
-  }
-
-  /// Helper to update state with a throttled approach for smoother UI performance
-  void _updateThrottledStatus(String statusText) {
-    _pendingLoadingStatus = statusText;
-    if (_statusUpdateTimer?.isActive ?? false) return;
-
-    _statusUpdateTimer = Timer(const Duration(milliseconds: 400), () {
-      if (mounted && _pendingLoadingStatus != null) {
-        setState(() {
-          loadingStatus = _pendingLoadingStatus!;
-        });
-      }
-    });
-  }
-
-  /// Update processedServers list immediately when ping result comes in (for real-time display)
-  void _updateProcessedServerPing(String serverConfig, int ping) {
-    try {
-      // Find the server in processedServers and update its ping immediately
-      for (int i = 0; i < processedServers.length; i++) {
-        if (processedServers[i]['config'] == serverConfig) {
-          processedServers[i]['ping'] = ping;
-          print(
-              '🔄 Updated server ${i + 1} ping to ${ping}ms in processedServers list');
-          break;
-        }
-      }
-    } catch (e) {
-      print('Error updating processed server ping: $e');
-    }
-  }
-
-  /// Process servers with real location parsing for enhanced display
-  Future<void> _processServersWithLocation(List<String> servers) async {
-    try {
-      processedServers.clear();
+      final newProcessedServers = <Map<String, dynamic>>[];
 
       for (int i = 0; i < servers.length; i++) {
         final server = servers[i];
 
-        // Extract server information
         final ip = _extractIPFromConfig(server);
         final serverName = _generateServerName(server, ip, i + 1);
         final remark = _extractRemark(server);
         final countryCode = _getCountryCodeFromIPSync(ip);
         final ping = serverPings[server] ?? 0;
 
-        // Parse real location from server configuration
         final locationInfo =
-            await ServerLocationParser.parseServerLocation(server);
+            ServerLocationParser.parseServerLocationSync(server);
         final realCountryCode = locationInfo['countryCode']?.isNotEmpty == true
             ? locationInfo['countryCode']!
             : countryCode;
@@ -3164,7 +3325,7 @@ class _HomePageState extends State<HomePage> {
             ? '$cityName, $realCountryName'
             : realCountryName;
 
-        final serverData = {
+        newProcessedServers.add({
           'name': locationLabel,
           'location': locationLabel,
           'remark': remark,
@@ -3172,21 +3333,19 @@ class _HomePageState extends State<HomePage> {
           'ip': ip,
           'countryCode': realCountryCode,
           'ping': ping,
-        };
-
-        processedServers.add(serverData);
+        });
       }
 
       // Sort servers by ping with categories:
       // 0=success (1..9998), 1=not tested (0), 2=timeout (>=9999), 3=failed (-1)
-      processedServers.sort((a, b) {
+      newProcessedServers.sort((a, b) {
         final pingA = a['ping'] as int;
         final pingB = b['ping'] as int;
         int cat(int p) {
           if (p > 0 && p < 9999) return 0;
           if (p == 0) return 1;
           if (p >= 9999) return 2;
-          return 3; // -1 or other negatives
+          return 3;
         }
 
         final cA = cat(pingA);
@@ -3195,7 +3354,7 @@ class _HomePageState extends State<HomePage> {
         return pingA.compareTo(pingB);
       });
 
-      print(' Processed ${processedServers.length} servers for display');
+      processedServers = newProcessedServers;
     } catch (e) {
       print('Error processing servers: $e');
     }

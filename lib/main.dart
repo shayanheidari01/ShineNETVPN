@@ -12,6 +12,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_v2ray_client/model/v2ray_status.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:safe_device/safe_device.dart';
 import 'dart:async';
 import 'dart:developer' as developer;
@@ -261,12 +262,35 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // Check notification permission after first frame renders
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkNotificationPermission();
+    });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  Future<void> _checkNotificationPermission() async {
+    try {
+      final status = await Permission.notification.status;
+      if (status.isDenied || status.isPermanentlyDenied) {
+        final result = await Permission.notification.request();
+        developer.log(
+          'Notification permission request result: $result',
+          name: 'permission',
+        );
+      }
+    } catch (e) {
+      developer.log(
+        'Failed to check notification permission',
+        error: e,
+        name: 'permission',
+      );
+    }
   }
 
   @override

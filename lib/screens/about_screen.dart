@@ -63,21 +63,17 @@ class _AboutScreenState extends State<AboutScreen> {
               elevation: 0,
               floating: true,
               pinned: false,
-              expandedHeight: 80,
+              toolbarHeight: 64,
               automaticallyImplyLeading: false,
-              title: Container(
-                width: double.infinity,
-                height: 80,
-                alignment: Alignment.center,
-                child: Text(
-                  'about'.tr(),
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w700,
-                    color: ThemeColor.primaryText,
-                  ),
-                  overflow: TextOverflow.ellipsis,
+              centerTitle: true,
+              title: Text(
+                'about'.tr(),
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: ThemeColor.primaryText,
                 ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
 
@@ -255,7 +251,7 @@ class _AboutScreenState extends State<AboutScreen> {
     return Column(
       children: [
         Container(
-          padding: EdgeInsets.all(ThemeColor.mediumSpacing),
+          padding: EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
@@ -267,7 +263,7 @@ class _AboutScreenState extends State<AboutScreen> {
           child: Icon(
             icon,
             color: color,
-            size: 32,
+            size: 26,
           ),
         ),
         SizedBox(height: ThemeColor.smallSpacing),
@@ -276,7 +272,7 @@ class _AboutScreenState extends State<AboutScreen> {
           style: ThemeColor.bodyStyle(
             fontWeight: FontWeight.w600,
             color: ThemeColor.primaryText,
-            fontSize: 14,
+            fontSize: 13,
           ),
           textAlign: TextAlign.center,
         ),
@@ -471,7 +467,7 @@ class _AboutScreenState extends State<AboutScreen> {
                 child: _buildInfoItem(
                   icon: Icons.update_rounded,
                   title: 'version'.tr(),
-                  value: version ?? '1.1.4',
+                  value: version ?? '—',
                   color: ThemeColor.primaryColor,
                 ),
               ),

@@ -12,7 +12,6 @@ class AdBannerWidget extends StatefulWidget {
 }
 
 class _AdBannerWidgetState extends State<AdBannerWidget> {
-  // استفاده از jsDelivr برای دسترسی بهتر به فایل‌های GitHub
   static const String _bannerImageUrl =
       'https://cdn.jsdelivr.net/gh/shayanheidari01/shayanheidari01@main/SNV-ADS/banner.gif';
   static const String _clickUrlSource =
@@ -43,6 +42,7 @@ class _AdBannerWidgetState extends State<AdBannerWidget> {
       if (response.statusCode == 200 && response.data != null) {
         final url = response.data.toString().trim();
         if (url.isNotEmpty) {
+          if (!mounted) return;
           setState(() {
             _clickUrl = url;
             _isLoading = false;
@@ -55,6 +55,7 @@ class _AdBannerWidgetState extends State<AdBannerWidget> {
       throw Exception('Invalid response');
     } catch (e) {
       print('Error loading click URL: $e');
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
         _hasError = true;
@@ -84,7 +85,6 @@ class _AdBannerWidgetState extends State<AdBannerWidget> {
 
   @override
   Widget build(BuildContext context) {
-    // اگر خطا داریم یا در حال بارگذاری است، چیزی نشان نمی‌دهیم
     if (_hasError || _isLoading) {
       return const SizedBox.shrink();
     }
@@ -109,7 +109,7 @@ class _AdBannerWidgetState extends State<AdBannerWidget> {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(ThemeColor.xlRadius),
             child: AspectRatio(
-              aspectRatio: 16 / 9, // نسبت ابعاد 16:9
+              aspectRatio: 16 / 9,
               child: Image.network(
                 _bannerImageUrl,
                 fit: BoxFit.cover,

@@ -2,6 +2,53 @@ import 'dart:convert';
 
 /// Utility class to parse server location information from server configurations
 class ServerLocationParser {
+  /// Synchronous version for instant display (no Future overhead)
+  static Map<String, String> parseServerLocationSync(String serverConfig) {
+    try {
+      Map<String, String> location = {
+        'country': '',
+        'countryCode': '',
+        'city': '',
+        'region': '',
+        'flag': '🏳️',
+      };
+
+      Map<String, String> remarksLocation = {};
+
+      if (serverConfig.startsWith('vmess://')) {
+        remarksLocation = _parseVmessLocation(serverConfig, location);
+      } else if (serverConfig.startsWith('vless://')) {
+        remarksLocation = _parseVlessLocation(serverConfig, location);
+      } else if (serverConfig.startsWith('trojan://')) {
+        remarksLocation = _parseTrojanLocation(serverConfig, location);
+      } else if (serverConfig.startsWith('ss://')) {
+        remarksLocation = _parseShadowsocksLocation(serverConfig, location);
+      }
+
+      Map<String, String> finalLocation = Map<String, String>.from(location);
+
+      if (remarksLocation['country']?.isNotEmpty == true ||
+          remarksLocation['city']?.isNotEmpty == true) {
+        finalLocation = _mergeLocationData(remarksLocation, finalLocation);
+      }
+
+      if (finalLocation['countryCode']?.isNotEmpty == true &&
+          (finalLocation['flag']?.isEmpty ?? true)) {
+        finalLocation['flag'] = getFlagEmoji(finalLocation['countryCode']!);
+      }
+
+      return finalLocation;
+    } catch (e) {
+      return {
+        'country': 'Unknown',
+        'countryCode': '',
+        'city': '',
+        'region': '',
+        'flag': '🏳️',
+      };
+    }
+  }
+
   /// Extract location information from server configuration
   static Future<Map<String, String>> parseServerLocation(
       String serverConfig) async {

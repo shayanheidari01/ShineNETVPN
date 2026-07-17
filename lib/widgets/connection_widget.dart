@@ -151,38 +151,45 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
   }
 
   Color _getShadowColor() {
+    final status = widget.status.toUpperCase();
     if (widget.isLoading) {
       if (_isDisconnectingState()) {
         return ThemeColor.warningColor; // Orange for disconnecting
       }
       return ThemeColor.connectingColor; // Blue for connecting
-    } else if (widget.status.toUpperCase() == "CONNECTED") {
-      // Use animated color for smooth transition to connected state
+    } else if (status == "CONNECTED") {
       return _colorAnimation.value ?? ThemeColor.connectedColor;
+    } else if (status == "FAILED") {
+      return ThemeColor.errorColor;
     } else {
-      // Use animated color for smooth transition to disconnected state
       return _colorAnimation.value ?? ThemeColor.disconnectedColor;
     }
   }
 
   Color _getButtonColor() {
+    final status = widget.status.toUpperCase();
     if (widget.isLoading) {
       return ThemeColor.connectingColor.withValues(alpha: 0.2);
-    } else if (widget.status.toUpperCase() == "CONNECTED") {
+    } else if (status == "CONNECTED") {
       return ThemeColor.connectedColor.withValues(alpha: 0.2);
+    } else if (status == "FAILED") {
+      return ThemeColor.errorColor.withValues(alpha: 0.25);
     } else {
       return ThemeColor.errorColor.withValues(alpha: 0.2);
     }
   }
 
   IconData _getStatusIcon() {
+    final status = widget.status.toUpperCase();
     if (widget.isLoading) {
       if (_isDisconnectingState()) {
         return Icons.power_off_rounded; // Power off icon for disconnecting
       }
       return Icons.power_settings_new_rounded; // Power icon for connecting
-    } else if (widget.status.toUpperCase() == "CONNECTED") {
+    } else if (status == "CONNECTED") {
       return Icons.shield_rounded; // Shield icon for connected
+    } else if (status == "FAILED") {
+      return Icons.error_outline_rounded;
     } else {
       return Icons.power_settings_new_rounded; // Power icon for disconnected
     }
@@ -411,7 +418,9 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
                             widget.status.isEmpty ||
                             widget.status.toLowerCase() == "disconnected"
                         ? 'disconnected'.tr()
-                        : 'connected'.tr(),
+                        : widget.status.toUpperCase() == "FAILED"
+                            ? 'failed'.tr()
+                            : 'connected'.tr(),
                 style: ThemeColor.headingStyle(
                   fontSize: isSmallScreen ? 16 : 18,
                   color: _getShadowColor(),
@@ -420,49 +429,11 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
                 overflow: TextOverflow.ellipsis,
                 maxLines: 1,
               ),
-              SizedBox(height: ThemeColor.smallSpacing),
-              Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: ThemeColor.mediumSpacing,
-                  vertical: ThemeColor.smallSpacing,
-                ),
-                decoration: BoxDecoration(
-                  color: _getShadowColor().withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(ThemeColor.largeRadius),
-                  border: Border.all(
-                    color: _getShadowColor().withValues(alpha: 0.3),
-                    width: 1,
-                  ),
-                ),
-                child: Text(
-                  _getStatusDescription(),
-                  style: ThemeColor.captionStyle(
-                    fontSize: isSmallScreen ? 12 : 14,
-                    color: _getShadowColor(),
-                    fontWeight: FontWeight.w500,
-                  ),
-                  textAlign: TextAlign.center,
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 2,
-                ),
-              ),
+
             ],
           ),
         ),
       ],
     );
-  }
-
-  String _getStatusDescription() {
-    if (widget.isLoading) {
-      if (_isDisconnectingState()) {
-        return 'disconnecting_secure_connection'.tr();
-      }
-      return 'establishing_secure_connection'.tr();
-    } else if (widget.status.toUpperCase() == "CONNECTED") {
-      return 'connection_secure_private'.tr();
-    } else {
-      return 'tap_connect_vpn'.tr();
-    }
   }
 }

@@ -5,9 +5,11 @@ import 'package:shinenet_vpn/widgets/settings/language_widget.dart';
 import 'package:shinenet_vpn/widgets/settings/font_accessibility_widget.dart';
 import 'package:shinenet_vpn/common/liquid_glass_container.dart';
 import 'package:shinenet_vpn/services/language_manager.dart';
+import 'package:shinenet_vpn/screens/scan_mode_screen.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 class SettingsWidget extends StatefulWidget {
   SettingsWidget({super.key});
@@ -19,6 +21,7 @@ class SettingsWidget extends StatefulWidget {
 class _SettingsWidgetState extends State<SettingsWidget> {
   String _selectedLanguage = '';
   bool _isLoading = false;
+  String? _appVersion;
 
   // Cached gradients for performance
   late final List<Color> _primaryGradient;
@@ -31,6 +34,7 @@ class _SettingsWidgetState extends State<SettingsWidget> {
     super.initState();
     _initializeGradients();
     _loadSelectedLanguage();
+    _loadAppVersion();
   }
 
   // Initialize gradients once to avoid repeated calculations
@@ -62,6 +66,15 @@ class _SettingsWidgetState extends State<SettingsWidget> {
     super.didChangeDependencies();
     if (!_isLoading) {
       _loadSelectedLanguage();
+    }
+  }
+
+  Future<void> _loadAppVersion() async {
+    final packageInfo = await PackageInfo.fromPlatform();
+    if (mounted) {
+      setState(() {
+        _appVersion = packageInfo.version;
+      });
     }
   }
 
@@ -105,21 +118,17 @@ class _SettingsWidgetState extends State<SettingsWidget> {
               elevation: 0,
               floating: true,
               pinned: false,
-              expandedHeight: 80,
+              toolbarHeight: 64,
               automaticallyImplyLeading: false,
-              title: Container(
-                width: double.infinity,
-                height: 80,
-                alignment: Alignment.center,
-                child: Text(
-                  'setting'.tr(),
-                  style: FontHelper.getHeadingStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w700,
-                    context: context,
-                  ),
-                  overflow: TextOverflow.ellipsis,
+              centerTitle: true,
+              title: Text(
+                'setting'.tr(),
+                style: FontHelper.getHeadingStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  context: context,
                 ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
 
@@ -225,6 +234,21 @@ class _SettingsWidgetState extends State<SettingsWidget> {
     return Column(
       children: [
         _buildSettingOption(
+          icon: Icons.radar_rounded,
+          title: 'scan_mode'.tr(),
+          subtitle: 'scan_mode_settings_subtitle'.tr(),
+          color: ThemeColor.successColor,
+          onTap: () {
+            HapticFeedback.lightImpact();
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => const ScanModeScreen(),
+              ),
+            );
+          },
+        ),
+        SizedBox(height: ThemeColor.mediumSpacing),
+        _buildSettingOption(
           icon: Icons.apps_rounded,
           title: 'block_application'.tr(),
           subtitle: 'control_apps_bypass'.tr(),
@@ -264,7 +288,7 @@ class _SettingsWidgetState extends State<SettingsWidget> {
           icon: Icons.text_fields_rounded,
           title: 'font_accessibility'.tr(),
           subtitle: 'font_size_settings'.tr(),
-          color: ThemeColor.primaryColor.withValues(alpha: 0.8),
+          color: ThemeColor.primaryColor,
           onTap: () {
             HapticFeedback.lightImpact();
             Navigator.of(context).push(
@@ -289,8 +313,9 @@ class _SettingsWidgetState extends State<SettingsWidget> {
     List<Color> gradientColors;
     if (color == ThemeColor.warningColor) {
       gradientColors = _warningGradient;
-    } else if (color == ThemeColor.primaryColor ||
-        color == ThemeColor.primaryColor.withValues(alpha: 0.8)) {
+    } else if (color == ThemeColor.successColor) {
+      gradientColors = _successGradient;
+    } else if (color == ThemeColor.primaryColor) {
       gradientColors = _primaryGradient;
     } else {
       gradientColors =
@@ -399,7 +424,7 @@ class _SettingsWidgetState extends State<SettingsWidget> {
                   child: _buildInfoCard(
                     icon: Icons.update_rounded,
                     title: 'version'.tr(),
-                    value: '1.1.4',
+                    value: _appVersion ?? '—',
                     color: ThemeColor.primaryColor,
                   ),
                 ),

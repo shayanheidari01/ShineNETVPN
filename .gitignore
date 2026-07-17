@@ -1,8 +1,6 @@
-```
 # Gradle / build outputs
 .gradle/
 build/
-!gradle/wrapper/gradle-wrapper.jar
 **/.gradle/
 **/build/
 **/captures/
@@ -14,11 +12,7 @@ build/
 **/.cxx
 **/.cxx/
 **/.cxx/**
-/android/app/.cxx/
-/android/app/.cxx/**
-/android/app/.cxx
-**/android/app/.cxx/
-**/android/app/.cxx/**
+!gradle/wrapper/gradle-wrapper.jar
 
 # Flutter / Dart caches
 .dart_tool/
@@ -27,6 +21,10 @@ build/
 .packages
 .pub-cache/
 coverage/
+.flutter-plugins-dependencies
+
+# Rust (aether_core)
+**/target/
 
 # Android / signing and secrets
 *.apk
@@ -65,4 +63,10 @@ secrets/
 .vscode/
 .DS_Store
 Thumbs.db
-```
+
+# MiMoCode workspace
+.mimocode/
+
+# OS generated files
+*.swp
+*~
