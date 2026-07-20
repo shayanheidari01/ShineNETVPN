@@ -143,18 +143,39 @@ jobs:
 
           chmod 600 android/key.properties
 
-      - name: Build APK
+      - name: Build Split APKs per ABI
         run: |
-          flutter build apk --release \
+          flutter build apk --release --split-per-abi \
             --build-name=${{ steps.new_version.outputs.new_version_name }} \
             --build-number=${{ steps.new_version.outputs.new_build_number }}
 
-          APK_NAME="ShineNET_v${{ steps.new_version.outputs.new_version_name }}_${{ steps.new_version.outputs.new_build_number }}.apk"
+      - name: Rename APK files
+        id: rename
+        run: |
+          VERSION="${{ steps.new_version.outputs.new_version_name }}"
+          BUILD="${{ steps.new_version.outputs.new_build_number }}"
+          OUTPUT_DIR="build/app/outputs/flutter-apk"
+          RELEASE_DIR="release-assets"
+          mkdir -p "$RELEASE_DIR"
 
-          mv build/app/outputs/flutter-apk/app-release.apk \
-             build/app/outputs/flutter-apk/$APK_NAME
+          cd "$OUTPUT_DIR"
 
-          echo "APK_NAME=$APK_NAME" >> $GITHUB_ENV
+          for APK in app-*-release.apk; do
+            ABI=$(echo "$APK" | sed 's/app-//;s/-release.apk//')
+            NEW_NAME="ShineNET_v${VERSION}_${BUILD}_${ABI}.apk"
+            cp "$APK" "../../$RELEASE_DIR/$NEW_NAME"
+            echo "Built: $NEW_NAME"
+          done
+
+          cd ../..
+          ls -lh "$RELEASE_DIR/"
+
+      - name: Generate SHA256 checksums
+        run: |
+          cd release-assets
+          sha256sum *.apk > SHA256_Checksums.txt
+          echo "--- Checksums ---"
+          cat SHA256_Checksums.txt
 
       - name: Cleanup secrets
         if: always()
@@ -167,23 +188,31 @@ jobs:
         with:
           tag_name: v${{ steps.new_version.outputs.new_version_name }}+${{ steps.new_version.outputs.new_build_number }}
           name: ShineNET VPN v${{ steps.new_version.outputs.new_version_name }}
-          files: build/app/outputs/flutter-apk/${{ env.APK_NAME }}
+          files: |
+            release-assets/*.apk
+            release-assets/SHA256_Checksums.txt
           draft: false
           prerelease: false
           body: |
-            ## ShineNET VPN Release
+            ## ShineNET VPN v${{ steps.new_version.outputs.new_version_name }}
 
-            ### Version
-            - Version: ${{ steps.new_version.outputs.new_version_name }}
-            - Build: ${{ steps.new_version.outputs.new_build_number }}
+            ### Downloads
+            | File | Architecture | Description |
+            |------|-------------|-------------|
+            | `ShineNET_v${{ steps.new_version.outputs.new_version_name }}_${{ steps.new_version.outputs.new_build_number }}_arm64-v8a.apk` | ARM 64-bit | For most modern Android devices |
+            | `ShineNET_v${{ steps.new_version.outputs.new_version_name }}_${{ steps.new_version.outputs.new_build_number }}_armeabi-v7a.apk` | ARM 32-bit | For older Android devices |
+            | `ShineNET_v${{ steps.new_version.outputs.new_version_name }}_${{ steps.new_version.outputs.new_build_number }}_x86_64.apk` | x86_64 | For emulators and Chromebooks |
 
-            ### Changes
-            - Automated build via GitHub Actions
-            - Auto-incremented version
+            > **Tip:** Download the APK matching your device architecture. Check `SHA256_Checksums.txt` to verify file integrity.
 
-      - name: Upload APK Artifact
+            ### Build Info
+            - **Version:** ${{ steps.new_version.outputs.new_version_name }}
+            - **Build Number:** ${{ steps.new_version.outputs.new_build_number }}
+            - **Flutter Channel:** stable
+
+      - name: Upload APK Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ShineNET-APK
-          path: build/app/outputs/flutter-apk/*.apk
+          name: ShineNET-APKs
+          path: release-assets/*.apk
           retention-days: 30

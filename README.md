@@ -21,6 +21,12 @@
 
 ShineNET VPN is a **free, open-source** VPN application designed to provide secure and unrestricted internet access. Built with modern Flutter technology, it offers a seamless experience across Android devices with enterprise-grade security and privacy protection.
 
+### 📸 Screenshots
+
+<p align="center">
+  <img src="screenshots/screenshot-home.jpg" width="250" alt="ShineNET VPN Home">
+</p>
+
 ### ✨ Key Features
 
 - 🔒 **Military-Grade Encryption** - Advanced security protocols
@@ -77,6 +83,12 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ShineNET VPN یک اپلیکیشن **رایگان و متن‌باز** است که برای ارائه دسترسی امن و نامحدود به اینترنت طراحی شده است. با استفاده از تکنولوژی مدرن Flutter ساخته شده و تجربه‌ای روان در دستگاه‌های اندروید با امنیت و حفظ حریم خصوصی سطح سازمانی ارائه می‌دهد.
 
+### 📸 اسکرین‌شات‌ها
+
+<p align="center">
+  <img src="screenshots/screenshot-home.jpg" width="250" alt="ShineNET VPN Home">
+</p>
+
 ### ✨ ویژگی‌های کلیدی
 
 - 🔒 **رمزگذاری نظامی** - پروتکل‌های امنیتی پیشرفته
@@ -115,6 +127,12 @@ ShineNET VPN یک اپلیکیشن **رایگان و متن‌باز** است ک
 
 ShineNET VPN 是一款**免费开源**的 VPN 应用程序，旨在提供安全无限制的互联网访问。采用现代 Flutter 技术构建，为 Android 设备提供企业级安全和隐私保护的流畅体验。
 
+### 📸 截图
+
+<p align="center">
+  <img src="screenshots/screenshot-home.jpg" width="250" alt="ShineNET VPN Home">
+</p>
+
 ### ✨ 主要特性
 
 - 🔒 **军用级加密** - 先进的安全协议
@@ -139,6 +157,12 @@ ShineNET VPN 是一款**免费开源**的 VPN 应用程序，旨在提供安全�
 ### 🚀 О ShineNET VPN
 
 ShineNET VPN — это **бесплатное приложение с открытым исходным кодом**, предназначенное для обеспечения безопасного и неограниченного доступа в интернет. Построенное на современной технологии Flutter, оно обеспечивает беспрепятственную работу на Android-устройствах с корпоративным уровнем безопасности и защиты конфиденциальности.
+
+### 📸 Скриншоты
+
+<p align="center">
+  <img src="screenshots/screenshot-home.jpg" width="250" alt="ShineNET VPN Home">
+</p>
 
 ### ✨ Ключевые особенности
 
@@ -165,6 +189,6 @@ ShineNET VPN — это **бесплатное приложение с откр�
   
   **Made with ❤️ by the ShineNET Team**
   
-  © 2025 ShineNET VPN. All rights reserved.
+  © 2026 ShineNET VPN. All rights reserved.
   
 </div>

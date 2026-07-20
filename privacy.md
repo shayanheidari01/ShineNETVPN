@@ -5,7 +5,7 @@
   
   **Protecting Your Privacy, Securing Your Freedom**
   
-  *Last Updated: September 2025*
+  *Last Updated: July 2026*
   
 </div>
 
