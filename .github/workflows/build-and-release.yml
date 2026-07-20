@@ -154,6 +154,12 @@ jobs:
             --build-name=${{ steps.new_version.outputs.new_version_name }} \
             --build-number=${{ steps.new_version.outputs.new_build_number }}
 
+      - name: Build Universal APK
+        run: |
+          flutter build apk --release \
+            --build-name=${{ steps.new_version.outputs.new_version_name }} \
+            --build-number=${{ steps.new_version.outputs.new_build_number }}
+
       - name: Rename APK files
         id: rename
         run: |
@@ -171,6 +177,10 @@ jobs:
             cp "$APK" "../../../../$RELEASE_DIR/$NEW_NAME"
             echo "Built: $NEW_NAME"
           done
+
+          # Copy universal APK
+          cp app-release.apk "../../../../$RELEASE_DIR/ShineNET_v${VERSION}_${BUILD}_universal.apk"
+          echo "Built: ShineNET_v${VERSION}_${BUILD}_universal.apk"
 
           cd ../../../..
           ls -lh "$RELEASE_DIR/"
@@ -204,11 +214,12 @@ jobs:
             ### Downloads
             | File | Architecture | Description |
             |------|-------------|-------------|
+            | `ShineNET_v${{ steps.new_version.outputs.new_version_name }}_${{ steps.new_version.outputs.new_build_number }}_universal.apk` | All | Universal APK for all architectures (recommended) |
             | `ShineNET_v${{ steps.new_version.outputs.new_version_name }}_${{ steps.new_version.outputs.new_build_number }}_arm64-v8a.apk` | ARM 64-bit | For most modern Android devices |
             | `ShineNET_v${{ steps.new_version.outputs.new_version_name }}_${{ steps.new_version.outputs.new_build_number }}_armeabi-v7a.apk` | ARM 32-bit | For older Android devices |
             | `ShineNET_v${{ steps.new_version.outputs.new_version_name }}_${{ steps.new_version.outputs.new_build_number }}_x86_64.apk` | x86_64 | For emulators and Chromebooks |
 
-            > **Tip:** Download the APK matching your device architecture. Check `SHA256_Checksums.txt` to verify file integrity.
+            > **Tip:** Use the **universal APK** for easy installation on any device. For smaller file size, download the APK matching your device architecture. Check `SHA256_Checksums.txt` to verify file integrity.
 
             ### Build Info
             - **Version:** ${{ steps.new_version.outputs.new_version_name }}
