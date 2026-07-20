@@ -168,11 +168,11 @@ jobs:
           for APK in app-*-release.apk; do
             ABI=$(echo "$APK" | sed 's/app-//;s/-release.apk//')
             NEW_NAME="ShineNET_v${VERSION}_${BUILD}_${ABI}.apk"
-            cp "$APK" "../../../$RELEASE_DIR/$NEW_NAME"
+            cp "$APK" "../../../../$RELEASE_DIR/$NEW_NAME"
             echo "Built: $NEW_NAME"
           done
 
-          cd ../../..
+          cd ../../../..
           ls -lh "$RELEASE_DIR/"
 
       - name: Generate SHA256 checksums
