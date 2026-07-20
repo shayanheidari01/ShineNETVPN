@@ -30,6 +30,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Switch to branch for commit
+        run: |
+          BRANCH=$(git branch -r --contains HEAD | head -1 | sed 's|origin/||' | xargs)
+          git checkout -B "$BRANCH"
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
