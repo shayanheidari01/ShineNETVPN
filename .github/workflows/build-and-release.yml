@@ -132,29 +132,8 @@ jobs:
 
             cd "$BASE_DIR/android/aether_core/aether"
 
-            # Pass 1: cargo-ndk bootstrap (compiles BoringSSL)
-            echo "--- Pass 1: BoringSSL bootstrap ---"
+            # Single pass: cargo-ndk handles everything including BoringSSL
             cargo ndk -t "$ABI" --platform "$API_LEVEL" build --release --lib
-
-            # Locate BoringSSL output
-            BSSL_OUT=$(find "target/$RUST_TARGET/release/build" -maxdepth 1 -name 'boring-sys-*' -type d 2>/dev/null | while read d; do
-              if [ -f "$d/out/build/libssl.a" ]; then echo "$d/out"; fi
-            done | tail -1)
-
-            if [ -z "$BSSL_OUT" ]; then
-              echo "ERROR: BoringSSL output not found for $ABI"
-              exit 1
-            fi
-            echo "BoringSSL: $BSSL_OUT"
-
-            # Pass 2: full build linking against pre-built BoringSSL
-            export BORING_BSSL_PATH="$BSSL_OUT/build"
-            export BORING_BSSL_INCLUDE_PATH="$BSSL_OUT/boringssl/src/include"
-            export BORING_BSSL_ASSUME_PATCHED=1
-            export CLANG_PATH="$TOOLCHAIN/bin/clang"
-
-            echo "--- Pass 2: Full build ---"
-            cargo build --release --lib --target "$RUST_TARGET"
 
             # Copy to jniLibs
             DEST="$BASE_DIR/android/app/src/main/jniLibs/$ABI"
@@ -165,7 +144,7 @@ jobs:
             cd "$BASE_DIR"
 
             # Clean up env vars for next ABI
-            unset BORING_BSSL_PATH BORING_BSSL_INCLUDE_PATH BORING_BSSL_ASSUME_PATCHED CLANG_PATH RUSTFLAGS
+            unset RUSTFLAGS
             unset_abi_env "$RUST_TARGET"
           }
 
