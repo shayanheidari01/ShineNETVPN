@@ -81,26 +81,38 @@ jobs:
           NDK_DIR="$ANDROID_HOME/ndk/$NDK_VERSION"
           TOOLCHAIN="$NDK_DIR/toolchains/llvm/prebuilt/linux-x86_64"
           BASE_DIR="$GITHUB_WORKSPACE"
+          SYSROOT="$TOOLCHAIN/sysroot"
           export CMAKE_GENERATOR=Ninja
+
+          set_abi_env() {
+            # $1=RUST_TARGET, $2=CC_TRIPLE
+            local TARGET_UPPER=$(echo "$1" | tr '[:lower:]-' '[:upper:]_')
+            export "CARGO_TARGET_${TARGET_UPPER}_LINKER=${TOOLCHAIN}/bin/${2}${API_LEVEL}-clang"
+            export "AR_${TARGET_UPPER}=${TOOLCHAIN}/bin/llvm-ar"
+            export "CC_${TARGET_UPPER}=${TOOLCHAIN}/bin/clang"
+            export "CXX_${TARGET_UPPER}=${TOOLCHAIN}/bin/clang++"
+            export "CFLAGS_${TARGET_UPPER}=--target=${2}${API_LEVEL}"
+            export "CXXFLAGS_${TARGET_UPPER}=--target=${2}${API_LEVEL}"
+            export "BINDGEN_EXTRA_CLANG_ARGS_${TARGET_UPPER}=--target=${2}${API_LEVEL} --sysroot=${SYSROOT}"
+          }
+
+          unset_abi_env() {
+            local TARGET_UPPER=$(echo "$1" | tr '[:lower:]-' '[:upper:]_')
+            unset "CARGO_TARGET_${TARGET_UPPER}_LINKER" "AR_${TARGET_UPPER}" "CC_${TARGET_UPPER}" \
+              "CXX_${TARGET_UPPER}" "CFLAGS_${TARGET_UPPER}" "CXXFLAGS_${TARGET_UPPER}" \
+              "BINDGEN_EXTRA_CLANG_ARGS_${TARGET_UPPER}"
+          }
 
           build_abi() {
             local ABI=$1
             local RUST_TARGET=$2
             local CC_TRIPLE=$3
-            local TARGET_UPPER=$(echo "$RUST_TARGET" | tr '[:lower:]-' '[:upper:]_')
 
             echo "========================================="
             echo "Building libaether.so for $ABI ($RUST_TARGET)"
             echo "========================================="
 
-            # Set cross-compilation env vars (override .cargo/config.toml Windows paths)
-            eval "export CARGO_TARGET_${TARGET_UPPER}_LINKER=$TOOLCHAIN/bin/${CC_TRIPLE}${API_LEVEL}-clang"
-            eval "export AR_${TARGET_UPPER}=$TOOLCHAIN/bin/llvm-ar"
-            eval "export CC_${TARGET_UPPER}=$TOOLCHAIN/bin/clang"
-            eval "export CXX_${TARGET_UPPER}=$TOOLCHAIN/bin/clang++"
-            eval "export CFLAGS_${TARGET_UPPER}=--target=${CC_TRIPLE}${API_LEVEL}"
-            eval "export CXXFLAGS_${TARGET_UPPER}=--target=${CC_TRIPLE}${API_LEVEL}"
-            eval "export BINDGEN_EXTRA_CLANG_ARGS_${TARGET_UPPER}=--target=${CC_TRIPLE}${API_LEVEL} --sysroot=$TOOLCHAIN/sysroot"
+            set_abi_env "$RUST_TARGET" "$CC_TRIPLE"
             export RUSTFLAGS="-C link-arg=-Wl,-soname,libaether.so -C link-arg=-Wl,-z,max-page-size=16384 -C link-arg=-Wl,-z,common-page-size=16384"
 
             cd "$BASE_DIR/android/aether_core/aether"
@@ -139,7 +151,7 @@ jobs:
 
             # Clean up env vars for next ABI
             unset BORING_BSSL_PATH BORING_BSSL_INCLUDE_PATH BORING_BSSL_ASSUME_PATCHED CLANG_PATH RUSTFLAGS
-            eval "unset CARGO_TARGET_${TARGET_UPPER}_LINKER AR_${TARGET_UPPER} CC_${TARGET_UPPER} CXX_${TARGET_UPPER} CFLAGS_${TARGET_UPPER} CXXFLAGS_${TARGET_UPPER} BINDGEN_EXTRA_CLANG_ARGS_${TARGET_UPPER}"
+            unset_abi_env "$RUST_TARGET"
           }
 
           build_abi "arm64-v8a" "aarch64-linux-android" "aarch64-linux-android"
