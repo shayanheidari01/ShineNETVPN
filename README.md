@@ -29,7 +29,7 @@ ShineNET VPN is a **free, open-source** VPN application designed to provide secu
 
 ### ✨ Key Features
 
-- 🔒 **Military-Grade Encryption** - Advanced security protocols
+- 🔒 **Industry-Standard Encryption** - VMess, VLESS+XTLS, Trojan, Shadowsocks protocols
 - ⚡ **High-Speed Servers** - Optimized for performance
 - 🌍 **Global Server Network** - Multiple server locations
 - 📱 **Modern UI/UX** - Clean, intuitive interface
@@ -37,6 +37,26 @@ ShineNET VPN is a **free, open-source** VPN application designed to provide secu
 - 🛡️ **Privacy Focused** - No logs, no tracking
 - 🆓 **Completely Free** - No hidden costs or subscriptions
 - 📂 **Open Source** - Transparent and trustworthy
+- 🛡️ **Aether Integration** - MASQUE, WireGuard, WARP protocols via Cloudflare WARP
+
+### 🔐 Security
+
+ShineNET VPN uses industry-standard encryption protocols:
+
+#### V2Ray/Xray Protocols
+- **VMess**: AES-128-GCM / ChaCha20-Poly1305 encryption
+- **VLESS + XTLS**: AES-256-GCM / ChaCha20-Poly1305 with reduced latency
+- **Trojan**: TLS 1.3 based, mimics HTTPS traffic
+- **Shadowsocks**: AEAD ciphers (AES-256-GCM, ChaCha20)
+
+**Note**: V2Ray server configurations are sourced from publicly available community lists and all connections use TLS encryption.
+
+#### Aether Protocols (Cloudflare WARP)
+- **MASQUE**: HTTP/3 tunnel over QUIC protocol
+- **WireGuard**: Modern, fast VPN protocol
+- **WARP-on-WARP**: Double-layer encryption for enhanced security
+
+For detailed security information, see our [Security Policy](SECURITY.md).
 
 ### 📥 Download
 
@@ -60,6 +80,8 @@ ShineNET VPN is a **free, open-source** VPN application designed to provide secu
 ### 🤝 Contributing
 
 We welcome contributions! Please feel free to submit pull requests, report bugs, or suggest new features.
+
+**Security Notice**: If you discover a security vulnerability, please follow our [Security Policy](SECURITY.md) instead of opening a public issue.
 
 ### 📞 Support
 
@@ -91,7 +113,7 @@ ShineNET VPN یک اپلیکیشن **رایگان و متن‌باز** است ک
 
 ### ✨ ویژگی‌های کلیدی
 
-- 🔒 **رمزگذاری نظامی** - پروتکل‌های امنیتی پیشرفته
+- 🔒 **رمزنگاری استاندارد صنعتی** - پروتکل‌های VMess، VLESS+XTLS، Trojan، Shadowsocks
 - ⚡ **سرورهای پرسرعت** - بهینه‌سازی شده برای عملکرد
 - 🌍 **شبکه سرور جهانی** - چندین مکان سرور
 - 📱 **رابط کاربری مدرن** - طراحی تمیز و شهودی
@@ -99,6 +121,26 @@ ShineNET VPN یک اپلیکیشن **رایگان و متن‌باز** است ک
 - 🛡️ **متمرکز بر حریم خصوصی** - بدون لاگ، بدون ردیابی
 - 🆓 **کاملاً رایگان** - بدون هزینه پنهان یا اشتراک
 - 📂 **متن‌باز** - شفاف و قابل اعتماد
+- 🛡️ **یکپارچه Aether** - پروتکل‌های MASQUE، WireGuard، WARP از طریق Cloudflare WARP
+
+### 🔐 امنیت
+
+ShineNET VPN از پروتکل‌های رمزنگاری استاندارد صنعتی استفاده می‌کند:
+
+#### پروتکل‌های V2Ray/Xray
+- **VMess**: رمزنگاری AES-128-GCM / ChaCha20-Poly1305
+- **VLESS + XTLS**: رمزنگاری AES-256-GCM / ChaCha20-Poly1305 با تاخیر کمتر
+- **Trojan**: مبتنی بر TLS 1.3، ترافیک HTTPS را تقلید می‌کند
+- **Shadowsocks**: رمزهای AEAD (AES-256-GCM, ChaCha20)
+
+**توجه**: پیکربندی سرورهای V2Ray از لیست‌های عمومی جامعه جمع‌آوری می‌شوند و تمام اتصالات از TLS استفاده می‌کنند.
+
+#### پروتکل‌های Aether (Cloudflare WARP)
+- **MASQUE**: تونل HTTP/3 از پروتکل QUIC
+- **WireGuard**: پروتکل مدرن و سریع VPN
+- **WARP-on-WARP**: رمزنگاری دو لایه برای امنیت بیشتر
+
+برای اطلاعات امنیتی جزئی، [سیاست امنیتی](SECURITY.md) ما را ببینید.
 
 ### 📥 دانلود
 
@@ -135,7 +177,7 @@ ShineNET VPN 是一款**免费开源**的 VPN 应用程序，旨在提供安全�
 
 ### ✨ 主要特性
 
-- 🔒 **军用级加密** - 先进的安全协议
+- 🔒 **行业标准加密** - VMess、VLESS+XTLS、Trojan、Shadowsocks 协议
 - ⚡ **高速服务器** - 性能优化
 - 🌍 **全球服务器网络** - 多个服务器位置
 - 📱 **现代化界面** - 简洁直观的设计
@@ -143,6 +185,26 @@ ShineNET VPN 是一款**免费开源**的 VPN 应用程序，旨在提供安全�
 - 🛡️ **注重隐私** - 无日志，无追踪
 - 🆓 **完全免费** - 无隐藏费用或订阅
 - 📂 **开源** - 透明可信
+- 🛡️ **Aether 集成** - 通过 Cloudflare WARP 支持 MASQUE、WireGuard、WARP 协议
+
+### 🔐 安全性
+
+ShineNET VPN 使用行业标准加密协议：
+
+#### V2Ray/Xray 协议
+- **VMess**: AES-128-GCM / ChaCha20-Poly1305 加密
+- **VLESS + XTLS**: AES-256-GCM / ChaCha20-Poly1305 加密，延迟更低
+- **Trojan**: 基于 TLS 1.3，模拟 HTTPS 流量
+- **Shadowsocks**: AEAD 加密 (AES-256-GCM, ChaCha20)
+
+**注意**: V2Ray 服务器配置来自公开的社区列表，所有连接使用 TLS 加密。
+
+#### Aether 协议 (Cloudflare WARP)
+- **MASQUE**: 基于 QUIC 协议的 HTTP/3 隧道
+- **WireGuard**: 现代、快速的 VPN 协议
+- **WARP-on-WARP**: 双层加密增强安全性
+
+详细安全信息请参阅我们的[安全政策](SECURITY.md)。
 
 ### 📥 下载
 
@@ -166,7 +228,7 @@ ShineNET VPN — это **бесплатное приложение с откр�
 
 ### ✨ Ключевые особенности
 
-- 🔒 **Военное шифрование** - Продвинутые протоколы безопасности
+- 🔒 **Отраслевое шифрование** - Протоколы VMess, VLESS+XTLS, Trojan, Shadowsocks
 - ⚡ **Высокоскоростные серверы** - Оптимизированы для производительности
 - 🌍 **Глобальная сеть серверов** - Множество локаций серверов
 - 📱 **Современный интерфейс** - Чистый, интуитивный дизайн
@@ -174,6 +236,26 @@ ShineNET VPN — это **бесплатное приложение с откр�
 - 🛡️ **Ориентированность на приватность** - Без логов, без отслеживания
 - 🆓 **Полностью бесплатно** - Без скрытых затрат или подписок
 - 📂 **Открытый исходный код** - Прозрачно и надежно
+- 🛡️ **Интеграция Aether** - Протоколы MASQUE, WireGuard, WARP через Cloudflare WARP
+
+### 🔐 Безопасность
+
+ShineNET VPN использует отраслевые стандарты шифрования:
+
+#### Протоколы V2Ray/Xray
+- **VMess**: Шифрование AES-128-GCM / ChaCha20-Poly1305
+- **VLESS + XTLS**: Шифрование AES-256-GCM / ChaCha20-Poly1305 с минимальной задержкой
+- **Trojan**: На основе TLS 1.3, имитирует HTTPS-трафик
+- **Shadowsocks**: AEAD шифры (AES-256-GCM, ChaCha20)
+
+**Примечание**: Конфигурации серверов V2Ray берутся из публичных списков сообщества, все соединения используют TLS.
+
+#### Протоколы Aether (Cloudflare WARP)
+- **MASQUE**: Туннель HTTP/3 через протокол QUIC
+- **WireGuard**: Современный быстрый VPN-протокол
+- **WARP-on-WARP**: Двухслойное шифрование для повышенной безопасности
+
+Подробную информацию о безопасности смотрите в нашей [политике безопасности](SECURITY.md).
 
 ### 📥 Скачать
 

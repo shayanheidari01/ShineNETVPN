@@ -126,13 +126,33 @@ ShineNET VPN may only disclose information if:
 ## 5. Security Measures
 
 ### 5.1 Data Protection
-- 🔐 **End-to-End Encryption**: All data transmission is encrypted
+- 🔐 **End-to-End Encryption**: All data transmission is encrypted using industry-standard protocols
 - 🏰 **Secure Infrastructure**: Hardened servers with regular security updates
 - 👥 **Limited Access**: Strict employee access controls
 - 🔍 **Regular Audits**: Periodic security assessments
 - 🗑️ **Automatic Deletion**: Data is automatically purged after retention period
 
-### 5.2 Open Source Transparency
+### 5.2 Encryption Protocols
+ShineNET VPN supports multiple secure VPN protocols:
+
+#### V2Ray/Xray Protocols (Primary)
+| Protocol | Encryption | Security Level |
+|----------|------------|----------------|
+| VMess | AES-128-GCM / ChaCha20-Poly1305 | High |
+| VLESS + XTLS | AES-256-GCM / ChaCha20-Poly1305 | Very High |
+| Trojan | AES-256-GCM (TLS 1.3) | Very High |
+| Shadowsocks | AEAD Ciphers (AES-256-GCM, ChaCha20) | High |
+
+**Note**: V2Ray server configurations are sourced from publicly available community lists. All connections use TLS encryption.
+
+#### Aether Protocols (Cloudflare WARP)
+| Protocol | Description | Security Level |
+|----------|-------------|----------------|
+| MASQUE | HTTP/3 tunnel over QUIC | Very High |
+| WireGuard | Modern VPN protocol | High |
+| WARP-on-WARP | Double-layer encryption | Very High |
+
+### 5.3 Open Source Transparency
 - 📖 **Code Transparency**: Our source code is publicly available
 - 🔍 **Community Audits**: Independent security researchers can verify our claims
 - 🔄 **Regular Updates**: Continuous security improvements

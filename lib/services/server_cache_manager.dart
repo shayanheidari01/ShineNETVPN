@@ -294,24 +294,12 @@ class ServerCacheManager {
       onStatusUpdate
           ?.call('🆘 No cache available, attempting emergency fallback...');
 
-      // This could trigger emergency server list from ServerOptimizationService
-      final serverOptimization = ServerOptimizationService();
-      // Use hardcoded emergency servers since getEmergencyServers is not available
-      final emergencyServers = [
-        'vmess://eyJ2IjoiMiIsInBzIjoiRW1lcmdlbmN5IFNlcnZlciAxIiwiYWRkIjoiMTA0LjIxLjU1LjIzNCIsInBvcnQiOiI0NDMiLCJ0eXBlIjoibm9uZSIsImlkIjoiOTVmZWRkM2QtYTc0My00OWRhLThiODYtOWYzZTczOTcyMmQ3IiwiYWlkIjoiMCIsIm5ldCI6IndzIiwicGF0aCI6Ii8iLCJob3N0IjoiIiwidGxzIjoidGxzIn0=',
-        'vmess://eyJ2IjoiMiIsInBzIjoiRW1lcmdlbmN5IFNlcnZlciAyIiwiYWRkIjoiMTcyLjY3LjEzMC4xNTQiLCJwb3J0IjoiNDQzIiwidHlwZSI6Im5vbmUiLCJpZCI6Ijk1ZmVkZDNkLWE3NDMtNDlkYS04Yjg2LTlmM2U3Mzk3MjJkNyIsImFpZCI6IjAiLCJuZXQiOiJ3cyIsInBhdGgiOiIvIiwiaG9zdCI6IiIsInRscyI6InRscyJ9',
-      ];
+      // Emergency servers are loaded from external configuration
+      // For security reasons, hardcoded credentials are not used
+      // Users should ensure they have internet connectivity for server fetching
+      onStatusUpdate?.call('⚠️ No cached servers available. Please check your internet connection.');
 
-      if (emergencyServers.isNotEmpty) {
-        await cacheServers(emergencyServers, metadata: {
-          'fetchTime': DateTime.now().toIso8601String(),
-          'serverCount': emergencyServers.length,
-          'fetchMethod': 'emergency_fallback',
-        });
-        onStatusUpdate
-            ?.call('🆘 Using ${emergencyServers.length} emergency servers');
-        return emergencyServers;
-      }
+      return [];
     } catch (fallbackError) {
       onStatusUpdate
           ?.call('❌ All fallback methods failed: ${fallbackError.toString()}');
