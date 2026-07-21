@@ -58,6 +58,99 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk
+
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y libclang-dev ninja-build
+
+      - name: Install Android NDK
+        run: |
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;28.2.13676358"
+
+      - name: Build Aether native library
+        env:
+          NDK_VERSION: "28.2.13676358"
+          API_LEVEL: "24"
+        run: |
+          NDK_DIR="$ANDROID_HOME/ndk/$NDK_VERSION"
+          TOOLCHAIN="$NDK_DIR/toolchains/llvm/prebuilt/linux-x86_64"
+          BASE_DIR="$GITHUB_WORKSPACE"
+          export CMAKE_GENERATOR=Ninja
+
+          build_abi() {
+            local ABI=$1
+            local RUST_TARGET=$2
+            local CC_TRIPLE=$3
+            local TARGET_UPPER=$(echo "$RUST_TARGET" | tr '[:lower:]-' '[:upper:]_')
+
+            echo "========================================="
+            echo "Building libaether.so for $ABI ($RUST_TARGET)"
+            echo "========================================="
+
+            # Set cross-compilation env vars (override .cargo/config.toml Windows paths)
+            eval "export CARGO_TARGET_${TARGET_UPPER}_LINKER=$TOOLCHAIN/bin/${CC_TRIPLE}${API_LEVEL}-clang"
+            eval "export AR_${TARGET_UPPER}=$TOOLCHAIN/bin/llvm-ar"
+            eval "export CC_${TARGET_UPPER}=$TOOLCHAIN/bin/clang"
+            eval "export CXX_${TARGET_UPPER}=$TOOLCHAIN/bin/clang++"
+            eval "export CFLAGS_${TARGET_UPPER}=--target=${CC_TRIPLE}${API_LEVEL}"
+            eval "export CXXFLAGS_${TARGET_UPPER}=--target=${CC_TRIPLE}${API_LEVEL}"
+            eval "export BINDGEN_EXTRA_CLANG_ARGS_${TARGET_UPPER}=--target=${CC_TRIPLE}${API_LEVEL} --sysroot=$TOOLCHAIN/sysroot"
+            export RUSTFLAGS="-C link-arg=-Wl,-soname,libaether.so -C link-arg=-Wl,-z,max-page-size=16384 -C link-arg=-Wl,-z,common-page-size=16384"
+
+            cd "$BASE_DIR/android/aether_core/aether"
+
+            # Pass 1: cargo-ndk bootstrap (compiles BoringSSL)
+            echo "--- Pass 1: BoringSSL bootstrap ---"
+            cargo ndk -t "$ABI" --platform "$API_LEVEL" build --release --lib
+
+            # Locate BoringSSL output
+            BSSL_OUT=$(find "target/$RUST_TARGET/release/build" -maxdepth 1 -name 'boring-sys-*' -type d 2>/dev/null | while read d; do
+              if [ -f "$d/out/build/libssl.a" ]; then echo "$d/out"; fi
+            done | tail -1)
+
+            if [ -z "$BSSL_OUT" ]; then
+              echo "ERROR: BoringSSL output not found for $ABI"
+              exit 1
+            fi
+            echo "BoringSSL: $BSSL_OUT"
+
+            # Pass 2: full build linking against pre-built BoringSSL
+            export BORING_BSSL_PATH="$BSSL_OUT/build"
+            export BORING_BSSL_INCLUDE_PATH="$BSSL_OUT/boringssl/src/include"
+            export BORING_BSSL_ASSUME_PATCHED=1
+            export CLANG_PATH="$TOOLCHAIN/bin/clang"
+
+            echo "--- Pass 2: Full build ---"
+            cargo build --release --lib --target "$RUST_TARGET"
+
+            # Copy to jniLibs
+            DEST="$BASE_DIR/android/app/src/main/jniLibs/$ABI"
+            mkdir -p "$DEST"
+            cp "target/$RUST_TARGET/release/libaether.so" "$DEST/libaether.so"
+            echo "Installed: $DEST/libaether.so"
+
+            cd "$BASE_DIR"
+
+            # Clean up env vars for next ABI
+            unset BORING_BSSL_PATH BORING_BSSL_INCLUDE_PATH BORING_BSSL_ASSUME_PATCHED CLANG_PATH RUSTFLAGS
+            eval "unset CARGO_TARGET_${TARGET_UPPER}_LINKER AR_${TARGET_UPPER} CC_${TARGET_UPPER} CXX_${TARGET_UPPER} CFLAGS_${TARGET_UPPER} CXXFLAGS_${TARGET_UPPER} BINDGEN_EXTRA_CLANG_ARGS_${TARGET_UPPER}"
+          }
+
+          build_abi "arm64-v8a" "aarch64-linux-android" "aarch64-linux-android"
+          build_abi "armeabi-v7a" "armv7-linux-androideabi" "armv7a-linux-androideabi"
+          build_abi "x86_64" "x86_64-linux-android" "x86_64-linux-android"
+
+          echo "========================================="
+          echo "All ABIs built:"
+          ls -lh "$BASE_DIR/android/app/src/main/jniLibs/"*/libaether.so
+          echo "========================================="
+
       - name: Extract current version from pubspec.yaml
         id: current_version
         run: |
