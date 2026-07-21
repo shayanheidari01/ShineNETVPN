@@ -84,13 +84,28 @@ jobs:
           SYSROOT="$TOOLCHAIN/sysroot"
           export CMAKE_GENERATOR=Ninja
 
+          # Create symlinks so cc crate (used by ring) finds the compiler
+          # NDK ships aarch64-linux-android24-clang but ring expects aarch64-linux-android-clang
+          for triple in aarch64-linux-android armv7a-linux-androideabi x86_64-linux-android i686-linux-android; do
+            for tool in clang clang++ ld.lld ar ranlib strip; do
+              src="$TOOLCHAIN/bin/${triple}${API_LEVEL}-${tool}"
+              dst="$TOOLCHAIN/bin/${triple}-${tool}"
+              if [ -f "$src" ] && [ ! -f "$dst" ]; then
+                ln -s "$(basename "$src")" "$dst"
+              fi
+            done
+          done
+
+          # Add NDK bin to PATH so cc crate finds the compiler
+          export PATH="$TOOLCHAIN/bin:$PATH"
+
           set_abi_env() {
             # $1=RUST_TARGET, $2=CC_TRIPLE
             local TARGET_UPPER=$(echo "$1" | tr '[:lower:]-' '[:upper:]_')
             export "CARGO_TARGET_${TARGET_UPPER}_LINKER=${TOOLCHAIN}/bin/${2}${API_LEVEL}-clang"
             export "AR_${TARGET_UPPER}=${TOOLCHAIN}/bin/llvm-ar"
-            export "CC_${TARGET_UPPER}=${TOOLCHAIN}/bin/clang"
-            export "CXX_${TARGET_UPPER}=${TOOLCHAIN}/bin/clang++"
+            export "CC_${TARGET_UPPER}=${TOOLCHAIN}/bin/${2}${API_LEVEL}-clang"
+            export "CXX_${TARGET_UPPER}=${TOOLCHAIN}/bin/${2}${API_LEVEL}-clang++"
             export "CFLAGS_${TARGET_UPPER}=--target=${2}${API_LEVEL}"
             export "CXXFLAGS_${TARGET_UPPER}=--target=${2}${API_LEVEL}"
             export "BINDGEN_EXTRA_CLANG_ARGS_${TARGET_UPPER}=--target=${2}${API_LEVEL} --sysroot=${SYSROOT}"
