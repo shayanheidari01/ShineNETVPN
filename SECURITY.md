@@ -28,7 +28,7 @@ We take security seriously. If you discover a security vulnerability, please rep
 
 **DO NOT** open a public GitHub issue for security vulnerabilities.
 
-Instead, please send an email to: **security@shinenetvpn.com**
+Instead, please send an email to: **shinenetvpn@gmail.com**
 
 Include the following information:
 - Description of the vulnerability
@@ -157,7 +157,7 @@ Since V2Ray server configurations are sourced from public community lists:
 ## Contact
 
 For security-related inquiries:
-- **Email**: security@shinenetvpn.com
+- **Email**: shinenetvpn@gmail.com
 - **Telegram**: [@ShineNETVPN](https://t.me/ShineNETVPN)
 - **GitHub Issues**: For non-security bugs only
 

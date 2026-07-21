@@ -172,7 +172,7 @@ You have the right to:
 ### 6.2 Data Deletion
 To request data deletion:
 
-1. **Email**: Send a request to [support@shinenetvpn.com](mailto:support@shinenetvpn.com)
+1. **Email**: Send a request to [shinenetvpn@gmail.com](mailto:shinenetvpn@gmail.com)
 2. **Telegram**: Contact us at [@ShineNETVPN](https://t.me/ShineNETVPN)
 3. **GitHub**: Open an issue at our [repository](https://github.com/shayanheidari01/ShineNETVPN/issues)
 
@@ -255,7 +255,7 @@ We do not knowingly collect data from children under 13. If we become aware of s
 ### 12.1 Privacy Questions
 For privacy-related inquiries, contact us:
 
-- **📧 Email**: [support@shinenetvpn.com](mailto:support@shinenetvpn.com)
+- **📧 Email**: [shinenetvpn@gmail.com](mailto:shinenetvpn@gmail.com)
 - **💬 Telegram**: [@ShineNETVPN](https://t.me/ShineNETVPN)
 - **🐙 GitHub**: [ShineNET VPN Repository](https://github.com/shayanheidari01/ShineNETVPN)
 - **🗂️ Issues**: [Report Privacy Concerns](https://github.com/shayanheidari01/ShineNETVPN/issues)

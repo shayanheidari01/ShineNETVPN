@@ -85,7 +85,7 @@ We welcome contributions! Please feel free to submit pull requests, report bugs,
 
 ### 📞 Support
 
-- **Email**: support@shinenetvpn.com
+- **Email**: shinenetvpn@gmail.com
 - **Telegram**: [@ShineNETVPN](https://t.me/ShineNETVPN)
 - **Issues**: [GitHub Issues](https://github.com/shayanheidari01/ShineNETVPN/issues)
 
@@ -157,7 +157,7 @@ ShineNET VPN از پروتکل‌های رمزنگاری استاندارد صن
 
 ### 📞 پشتیبانی
 
-- **ایمیل**: support@shinenetvpn.com
+- **ایمیل**: shinenetvpn@gmail.com
 - **تلگرام**: [@ShineNETVPN](https://t.me/ShineNETVPN)
 - **مسائل**: [GitHub Issues](https://github.com/shayanheidari01/ShineNETVPN/issues)
 
