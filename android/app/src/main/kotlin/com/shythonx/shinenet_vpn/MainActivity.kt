@@ -10,6 +10,7 @@ import android.os.Build
 import android.os.Bundle
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 import kotlinx.coroutines.*
 import org.json.JSONObject
@@ -18,8 +19,9 @@ import java.io.File
 class MainActivity: FlutterActivity() {
     private val PING_CHANNEL = "com.shythonx.shinenet_vpn/native_ping"
     private val AETHER_CHANNEL = "com.shythonx.shinenet_vpn/aether"
+    private val AETHER_STATUS_CHANNEL = "com.shythonx.shinenet_vpn/aether_status"
     private lateinit var pingService: NativePingService
-    private var aetherStatusCallback: MethodChannel.Result? = null
+    private var aetherStatusSink: EventChannel.EventSink? = null
     private var receiverRegistered = false
     private var pendingVpnResult: MethodChannel.Result? = null
     private var pendingAetherConfig: String? = null
@@ -28,17 +30,17 @@ class MainActivity: FlutterActivity() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.getStringExtra(AetherVpnService.EXTRA_STATUS)) {
                 AetherVpnService.STATUS_CONNECTING -> {
-                    aetherStatusCallback?.success(mapOf("status" to "connecting"))
+                    aetherStatusSink?.success(mapOf("status" to "connecting"))
                 }
                 AetherVpnService.STATUS_CONNECTED -> {
-                    aetherStatusCallback?.success(mapOf("status" to "connected"))
+                    aetherStatusSink?.success(mapOf("status" to "connected"))
                 }
                 AetherVpnService.STATUS_FAILED -> {
                     val detail = intent.getStringExtra(AetherVpnService.EXTRA_DETAIL) ?: "Unknown error"
-                    aetherStatusCallback?.success(mapOf("status" to "failed", "detail" to detail))
+                    aetherStatusSink?.success(mapOf("status" to "failed", "detail" to detail))
                 }
                 AetherVpnService.STATUS_DISCONNECTED -> {
-                    aetherStatusCallback?.success(mapOf("status" to "disconnected"))
+                    aetherStatusSink?.success(mapOf("status" to "disconnected"))
                 }
             }
         }
@@ -48,6 +50,19 @@ class MainActivity: FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
 
         pingService = NativePingService()
+
+        EventChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            AETHER_STATUS_CHANNEL,
+        ).setStreamHandler(object : EventChannel.StreamHandler {
+            override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                aetherStatusSink = events
+            }
+
+            override fun onCancel(arguments: Any?) {
+                aetherStatusSink = null
+            }
+        })
 
         // Ping channel
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, PING_CHANNEL).setMethodCallHandler { call, result ->
@@ -227,6 +242,7 @@ class MainActivity: FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+
     }
 
     @Deprecated("Deprecated in Java")
@@ -249,6 +265,7 @@ class MainActivity: FlutterActivity() {
             registerReceiver(aetherStatusReceiver, filter)
         }
         receiverRegistered = true
+
     }
 
     override fun onStop() {
@@ -267,6 +284,7 @@ class MainActivity: FlutterActivity() {
     }
 
     companion object {
+        const val EXTRA_OPEN_DISCONNECT = "open_disconnect"
         private const val VPN_REQUEST_CODE = 1001
     }
 }

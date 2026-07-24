@@ -1,102 +1,68 @@
-import 'package:shinenet_vpn/common/liquid_glass_container.dart';
-import 'package:shinenet_vpn/common/theme.dart';
-import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:shinenet_vpn/common/theme.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class AboutScreen extends StatefulWidget {
-  AboutScreen({super.key});
+  const AboutScreen({super.key});
 
   @override
   State<AboutScreen> createState() => _AboutScreenState();
 }
 
 class _AboutScreenState extends State<AboutScreen> {
-  String? version;
+  String? _version;
 
   @override
   void initState() {
     super.initState();
-    _getVersion();
-  }
-
-  Future<void> _getVersion() async {
-    final packageInfo = await PackageInfo.fromPlatform();
-    setState(() {
-      version = packageInfo.version;
+    PackageInfo.fromPlatform().then((info) {
+      if (mounted) setState(() => _version = info.version);
     });
   }
 
-  List<Color> _tintedGlassGradient(
-    Color tint, {
-    double highlight = 0.24,
-    double lowlight = 0.06,
-  }) {
-    return [
-      tint.withValues(alpha: highlight.clamp(0.0, 1.0)),
-      Colors.white.withValues(alpha: lowlight.clamp(0.0, 1.0)),
-    ];
-  }
-
-  List<Color> _neutralGlassGradient({
-    double highlight = 0.16,
-    double lowlight = 0.05,
-  }) {
-    return [
-      Colors.white.withValues(alpha: highlight.clamp(0.0, 1.0)),
-      Colors.white.withValues(alpha: lowlight.clamp(0.0, 1.0)),
-    ];
+  Future<void> _launch(Uri uri) async {
+    HapticFeedback.selectionClick();
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: ThemeColor.backgroundColor,
       body: SafeArea(
         child: CustomScrollView(
+          physics: const BouncingScrollPhysics(),
           slivers: [
-            // Modern app bar consistent with home screen
             SliverAppBar(
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              floating: true,
-              pinned: false,
-              toolbarHeight: 64,
+              pinned: true,
               automaticallyImplyLeading: false,
-              centerTitle: true,
+              titleSpacing: 20,
               title: Text(
                 'about'.tr(),
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: ThemeColor.primaryText,
+                style: ThemeColor.headingStyle(
+                  fontSize: 24,
+                  context: context,
                 ),
-                overflow: TextOverflow.ellipsis,
               ),
             ),
-
-            // Main content
             SliverPadding(
-              padding: EdgeInsets.all(ThemeColor.mediumSpacing),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate([
-                  // Simplified app header
-                  _buildSimplifiedAppHeader(),
-                  SizedBox(height: ThemeColor.largeSpacing),
-
-                  // Simplified features
-                  _buildSimplifiedFeatures(),
-                  SizedBox(height: ThemeColor.largeSpacing),
-
-                  // Simplified contact section
-                  _buildSimplifiedContactSection(),
-                  SizedBox(height: ThemeColor.largeSpacing),
-
-                  // Simplified app info
-                  _buildSimplifiedAppInfo(),
-                ]),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+              sliver: SliverList.list(
+                children: [
+                  _intro(context),
+                  const SizedBox(height: 24),
+                  _sectionTitle(context, 'key_features'.tr()),
+                  const SizedBox(height: 10),
+                  _features(context),
+                  const SizedBox(height: 24),
+                  _sectionTitle(context, 'connect_with_us'.tr()),
+                  const SizedBox(height: 10),
+                  _contacts(context),
+                  const SizedBox(height: 24),
+                  _footer(context),
+                ],
               ),
             ),
           ],
@@ -105,77 +71,81 @@ class _AboutScreenState extends State<AboutScreen> {
     );
   }
 
-  // Simplified app header
-  Widget _buildSimplifiedAppHeader() {
-    return LiquidGlassContainer(
-      padding: EdgeInsets.all(ThemeColor.largeSpacing),
-      borderRadius: ThemeColor.xlRadius,
-      blurSigma: 28,
-      gradientColors: _tintedGlassGradient(
-        ThemeColor.primaryColor,
-        highlight: 0.28,
-        lowlight: 0.07,
+  Widget _sectionTitle(BuildContext context, String title) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Text(
+        title.toUpperCase(),
+        style: ThemeColor.captionStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: ThemeColor.mutedText,
+          context: context,
+        ).copyWith(letterSpacing: 1.1),
+      ),
+    );
+  }
+
+  Widget _intro(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF17342A), ThemeColor.cardColor],
+        ),
+        borderRadius: BorderRadius.circular(ThemeColor.largeRadius),
+        border: Border.all(
+          color: ThemeColor.primaryColor.withValues(alpha: 0.24),
+        ),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // App logo
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(ThemeColor.largeRadius),
-              boxShadow: [
-                BoxShadow(
-                  color: ThemeColor.primaryColor.withValues(alpha: 0.3),
-                  blurRadius: 12,
-                  offset: Offset(0, 6),
+          Row(
+            children: [
+              Container(
+                width: 54,
+                height: 54,
+                decoration: BoxDecoration(
+                  gradient: ThemeColor.primaryGradient,
+                  borderRadius: BorderRadius.circular(17),
                 ),
-              ],
-            ),
-            child: Padding(
-              padding: EdgeInsets.all(ThemeColor.mediumSpacing),
-              child: Icon(
-                Icons.vpn_lock_rounded,
-                color: ThemeColor.primaryColor,
-                size: 40,
+                child: const Icon(
+                  Icons.shield_rounded,
+                  color: ThemeColor.backgroundColor,
+                  size: 30,
+                ),
               ),
-            ),
+              const SizedBox(width: 15),
+              Expanded(
+                child: Text(
+                  'app_title'.tr(),
+                  style: ThemeColor.headingStyle(
+                    fontSize: 26,
+                    context: context,
+                  ),
+                ),
+              ),
+            ],
           ),
-          SizedBox(height: ThemeColor.mediumSpacing),
-          Text(
-            'app_title'.tr(),
-            style: ThemeColor.headingStyle(
-              fontSize: 28,
-              color: Colors.white,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          SizedBox(height: ThemeColor.smallSpacing),
+          const SizedBox(height: 18),
           Text(
             'about_description'.tr(),
             style: ThemeColor.bodyStyle(
-              color: Colors.white.withValues(alpha: 0.9),
+              color: ThemeColor.secondaryText,
+              context: context,
             ).copyWith(height: 1.6),
-            textAlign: TextAlign.center,
           ),
-          if (version != null) ...[
-            SizedBox(height: ThemeColor.mediumSpacing),
-            Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: ThemeColor.mediumSpacing,
-                vertical: ThemeColor.smallSpacing,
-              ),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(ThemeColor.largeRadius),
-              ),
-              child: Text(
-                '${'version_title'.tr()}: $version',
-                style: ThemeColor.captionStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w500,
-                ),
+          if (_version != null) ...[
+            const SizedBox(height: 16),
+            Text(
+              '${'version_title'.tr()}  $_version',
+              style: ThemeColor.captionStyle(
+                color: ThemeColor.primaryColor,
+                fontWeight: FontWeight.w700,
+                context: context,
               ),
             ),
           ],
@@ -184,219 +154,110 @@ class _AboutScreenState extends State<AboutScreen> {
     );
   }
 
-  // Simplified features
-  Widget _buildSimplifiedFeatures() {
-    return LiquidGlassContainer(
-      padding: EdgeInsets.all(ThemeColor.largeSpacing),
-      borderRadius: ThemeColor.largeRadius,
-      blurSigma: 24,
-      showShadow: false,
-      gradientColors: _neutralGlassGradient(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.star_rounded,
-                color: ThemeColor.warningColor,
-                size: 20,
-              ),
-              SizedBox(width: ThemeColor.smallSpacing),
-              Text(
-                'key_features'.tr(),
-                style: ThemeColor.bodyStyle(
-                  fontWeight: FontWeight.w600,
-                  color: ThemeColor.primaryText,
+  Widget _features(BuildContext context) {
+    final features = [
+      (Icons.lock_outline_rounded, 'secure'.tr()),
+      (Icons.bolt_rounded, 'fast'.tr()),
+      (Icons.code_rounded, 'open_source'.tr()),
+    ];
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: ThemeColor.cardDecoration(),
+      child: Row(
+        children: features
+            .map(
+              (feature) => Expanded(
+                child: Column(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: ThemeColor.primaryColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(
+                        feature.$1,
+                        color: ThemeColor.primaryColor,
+                        size: 21,
+                      ),
+                    ),
+                    const SizedBox(height: 9),
+                    Text(
+                      feature.$2,
+                      textAlign: TextAlign.center,
+                      style: ThemeColor.captionStyle(
+                        fontWeight: FontWeight.w600,
+                        color: ThemeColor.primaryText,
+                        context: context,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
-          SizedBox(height: ThemeColor.mediumSpacing),
-          Row(
-            children: [
-              Expanded(
-                child: _buildFeatureItem(
-                  icon: Icons.security_rounded,
-                  title: 'secure'.tr(),
-                  color: ThemeColor.successColor,
-                ),
-              ),
-              Expanded(
-                child: _buildFeatureItem(
-                  icon: Icons.speed_rounded,
-                  title: 'fast'.tr(),
-                  color: ThemeColor.primaryColor,
-                ),
-              ),
-              Expanded(
-                child: _buildFeatureItem(
-                  icon: Icons.code_rounded,
-                  title: 'open_source'.tr(),
-                  color: ThemeColor.warningColor,
-                ),
-              ),
-            ],
-          ),
-        ],
+            )
+            .toList(),
       ),
     );
   }
 
-  Widget _buildFeatureItem({
-    required IconData icon,
-    required String title,
-    required Color color,
-  }) {
-    return Column(
-      children: [
-        Container(
-          padding: EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
-            border: Border.all(
-              color: color.withValues(alpha: 0.3),
-              width: 1,
-            ),
-          ),
-          child: Icon(
-            icon,
-            color: color,
-            size: 26,
-          ),
-        ),
-        SizedBox(height: ThemeColor.smallSpacing),
-        Text(
-          title,
-          style: ThemeColor.bodyStyle(
-            fontWeight: FontWeight.w600,
-            color: ThemeColor.primaryText,
-            fontSize: 13,
-          ),
-          textAlign: TextAlign.center,
-        ),
-      ],
-    );
-  }
-
-  // Simplified contact section
-  Widget _buildSimplifiedContactSection() {
-    return LiquidGlassContainer(
-      padding: EdgeInsets.all(ThemeColor.largeSpacing),
-      borderRadius: ThemeColor.largeRadius,
-      blurSigma: 24,
-      gradientColors: _tintedGlassGradient(
-        ThemeColor.primaryColor,
-        highlight: 0.22,
-        lowlight: 0.05,
-      ),
+  Widget _contacts(BuildContext context) {
+    return Container(
+      decoration: ThemeColor.cardDecoration(),
+      clipBehavior: Clip.antiAlias,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(
-                Icons.connect_without_contact_rounded,
-                color: ThemeColor.primaryColor,
-                size: 20,
-              ),
-              SizedBox(width: ThemeColor.smallSpacing),
-              Text(
-                'connect_with_us'.tr(),
-                style: ThemeColor.bodyStyle(
-                  fontWeight: FontWeight.w600,
-                  color: ThemeColor.primaryText,
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: ThemeColor.mediumSpacing),
-          _buildContactButton(
-            icon: Icons.email_rounded,
-            title: 'email_support'.tr(),
-            subtitle: 'support_email'.tr(),
-            color: ThemeColor.primaryColor,
-            onTap: () async {
-              HapticFeedback.lightImpact();
-              final Uri emailLaunchUri = Uri(
+          _contact(
+            context,
+            Icons.mail_outline_rounded,
+            'email_support'.tr(),
+            'support_email'.tr(),
+            () => _launch(
+              Uri(
                 scheme: 'mailto',
                 path: 'support_email'.tr(),
                 queryParameters: {'subject': 'support_email_subject'.tr()},
-              );
-              await launchUrl(emailLaunchUri);
-            },
+              ),
+            ),
           ),
-          SizedBox(height: ThemeColor.smallSpacing),
-          _buildContactButton(
-            icon: Icons.chat_rounded,
-            title: 'telegram_channel'.tr(),
-            subtitle: 'join_community'.tr(),
-            color: ThemeColor.successColor,
-            onTap: () async {
-              HapticFeedback.lightImpact();
-              await launchUrl(
-                Uri.parse('https://t.me/ShineNETVPN'),
-                mode: LaunchMode.externalApplication,
-              );
-            },
+          _contact(
+            context,
+            Icons.send_rounded,
+            'telegram_channel'.tr(),
+            'join_community'.tr(),
+            () => _launch(Uri.parse('https://t.me/ShineNETVPN')),
           ),
-          SizedBox(height: ThemeColor.smallSpacing),
-          _buildContactButton(
-            icon: Icons.code_rounded,
-            title: 'open_source'.tr(),
-            subtitle: 'view_on_github'.tr(),
-            color: ThemeColor.secondaryText,
-            onTap: () async {
-              HapticFeedback.lightImpact();
-              await launchUrl(
-                Uri.parse('https://github.com/shayanheidari01/ShineNETVPN'),
-                mode: LaunchMode.externalApplication,
-              );
-            },
+          _contact(
+            context,
+            Icons.code_rounded,
+            'open_source'.tr(),
+            'view_on_github'.tr(),
+            () => _launch(
+              Uri.parse('https://github.com/shayanheidari01/ShineNETVPN'),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildContactButton({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
+  Widget _contact(
+    BuildContext context,
+    IconData icon,
+    String title,
+    String subtitle,
+    VoidCallback onTap,
+  ) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
-        child: Container(
-          padding: EdgeInsets.all(ThemeColor.mediumSpacing),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.05),
-            borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
-            border: Border.all(
-              color: color.withValues(alpha: 0.2),
-              width: 1,
-            ),
-          ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
           child: Row(
             children: [
-              Container(
-                padding: EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
-                ),
-                child: Icon(
-                  icon,
-                  color: color,
-                  size: 20,
-                ),
-              ),
-              SizedBox(width: ThemeColor.mediumSpacing),
+              Icon(icon, color: ThemeColor.primaryColor, size: 22),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -404,23 +265,22 @@ class _AboutScreenState extends State<AboutScreen> {
                     Text(
                       title,
                       style: ThemeColor.bodyStyle(
-                        fontWeight: FontWeight.w600,
                         color: ThemeColor.primaryText,
+                        fontWeight: FontWeight.w600,
+                        context: context,
                       ),
                     ),
                     Text(
                       subtitle,
-                      style: ThemeColor.captionStyle(
-                        color: ThemeColor.mutedText,
-                      ),
+                      style: ThemeColor.captionStyle(context: context),
                     ),
                   ],
                 ),
               ),
-              Icon(
-                Icons.arrow_forward_ios_rounded,
-                color: color,
-                size: 16,
+              const Icon(
+                Icons.open_in_new_rounded,
+                color: ThemeColor.mutedText,
+                size: 18,
               ),
             ],
           ),
@@ -429,104 +289,21 @@ class _AboutScreenState extends State<AboutScreen> {
     );
   }
 
-  // Simplified app info
-  Widget _buildSimplifiedAppInfo() {
-    return LiquidGlassContainer(
-      padding: EdgeInsets.all(ThemeColor.largeSpacing),
-      borderRadius: ThemeColor.largeRadius,
-      blurSigma: 24,
-      showShadow: false,
-      gradientColors: _tintedGlassGradient(
-        ThemeColor.secondaryColor,
-        highlight: 0.2,
-        lowlight: 0.05,
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.info_rounded,
-                color: ThemeColor.primaryColor,
-                size: 20,
-              ),
-              SizedBox(width: ThemeColor.smallSpacing),
-              Text(
-                'app_information'.tr(),
-                style: ThemeColor.bodyStyle(
-                  fontWeight: FontWeight.w600,
-                  color: ThemeColor.primaryText,
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: ThemeColor.mediumSpacing),
-          Row(
-            children: [
-              Expanded(
-                child: _buildInfoItem(
-                  icon: Icons.update_rounded,
-                  title: 'version'.tr(),
-                  value: version ?? '—',
-                  color: ThemeColor.primaryColor,
-                ),
-              ),
-              Expanded(
-                child: _buildInfoItem(
-                  icon: Icons.code_rounded,
-                  title: 'license'.tr(),
-                  value: 'mit_license'.tr(),
-                  color: ThemeColor.successColor,
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: ThemeColor.largeSpacing),
-          Text(
-            'copyright'.tr(),
-            style: ThemeColor.captionStyle(
-              color: ThemeColor.mutedText,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoItem({
-    required IconData icon,
-    required String title,
-    required String value,
-    required Color color,
-  }) {
+  Widget _footer(BuildContext context) {
     return Column(
       children: [
-        Container(
-          padding: EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
-          ),
-          child: Icon(
-            icon,
-            color: color,
-            size: 24,
-          ),
-        ),
-        SizedBox(height: ThemeColor.smallSpacing),
         Text(
-          value,
-          style: ThemeColor.bodyStyle(
-            fontWeight: FontWeight.w700,
-            color: color,
-            fontSize: 16,
-          ),
+          'copyright'.tr(),
+          textAlign: TextAlign.center,
+          style: ThemeColor.captionStyle(context: context),
         ),
+        const SizedBox(height: 6),
         Text(
-          title,
+          'MIT License',
           style: ThemeColor.captionStyle(
-            color: color.withValues(alpha: 0.8),
+            fontSize: 11,
+            color: ThemeColor.mutedText,
+            context: context,
           ),
         ),
       ],

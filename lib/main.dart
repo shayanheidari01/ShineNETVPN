@@ -183,9 +183,22 @@ Future<void> _runMainApp() async {
           error: error,
           name: 'localization',
         );
-        return Text(
-          'translation_error'.tr(),
-          style: FontHelper.getTextStyle(color: Colors.red),
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: ThemeColor.buildTheme(),
+          home: Scaffold(
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  'Translation resources could not be loaded.',
+                  textAlign: TextAlign.center,
+                  style:
+                      FontHelper.getTextStyle(color: ThemeColor.errorColor),
+                ),
+              ),
+            ),
+          ),
         );
       },
       child: MyApp(),
@@ -436,42 +449,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
       return MaterialApp(
         title: 'ShineNET VPN',
-        theme: ThemeData.dark(
-          useMaterial3: true,
-        ).copyWith(
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: ThemeColor.primaryColor,
-            brightness: Brightness.dark,
-            primary: ThemeColor.primaryColor,
-            onPrimary: Colors.white,
-            secondary: ThemeColor.secondaryColor,
-            onSecondary: Colors.white,
-            error: ThemeColor.errorColor,
-            onError: Colors.white,
-            surface: ThemeColor.backgroundColor,
-            onSurface: ThemeColor.foregroundColor,
-          ),
-          dialogTheme: DialogThemeData(
-            backgroundColor: ThemeColor.backgroundColor,
-          ),
-          appBarTheme: AppBarTheme(
-            backgroundColor: ThemeColor.backgroundColor,
-            foregroundColor: ThemeColor.foregroundColor,
-            elevation: 0,
-          ),
-          scaffoldBackgroundColor: ThemeColor.backgroundColor,
-          bottomSheetTheme: BottomSheetThemeData(
-            backgroundColor: Colors.transparent,
-          ),
-          textTheme: TextTheme(
-            bodyMedium: ThemeColor.bodyStyle(),
-            bodyLarge: ThemeColor.bodyStyle(fontSize: 18),
-            bodySmall: ThemeColor.captionStyle(),
-            headlineMedium: ThemeColor.headingStyle(),
-            headlineSmall: ThemeColor.headingStyle(fontSize: 20),
-            titleMedium: ThemeColor.bodyStyle(fontWeight: FontWeight.w600),
-          ),
-        ),
+        theme: ThemeColor.buildTheme(),
         // Null-safe localization handling
         localizationsDelegates: _safeGetLocalizationDelegates(context),
         supportedLocales: _safeGetSupportedLocales(context),
@@ -693,8 +671,8 @@ class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
   void _initializePages() {
     try {
       _pages = [
-        _buildPageWithErrorBoundary(() => SettingsWidget()),
-        _buildPageWithErrorBoundary(() => HomePage()),
+        _buildPageWithErrorBoundary(() => SettingsScreen()),
+        _buildPageWithErrorBoundary(() => HomeScreen()),
         _buildPageWithErrorBoundary(() => AboutScreen()),
       ];
       setState(() {

@@ -1,17 +1,11 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:easy_localization/easy_localization.dart';
-import 'package:iconsax/iconsax.dart';
-import 'package:shinenet_vpn/common/liquid_glass_container.dart';
-import 'package:shinenet_vpn/common/theme.dart';
 import 'package:flutter_v2ray_client/flutter_v2ray.dart';
+import 'package:iconsax/iconsax.dart';
+import 'package:shinenet_vpn/common/theme.dart';
 
-class ModernNavigation extends StatefulWidget {
-  final int selectedIndex;
-  final ValueNotifier<V2RayStatus> v2rayStatus;
-  final Function(int) onDestinationSelected;
-  final bool isWideScreen;
-
+class ModernNavigation extends StatelessWidget {
   const ModernNavigation({
     super.key,
     required this.selectedIndex,
@@ -20,472 +14,257 @@ class ModernNavigation extends StatefulWidget {
     required this.isWideScreen,
   });
 
-  @override
-  State<ModernNavigation> createState() => _ModernNavigationState();
-}
+  final int selectedIndex;
+  final ValueNotifier<V2RayStatus> v2rayStatus;
+  final ValueChanged<int> onDestinationSelected;
+  final bool isWideScreen;
 
-class _ModernNavigationState extends State<ModernNavigation>
-    with TickerProviderStateMixin {
-  late AnimationController _animationController;
-  late Animation<double> _scaleAnimation;
-  late Animation<double> _fadeAnimation;
+  List<_NavigationItem> _items() => [
+        _NavigationItem(Iconsax.setting_2, 'settings'.tr(), 0),
+        _NavigationItem(Iconsax.shield_tick, 'home'.tr(), 1),
+        _NavigationItem(Iconsax.info_circle, 'about'.tr(), 2),
+      ];
 
-  @override
-  void initState() {
-    super.initState();
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: 300),
-      vsync: this,
-    );
-    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.elasticOut),
-    );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
-    );
-    _animationController.forward();
-  }
-
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
+  void _select(int index) {
+    HapticFeedback.selectionClick();
+    onDestinationSelected(index);
   }
 
   @override
   Widget build(BuildContext context) {
-    if (widget.isWideScreen) {
-      return _buildDesktopNavigation();
-    } else {
-      return _buildMobileNavigation();
-    }
+    return isWideScreen ? _desktop(context) : _mobile(context);
   }
 
-  Widget _buildDesktopNavigation() {
-    return SizedBox(
-      width: 280,
-      child: LiquidGlassContainer(
-        borderRadius: ThemeColor.largeRadius,
-        blurSigma: 26,
-        opacity: 0.08,
-        borderColor: ThemeColor.primaryColor.withValues(alpha: 0.4),
-        gradientColors: [
-          ThemeColor.surfaceColor.withValues(alpha: 0.75),
-          ThemeColor.surfaceColor.withValues(alpha: 0.55),
-        ],
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-        child: Column(
-          children: [
-            _buildAppHeader(),
-            const SizedBox(height: 32),
-            Expanded(
-              child: _buildNavigationItems(),
-            ),
-            const SizedBox(height: 16),
-            _buildConnectionStatus(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMobileNavigation() {
+  Widget _mobile(BuildContext context) {
     return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-        child: LiquidGlassContainer(
-          borderRadius: ThemeColor.largeRadius,
-          blurSigma: 20,
-          opacity: 0.1,
-          showShadow: false,
-          borderColor: ThemeColor.primaryColor.withValues(alpha: 0.25),
-          gradientColors: [
-            ThemeColor.surfaceColor.withValues(alpha: 0.75),
-            ThemeColor.surfaceColor.withValues(alpha: 0.5),
+      top: false,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          color: ThemeColor.surfaceColor.withValues(alpha: 0.98),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: ThemeColor.borderColor),
+          boxShadow: const [
+            BoxShadow(
+              color: ThemeColor.shadowColor,
+              blurRadius: 24,
+              offset: Offset(0, 10),
+            ),
           ],
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: _buildMobileNavigationItems(),
-          ),
+        ),
+        child: Row(
+          children: _items().map((item) {
+            final selected = selectedIndex == item.index;
+            return Expanded(
+              child: Semantics(
+                selected: selected,
+                button: true,
+                label: item.label,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => _select(item.index),
+                    borderRadius: BorderRadius.circular(17),
+                    child: AnimatedContainer(
+                      duration: ThemeColor.fastAnimation,
+                      padding: const EdgeInsets.symmetric(vertical: 9),
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? ThemeColor.primaryColor.withValues(alpha: 0.13)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(17),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            item.icon,
+                            size: 21,
+                            color: selected
+                                ? ThemeColor.primaryColor
+                                : ThemeColor.mutedText,
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            item.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: ThemeColor.captionStyle(
+                              fontSize: 11,
+                              fontWeight: selected
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                              color: selected
+                                  ? ThemeColor.primaryColor
+                                  : ThemeColor.mutedText,
+                              context: context,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
         ),
       ),
     );
   }
 
-  Widget _buildAppHeader() {
-    return AnimatedBuilder(
-      animation: _fadeAnimation,
-      builder: (context, child) {
-        return Opacity(
-          opacity: _fadeAnimation.value,
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  ThemeColor.primaryColor.withValues(alpha: 0.1),
-                  ThemeColor.primaryColor.withValues(alpha: 0.05),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(ThemeColor.largeRadius),
-              border: Border.all(
-                color: ThemeColor.primaryColor.withValues(alpha: 0.2),
-                width: 1,
-              ),
-            ),
-            child: Column(
+  Widget _desktop(BuildContext context) {
+    return Container(
+      width: 252,
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
+      decoration: ThemeColor.cardDecoration(
+        color: ThemeColor.surfaceColor,
+        radius: ThemeColor.largeRadius,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 28),
+            child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  width: 42,
+                  height: 42,
                   decoration: BoxDecoration(
-                    color: ThemeColor.primaryColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
+                    gradient: ThemeColor.primaryGradient,
+                    borderRadius:
+                        BorderRadius.circular(ThemeColor.smallRadius),
                   ),
-                  child: Icon(
-                    Icons.vpn_lock_rounded,
-                    color: ThemeColor.primaryColor,
-                    size: 32,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'app_title'.tr(),
-                  style: ThemeColor.headingStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: ThemeColor.primaryText,
+                  child: const Icon(
+                    Icons.shield_rounded,
+                    color: ThemeColor.backgroundColor,
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'secure_vpn'.tr(),
-                  style: ThemeColor.captionStyle(
-                    color: ThemeColor.secondaryText,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'app_title'.tr(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: ThemeColor.headingStyle(
+                      fontSize: 17,
+                      context: context,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
-        );
-      },
+          ..._items().map((item) => _desktopItem(context, item)),
+          const Spacer(),
+          _connectionStatus(context),
+        ],
+      ),
     );
   }
 
-  List<_NavigationItem> _getNavigationItems() {
-    return [
-      _NavigationItem(
-        icon: Iconsax.setting_2,
-        label: 'settings'.tr(),
-        index: 0,
-      ),
-      _NavigationItem(
-        icon: Iconsax.home_2,
-        label: 'home'.tr(),
-        index: 1,
-      ),
-      _NavigationItem(
-        icon: Iconsax.info_circle,
-        label: 'about'.tr(),
-        index: 2,
-      ),
-    ];
-  }
-
-  Widget _buildNavigationItems() {
-    final navItems = _getNavigationItems();
-    return Column(
-      children: navItems.map((item) => _buildNavigationItem(item)).toList(),
-    );
-  }
-
-  Widget _buildNavigationItem(_NavigationItem item) {
-    final isSelected = widget.selectedIndex == item.index;
-    
-    return AnimatedBuilder(
-      animation: _scaleAnimation,
-      builder: (context, child) {
-        return Transform.scale(
-          scale: isSelected ? _scaleAnimation.value : 1.0,
-          child: Container(
-            margin: const EdgeInsets.symmetric(vertical: 6),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  widget.onDestinationSelected(item.index);
-                },
-                borderRadius: BorderRadius.circular(ThemeColor.largeRadius),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  curve: Curves.easeInOut,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 16,
-                  ),
-                  decoration: BoxDecoration(
-                    gradient: isSelected
-                        ? LinearGradient(
-                            colors: [
-                              ThemeColor.primaryColor.withValues(alpha: 0.15),
-                              ThemeColor.primaryColor.withValues(alpha: 0.08),
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          )
-                        : null,
-                    color: isSelected ? null : Colors.transparent,
-                    borderRadius: BorderRadius.circular(ThemeColor.largeRadius),
-                    border: isSelected
-                        ? Border.all(
-                            color: ThemeColor.primaryColor.withValues(alpha: 0.3),
-                            width: 1.5,
-                          )
-                        : Border.all(
-                            color: ThemeColor.borderColor.withValues(alpha: 0.1),
-                            width: 1,
-                          ),
-                    boxShadow: isSelected
-                        ? [
-                            BoxShadow(
-                              color: ThemeColor.primaryColor.withValues(alpha: 0.2),
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
-                            ),
-                          ]
-                        : null,
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? ThemeColor.primaryColor.withValues(alpha: 0.2)
-                              : ThemeColor.surfaceColor.withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
-                        ),
-                        child: Icon(
-                          item.icon,
-                          color: isSelected
-                              ? ThemeColor.primaryColor
-                              : ThemeColor.mutedText,
-                          size: 20,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Text(
-                          item.label,
-                          style: ThemeColor.bodyStyle(
-                            color: isSelected
-                                ? ThemeColor.primaryColor
-                                : ThemeColor.mutedText,
-                            fontWeight: isSelected
-                                ? FontWeight.w700
-                                : FontWeight.w500,
-                            fontSize: 15,
-                          ),
-                        ),
-                      ),
-                      if (isSelected)
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: ThemeColor.primaryColor,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                    ],
+  Widget _desktopItem(BuildContext context, _NavigationItem item) {
+    final selected = selectedIndex == item.index;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _select(item.index),
+          borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
+          child: AnimatedContainer(
+            duration: ThemeColor.fastAnimation,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+            decoration: BoxDecoration(
+              color: selected
+                  ? ThemeColor.primaryColor.withValues(alpha: 0.12)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  item.icon,
+                  size: 21,
+                  color: selected
+                      ? ThemeColor.primaryColor
+                      : ThemeColor.secondaryText,
+                ),
+                const SizedBox(width: 13),
+                Expanded(
+                  child: Text(
+                    item.label,
+                    style: ThemeColor.bodyStyle(
+                      color: selected
+                          ? ThemeColor.primaryText
+                          : ThemeColor.secondaryText,
+                      fontWeight:
+                          selected ? FontWeight.w700 : FontWeight.w500,
+                      context: context,
+                    ),
                   ),
                 ),
-              ),
+                if (selected)
+                  const Icon(
+                    Icons.circle,
+                    size: 7,
+                    color: ThemeColor.primaryColor,
+                  ),
+              ],
             ),
           ),
-        );
-      },
-    );
-  }
-
-  List<Widget> _buildMobileNavigationItems() {
-    final navItems = _getNavigationItems();
-    return navItems.map((item) => _buildMobileNavigationItem(item)).toList();
-  }
-
-  Widget _buildMobileNavigationItem(_NavigationItem item) {
-    final isSelected = widget.selectedIndex == item.index;
-
-    return Expanded(
-      child: AnimatedBuilder(
-        animation: _scaleAnimation,
-        builder: (context, child) {
-          return Transform.scale(
-            scale: isSelected ? _scaleAnimation.value : 1.0,
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  widget.onDestinationSelected(item.index);
-                },
-                borderRadius: BorderRadius.circular(ThemeColor.largeRadius),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  curve: Curves.easeInOut,
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 9,
-                  ),
-                  decoration: BoxDecoration(
-                    gradient: isSelected
-                        ? LinearGradient(
-                            colors: [
-                              ThemeColor.primaryColor.withValues(alpha: 0.15),
-                              ThemeColor.primaryColor.withValues(alpha: 0.08),
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          )
-                        : null,
-                    color: isSelected ? null : Colors.transparent,
-                    borderRadius: BorderRadius.circular(ThemeColor.largeRadius),
-                    border: isSelected
-                        ? Border.all(
-                            color: ThemeColor.primaryColor.withValues(alpha: 0.3),
-                            width: 1.5,
-                          )
-                        : Border.all(
-                            color: ThemeColor.borderColor.withValues(alpha: 0.1),
-                            width: 1,
-                          ),
-                    boxShadow: isSelected
-                        ? [
-                            BoxShadow(
-                              color: ThemeColor.primaryColor.withValues(alpha: 0.2),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ]
-                        : null,
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(5),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? ThemeColor.primaryColor.withValues(alpha: 0.2)
-                              : ThemeColor.surfaceColor.withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
-                        ),
-                        child: Icon(
-                          item.icon,
-                          color: isSelected
-                              ? ThemeColor.primaryColor
-                              : ThemeColor.mutedText,
-                          size: 16,
-                        ),
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-                        item.label,
-                        style: ThemeColor.captionStyle(
-                          color: isSelected
-                              ? ThemeColor.primaryColor
-                              : ThemeColor.mutedText,
-                          fontWeight: isSelected
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                          fontSize: 10,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          );
-        },
+        ),
       ),
     );
   }
 
-  Widget _buildConnectionStatus() {
+  Widget _connectionStatus(BuildContext context) {
     return ValueListenableBuilder<V2RayStatus>(
-      valueListenable: widget.v2rayStatus,
+      valueListenable: v2rayStatus,
       builder: (context, status, _) {
         final normalized = status.state.toUpperCase();
-        final isConnected = normalized == 'CONNECTED';
-        final isConnecting = normalized == 'CONNECTING';
+        final connected = const {'CONNECTED', 'RUNNING', 'STARTED'}
+            .contains(normalized);
+        final connecting =
+            const {'CONNECTING', 'STARTING'}.contains(normalized);
+        final color = connected
+            ? ThemeColor.successColor
+            : connecting
+                ? ThemeColor.warningColor
+                : ThemeColor.mutedText;
+        final label = connected
+            ? 'connected'.tr()
+            : connecting
+                ? 'connecting'.tr()
+                : 'disconnected'.tr();
 
-        Color statusColor;
-        IconData statusIcon;
-        String statusText;
-
-        if (isConnected) {
-          statusColor = ThemeColor.successColor;
-          statusIcon = Icons.check_circle_rounded;
-          statusText = 'connected'.tr();
-        } else if (isConnecting) {
-          statusColor = ThemeColor.warningColor;
-          statusIcon = Icons.sync_rounded;
-          statusText = 'connecting'.tr();
-        } else {
-          statusColor = ThemeColor.mutedText;
-          statusIcon = Icons.radio_button_unchecked_rounded;
-          statusText = 'disconnected'.tr();
-        }
-
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          padding: const EdgeInsets.all(16),
+        return Container(
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: statusColor.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(ThemeColor.largeRadius),
-            border: Border.all(
-              color: statusColor.withValues(alpha: 0.3),
-              width: 1,
-            ),
+            color: ThemeColor.cardColor,
+            borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
+            border: Border.all(color: ThemeColor.borderColor),
           ),
           child: Row(
             children: [
-              AnimatedRotation(
-                turns: isConnecting ? 1 : 0,
-                duration: const Duration(seconds: 1),
-                child: Icon(
-                  statusIcon,
-                  color: statusColor,
-                  size: 20,
-                ),
+              Container(
+                width: 9,
+                height: 9,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'status'.tr(),
-                      style: ThemeColor.captionStyle(
-                        color: statusColor.withValues(alpha: 0.8),
-                        fontSize: 12,
-                      ),
-                    ),
-                    Text(
-                      statusText,
-                      style: ThemeColor.bodyStyle(
-                        color: statusColor,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  label,
+                  style: ThemeColor.bodyStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: color,
+                    context: context,
+                  ),
                 ),
               ),
             ],
@@ -497,13 +276,9 @@ class _ModernNavigationState extends State<ModernNavigation>
 }
 
 class _NavigationItem {
+  const _NavigationItem(this.icon, this.label, this.index);
+
   final IconData icon;
   final String label;
   final int index;
-
-  _NavigationItem({
-    required this.icon,
-    required this.label,
-    required this.index,
-  });
 }

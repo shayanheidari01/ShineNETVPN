@@ -275,7 +275,7 @@ We aim to respond to privacy inquiries within **48 hours**.
   
   ---
   
-  **© 2024 ShineNET VPN. All rights reserved.**
+  **© 2026 ShineNET VPN. All rights reserved.**
   
   *Made with ❤️ for digital freedom and privacy*
   

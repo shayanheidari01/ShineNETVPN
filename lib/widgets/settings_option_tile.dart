@@ -1,13 +1,13 @@
 import 'package:shinenet_vpn/common/theme.dart';
 import 'package:flutter/material.dart';
 
-class OptionTile extends StatelessWidget {
+class SettingsOptionTile extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
   final bool isShowArrowBtn;
 
-  OptionTile(
+  SettingsOptionTile(
       {required this.icon,
       required this.title,
       required this.subtitle,

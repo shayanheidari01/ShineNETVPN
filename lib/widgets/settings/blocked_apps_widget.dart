@@ -6,14 +6,14 @@ import 'package:installed_apps/installed_apps.dart';
 import 'package:installed_apps/app_info.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class BlockedAppsWidgets extends StatefulWidget {
-   BlockedAppsWidgets({super.key});
+class BlockedAppsWidget extends StatefulWidget {
+   BlockedAppsWidget({super.key});
 
   @override
-  State<BlockedAppsWidgets> createState() => _BlockedAppsWidgetsState();
+  State<BlockedAppsWidget> createState() => _BlockedAppsWidgetState();
 }
 
-class _BlockedAppsWidgetsState extends State<BlockedAppsWidgets>
+class _BlockedAppsWidgetState extends State<BlockedAppsWidget>
     with SingleTickerProviderStateMixin {
   List<AppInfo>? apps;
   List<AppInfo>? filteredApps;

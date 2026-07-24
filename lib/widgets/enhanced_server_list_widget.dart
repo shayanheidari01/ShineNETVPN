@@ -325,6 +325,8 @@ class _EnhancedServerListWidgetState extends State<EnhancedServerListWidget> {
     }
 
     return ListView.builder(
+      cacheExtent: 480,
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: EdgeInsets.all(ThemeColor.mediumSpacing),
       itemCount: _filteredServers.length,
       itemBuilder: (context, index) {

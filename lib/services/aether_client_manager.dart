@@ -18,6 +18,8 @@ class AetherClientManager {
 
   static const MethodChannel _channel =
       MethodChannel('com.shythonx.shinenet_vpn/aether');
+  static const EventChannel _statusChannel =
+      EventChannel('com.shythonx.shinenet_vpn/aether_status');
 
   static const String _connectedSinceKey = 'aether_connected_since';
 
@@ -26,6 +28,8 @@ class AetherClientManager {
 
   AetherState _currentState = AetherState.disconnected;
   bool _nativeLibsLoaded = false;
+  bool _pollingReadiness = false;
+  StreamSubscription<dynamic>? _nativeStatusSubscription;
 
   DateTime? _connectedSince;
   Timer? _durationTimer;
@@ -45,6 +49,10 @@ class AetherClientManager {
       if (running && ready && _currentState != AetherState.connected) {
         await _restoreConnectedSince();
         _updateState(AetherState.connected);
+      } else if (running && !ready && _currentState != AetherState.connecting) {
+        // Service is running but not ready yet — start polling
+        _updateState(AetherState.connecting);
+        _pollReadiness();
       } else if (!running && _currentState != AetherState.disconnected) {
         _updateState(AetherState.disconnected);
       }
@@ -58,11 +66,41 @@ class AetherClientManager {
       final result = await _channel.invokeMethod<Map>('checkNativeLibs');
       _nativeLibsLoaded =
           (result?['aetherLoaded'] ?? false) && (result?['jniLoaded'] ?? false);
+      if (_nativeLibsLoaded) {
+        _listenToNativeStatus();
+      }
       return _nativeLibsLoaded;
     } catch (e) {
       _nativeLibsLoaded = false;
       return false;
     }
+  }
+
+  void _listenToNativeStatus() {
+    if (_nativeStatusSubscription != null) return;
+
+    _nativeStatusSubscription =
+        _statusChannel.receiveBroadcastStream().listen((event) {
+      if (event is! Map) return;
+      switch (event['status']?.toString().toLowerCase()) {
+        case 'connecting':
+          _updateState(AetherState.connecting);
+          break;
+        case 'connected':
+          _updateState(AetherState.connected);
+          break;
+        case 'failed':
+          _updateState(AetherState.failed);
+          break;
+        case 'disconnected':
+          _updateState(AetherState.disconnected);
+          break;
+      }
+    }, onError: (_) {
+      // Native polling remains active as a fallback.
+      _nativeStatusSubscription?.cancel();
+      _nativeStatusSubscription = null;
+    });
   }
 
   Future<bool> requestVpnPermission() async {
@@ -151,47 +189,54 @@ class AetherClientManager {
   /// Poll for tunnel readiness after starting.
   /// The VPN service starts asynchronously, so we give it time to boot up.
   void _pollReadiness() async {
-    // Short delay for VPN service bootstrap
-    await Future.delayed(const Duration(milliseconds: 400));
+    if (_pollingReadiness) return;
+    _pollingReadiness = true;
 
-    int ticks = 0;
-    const maxWaitSeconds = 90;
+    try {
+      // Short delay for VPN service bootstrap
+      await Future.delayed(const Duration(milliseconds: 400));
 
-    while (_currentState == AetherState.connecting && ticks < maxWaitSeconds) {
-      await Future.delayed(const Duration(milliseconds: 500));
-      ticks++;
+      int ticks = 0;
+      const maxWaitSeconds = 90;
 
-      try {
-        final ready = await isReady();
-        if (ready && _currentState == AetherState.connecting) {
-          _updateState(AetherState.connected);
-          return;
+      while (_currentState == AetherState.connecting && ticks < maxWaitSeconds) {
+        await Future.delayed(const Duration(milliseconds: 500));
+        ticks++;
+
+        try {
+          final ready = await isReady();
+          if (ready && _currentState == AetherState.connecting) {
+            _updateState(AetherState.connected);
+            return;
+          }
+
+          final running = await isRunning();
+          final error = await getLastError();
+
+          // Fail fast when native prepare/start already reported an error
+          if (error.isNotEmpty &&
+              !running &&
+              ticks >= 2 &&
+              _currentState == AetherState.connecting) {
+            _updateState(AetherState.failed);
+            return;
+          }
+
+          if (!running && ticks > 10 && _currentState == AetherState.connecting) {
+            _updateState(AetherState.failed);
+            return;
+          }
+        } catch (e) {
+          // Continue polling
         }
-
-        final running = await isRunning();
-        final error = await getLastError();
-
-        // Fail fast when native prepare/start already reported an error
-        if (error.isNotEmpty &&
-            !running &&
-            ticks >= 2 &&
-            _currentState == AetherState.connecting) {
-          _updateState(AetherState.failed);
-          return;
-        }
-
-        if (!running && ticks > 10 && _currentState == AetherState.connecting) {
-          _updateState(AetherState.failed);
-          return;
-        }
-      } catch (e) {
-        // Continue polling
       }
-    }
 
-    // Timeout
-    if (_currentState == AetherState.connecting) {
-      _updateState(AetherState.failed);
+      // Timeout
+      if (_currentState == AetherState.connecting) {
+        _updateState(AetherState.failed);
+      }
+    } finally {
+      _pollingReadiness = false;
     }
   }
 
@@ -261,5 +306,7 @@ class AetherClientManager {
 
   void dispose() {
     _stopDurationTimer();
+    _nativeStatusSubscription?.cancel();
+    _nativeStatusSubscription = null;
   }
 }

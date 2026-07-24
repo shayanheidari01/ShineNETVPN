@@ -245,23 +245,12 @@ class _ServerSelectionModalState extends State<ServerSelectionModal>
                   ),
                   child: ClipRRect(
                     borderRadius: const BorderRadius.all(Radius.circular(28)),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                      child: Container(
+                    child: Container(
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              Colors.white.withValues(alpha: 0.15),
-                              Colors.white.withValues(alpha: 0.05),
-                            ],
-                          ),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            width: 1.5,
-                          ),
-                          borderRadius: const BorderRadius.all(Radius.circular(28)),
+                          color: ThemeColor.surfaceColor,
+                          border: Border.all(color: ThemeColor.borderColor),
+                          borderRadius:
+                              const BorderRadius.all(Radius.circular(28)),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -278,7 +267,6 @@ class _ServerSelectionModalState extends State<ServerSelectionModal>
                           ],
                         ),
                       ),
-                    ),
                   ),
                 ),
               ),
@@ -314,31 +302,22 @@ class _ServerSelectionModalState extends State<ServerSelectionModal>
         children: [
           // Handle bar
           Container(
-            width: 48,
+            width: 36,
             height: 4,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.3),
+              color: ThemeColor.mutedText,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 18),
           // Title section
           Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      ThemeColor.primaryColor.withValues(alpha: 0.2),
-                      ThemeColor.primaryColor.withValues(alpha: 0.1),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: ThemeColor.primaryColor.withValues(alpha: 0.3),
-                    width: 1,
-                  ),
+                  color: ThemeColor.primaryColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(
                   Icons.dns_rounded,
@@ -356,7 +335,7 @@ class _ServerSelectionModalState extends State<ServerSelectionModal>
                       style: ThemeColor.headingStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w700,
-                        color: Colors.white,
+                        color: ThemeColor.primaryText,
                         context: context,
                       ),
                     ),
@@ -367,7 +346,7 @@ class _ServerSelectionModalState extends State<ServerSelectionModal>
                           : 'server_count'.tr(namedArgs: {'count': _allServers.length.toString()}),
                       style: ThemeColor.captionStyle(
                         fontSize: 14,
-                        color: Colors.white.withValues(alpha: 0.7),
+                        color: ThemeColor.secondaryText,
                         context: context,
                       ),
                     ),
@@ -399,10 +378,10 @@ class _ServerSelectionModalState extends State<ServerSelectionModal>
           filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.1),
+              color: ThemeColor.cardColor,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: Colors.white.withValues(alpha: 0.2),
+                color: ThemeColor.borderColor,
                 width: 1,
               ),
             ),
@@ -419,7 +398,7 @@ class _ServerSelectionModalState extends State<ServerSelectionModal>
                   padding: const EdgeInsets.all(12),
                   child: Icon(
                     Icons.search_rounded,
-                    color: Colors.white.withValues(alpha: 0.6),
+                  color: ThemeColor.secondaryText,
                     size: 20,
                   ),
                 ),
@@ -432,13 +411,13 @@ class _ServerSelectionModalState extends State<ServerSelectionModal>
                         },
                         icon: Icon(
                           Icons.clear_rounded,
-                          color: Colors.white.withValues(alpha: 0.6),
+                          color: ThemeColor.secondaryText,
                           size: 20,
                         ),
                       ),
                 hintText: 'search_placeholder'.tr(),
                 hintStyle: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.5),
+                  color: ThemeColor.mutedText,
                   fontSize: 16,
                 ),
                 border: InputBorder.none,
@@ -466,25 +445,15 @@ class _ServerSelectionModalState extends State<ServerSelectionModal>
           curve: Curves.easeOut,
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            gradient: isSelected
-                ? LinearGradient(
-                    colors: [
-                      ThemeColor.primaryColor.withValues(alpha: 0.3),
-                      ThemeColor.primaryColor.withValues(alpha: 0.1),
-                    ],
-                  )
-                : LinearGradient(
-                    colors: [
-                      Colors.white.withValues(alpha: 0.1),
-                      Colors.white.withValues(alpha: 0.05),
-                    ],
-                  ),
+            color: isSelected
+                ? ThemeColor.primaryColor.withValues(alpha: 0.12)
+                : ThemeColor.cardColor,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: isSelected
                   ? ThemeColor.primaryColor.withValues(alpha: 0.4)
-                  : Colors.white.withValues(alpha: 0.2),
-              width: 1.5,
+                  : ThemeColor.borderColor,
+              width: isSelected ? 1.2 : 1,
             ),
           ),
           child: Row(
@@ -492,22 +461,16 @@ class _ServerSelectionModalState extends State<ServerSelectionModal>
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: isSelected
-                        ? [
-                            ThemeColor.primaryColor,
-                            ThemeColor.primaryColor.withValues(alpha: 0.8),
-                          ]
-                        : [
-                            Colors.white.withValues(alpha: 0.2),
-                            Colors.white.withValues(alpha: 0.1),
-                          ],
-                  ),
+                  color: isSelected
+                      ? ThemeColor.primaryColor
+                      : ThemeColor.elevatedSurface,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
                   Icons.auto_awesome_rounded,
-                  color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.8),
+                  color: isSelected
+                      ? ThemeColor.backgroundColor
+                      : ThemeColor.secondaryText,
                   size: 20,
                 ),
               ),
@@ -563,6 +526,8 @@ class _ServerSelectionModalState extends State<ServerSelectionModal>
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
       child: ListView.separated(
+        cacheExtent: 480,
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         physics: const BouncingScrollPhysics(),
         itemCount: _visibleServers.length,
         separatorBuilder: (context, index) => const SizedBox(height: 12),

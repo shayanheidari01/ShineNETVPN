@@ -97,6 +97,8 @@ class _SimpleServerListWidgetState extends State<SimpleServerListWidget>
     }
 
     final list = ListView.separated(
+      cacheExtent: 480,
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: const EdgeInsets.symmetric(
         horizontal: 16,
         vertical: 12,

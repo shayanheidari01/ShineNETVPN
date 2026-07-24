@@ -21,9 +21,7 @@ class ServerOptimizationService {
   Dio? _dio;
   bool _isInitialized = false;
   final List<String> _serverEndpoints = [
-    'https://raw.githubusercontent.com/shayanheidari01/ShineNETConfigs/main/configs.txt',
-    'https://cdn.jsdelivr.net/gh/shayanheidari01/ShineNETConfigs/configs.txt',
-    'https://api.allorigins.win/get?url=https%3A%2F%2Fraw.githubusercontent.com%2Fshayanheidari01%2FShineNETConfigs%2Fmain%2Fconfigs.txt'
+    'https://raw.githubusercontent.com/shayanheidari01/ShineNETConfigs/main/configs.txt'
   ];
 
   // Cache and storage keys
@@ -59,39 +57,43 @@ class ServerOptimizationService {
     print('✅ ServerOptimizationService initialized successfully');
   }
 
-  /// Initialize Dio with optimized settings
+  /// Initialize Dio with optimized settings and realistic browser headers
   void _initializeDio() {
     if (_dio != null) {
       print('⚠️ Dio already initialized');
       return;
     }
-    
+
     _dio = Dio(BaseOptions(
       connectTimeout: _connectTimeout,
       receiveTimeout: _requestTimeout,
       sendTimeout: _requestTimeout,
       headers: {
-        'Accept': 'application/json, text/plain, */*',
-        'User-Agent': 'ShineNET-VPN/1.0 (Mobile)',
-        'Accept-Encoding': 'gzip, deflate',
-        'Connection': 'keep-alive',
+        'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+        'accept-encoding': 'gzip, deflate, br, zstd',
+        'accept-language': 'en-US,en;q=0.9,fa-IR;q=0.8,fa;q=0.7',
+        'cache-control': 'max-age=0',
+        'priority': 'u=0, i',
+        'sec-ch-ua': '"Not;A=Brand";v="8", "Chromium";v="150", "Google Chrome";v="150"',
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': '"Windows"',
+        'sec-fetch-dest': 'document',
+        'sec-fetch-mode': 'navigate',
+        'sec-fetch-site': 'none',
+        'sec-fetch-user': '?1',
+        'upgrade-insecure-requests': '1',
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36',
       },
       validateStatus: (status) =>
           status != null && status >= 200 && status < 300,
       followRedirects: true,
       maxRedirects: 3,
-      // Enable connection pooling for better performance
       persistentConnection: true,
     ));
 
     // Add interceptors for better error handling and logging
     _dio!.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
-        options.headers['Cache-Control'] =
-            'no-cache, no-store, must-revalidate';
-        options.headers['Pragma'] = 'no-cache';
-        options.headers['Expires'] = '0';
-
         // Add request timestamp for timeout tracking
         options.extra['request_start_time'] =
             DateTime.now().millisecondsSinceEpoch;
@@ -463,7 +465,7 @@ class ServerOptimizationService {
     return server.hashCode.toString();
   }
 
-  /// Fetch servers from a specific endpoint with optimizations
+  /// Fetch servers from a specific endpoint with browser-like headers
   Future<List<String>> _fetchFromEndpoint(
       String endpoint, Function(String)? onStatusUpdate) async {
     final stopwatch = Stopwatch()..start();
@@ -476,11 +478,6 @@ class ServerOptimizationService {
         endpoint,
         options: Options(
           responseType: ResponseType.plain,
-          headers: {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0',
-          },
           receiveTimeout: _requestTimeout,
           sendTimeout: _requestTimeout,
         ),

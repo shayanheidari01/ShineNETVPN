@@ -1,7 +1,9 @@
 cmake_minimum_required(VERSION 3.22.1)
-project(aether_jni)
+project(shinenet_native)
 
 set(AETHER_SO "${CMAKE_CURRENT_LIST_DIR}/../jniLibs/${ANDROID_ABI}/libaether.so")
+
+find_library(log-lib log)
 
 if(EXISTS "${AETHER_SO}")
     add_library(aether SHARED IMPORTED)
@@ -13,7 +15,6 @@ if(EXISTS "${AETHER_SO}")
     target_link_options(aether_jni PRIVATE
         "-Wl,-z,max-page-size=16384"
         "-Wl,-z,common-page-size=16384")
-    find_library(log-lib log)
     target_link_libraries(aether_jni aether ${log-lib})
 else()
     message(WARNING "libaether.so not found - Aether JNI bridge will not be built.")

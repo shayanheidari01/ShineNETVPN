@@ -127,10 +127,36 @@ class AetherVpnService : VpnService() {
             "ShineNET Aether VPN",
             NotificationManager.IMPORTANCE_LOW,
         ))
+
+        // Keep the action focused: tapping Disconnect brings the user back to
+        // the app where the existing connection state and confirmation flow
+        // can handle the actual stop operation.
+        val openAppIntent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra(MainActivity.EXTRA_OPEN_DISCONNECT, true)
+        }
+        val openAppPendingIntent = android.app.PendingIntent.getActivity(
+            this,
+            NOTIFICATION_ACTION_REQUEST_CODE,
+            openAppIntent,
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or
+                android.app.PendingIntent.FLAG_IMMUTABLE,
+        )
+
         val notification = Notification.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.stat_sys_warning)
+            .setSmallIcon(R.mipmap.launcher_icon)
             .setContentTitle("ShineNET VPN")
             .setContentText("Aether tunnel active")
+            .setContentIntent(openAppPendingIntent)
+            .setAutoCancel(true)
+            .addAction(
+                Notification.Action.Builder(
+                    null,
+                    "Disconnect",
+                    openAppPendingIntent,
+                ).build(),
+            )
             .build()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
@@ -152,6 +178,7 @@ class AetherVpnService : VpnService() {
         const val STATUS_DISCONNECTED = "disconnected"
         private const val CHANNEL_ID = "aether_vpn"
         private const val NOTIFICATION_ID = 2
+        private const val NOTIFICATION_ACTION_REQUEST_CODE = 1002
         private const val LOG_TAG = "AetherVpn"
     }
 }

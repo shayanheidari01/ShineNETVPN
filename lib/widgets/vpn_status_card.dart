@@ -2,7 +2,7 @@ import 'package:shinenet_vpn/common/theme.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
-class VpnCard extends StatefulWidget {
+class VpnStatusCard extends StatefulWidget {
   final int downloadSpeed;
   final int uploadSpeed;
   final String selectedServer;
@@ -11,7 +11,7 @@ class VpnCard extends StatefulWidget {
   final int download;
   final int upload;
 
-  const VpnCard({
+  const VpnStatusCard({
     super.key,
     required this.downloadSpeed,
     required this.uploadSpeed,
@@ -23,10 +23,11 @@ class VpnCard extends StatefulWidget {
   });
 
   @override
-  State<VpnCard> createState() => _VpnCardState();
+  State<VpnStatusCard> createState() => _VpnStatusCardState();
 }
 
-class _VpnCardState extends State<VpnCard> with TickerProviderStateMixin {
+class _VpnStatusCardState extends State<VpnStatusCard>
+    with TickerProviderStateMixin {
   late AnimationController _pulseController;
 
   @override

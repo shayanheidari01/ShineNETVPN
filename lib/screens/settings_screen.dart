@@ -1,226 +1,98 @@
-import 'package:shinenet_vpn/common/theme.dart';
-import 'package:shinenet_vpn/common/font_helper.dart';
-import 'package:shinenet_vpn/widgets/settings/blocked_apps_widget.dart';
-import 'package:shinenet_vpn/widgets/settings/language_widget.dart';
-import 'package:shinenet_vpn/widgets/settings/font_accessibility_widget.dart';
-import 'package:shinenet_vpn/common/liquid_glass_container.dart';
-import 'package:shinenet_vpn/services/language_manager.dart';
-import 'package:shinenet_vpn/screens/scan_mode_screen.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:shinenet_vpn/common/theme.dart';
+import 'package:shinenet_vpn/screens/scan_mode_screen.dart';
+import 'package:shinenet_vpn/services/language_manager.dart';
+import 'package:shinenet_vpn/widgets/settings/blocked_apps_widget.dart';
+import 'package:shinenet_vpn/widgets/settings/font_accessibility_widget.dart';
+import 'package:shinenet_vpn/widgets/settings/language_widget.dart';
 
-class SettingsWidget extends StatefulWidget {
-  SettingsWidget({super.key});
+class SettingsScreen extends StatefulWidget {
+  const SettingsScreen({super.key});
 
   @override
-  _SettingsWidgetState createState() => _SettingsWidgetState();
+  State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsWidgetState extends State<SettingsWidget> {
+class _SettingsScreenState extends State<SettingsScreen> {
   String _selectedLanguage = '';
-  bool _isLoading = false;
   String? _appVersion;
-
-  // Cached gradients for performance
-  late final List<Color> _primaryGradient;
-  late final List<Color> _successGradient;
-  late final List<Color> _warningGradient;
-  late final List<Color> _neutralGradient;
+  bool _loadingLanguage = false;
 
   @override
   void initState() {
     super.initState();
-    _initializeGradients();
     _loadSelectedLanguage();
-    _loadAppVersion();
+    _loadVersion();
   }
 
-  // Initialize gradients once to avoid repeated calculations
-  void _initializeGradients() {
-    _primaryGradient = _tintedGlassGradient(
-      ThemeColor.primaryColor,
-      highlight: 0.24,
-      lowlight: 0.06,
-    );
-    _successGradient = _tintedGlassGradient(
-      ThemeColor.successColor,
-      highlight: 0.26,
-      lowlight: 0.07,
-    );
-    _warningGradient = _tintedGlassGradient(
-      ThemeColor.warningColor,
-      highlight: 0.22,
-      lowlight: 0.05,
-    );
-    _neutralGradient = _neutralGlassGradient(
-      highlight: 0.18,
-      lowlight: 0.04,
-    );
+  Future<void> _loadVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    if (mounted) setState(() => _appVersion = info.version);
   }
 
-  // Refresh language when returning from language screen
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!_isLoading) {
-      _loadSelectedLanguage();
-    }
-  }
-
-  Future<void> _loadAppVersion() async {
-    final packageInfo = await PackageInfo.fromPlatform();
-    if (mounted) {
-      setState(() {
-        _appVersion = packageInfo.version;
-      });
-    }
-  }
-
-  // Load current language from LanguageManager using saved preference
-  void _loadSelectedLanguage() async {
-    if (_isLoading) return; // Prevent duplicate calls
-
-    _isLoading = true;
+  Future<void> _loadSelectedLanguage() async {
+    if (_loadingLanguage) return;
+    _loadingLanguage = true;
     try {
-      final currentLang =
+      final language =
           await LanguageManager.getCurrentLanguageFromPreference();
+      if (!mounted) return;
+      setState(() {
+        _selectedLanguage =
+            LanguageManager.getLanguageDisplayName(language.code, context);
+      });
+    } catch (_) {
       if (mounted) {
-        setState(() {
-          _selectedLanguage = LanguageManager.getLanguageDisplayName(
-            currentLang.code,
-            context,
-          );
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _selectedLanguage = 'language_english'.tr();
-        });
+        setState(() => _selectedLanguage = 'language_english'.tr());
       }
     } finally {
-      _isLoading = false;
+      _loadingLanguage = false;
     }
+  }
+
+  Future<void> _open(Widget page, {bool refreshLanguage = false}) async {
+    HapticFeedback.selectionClick();
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => page),
+    );
+    if (refreshLanguage && mounted) await _loadSelectedLanguage();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: ThemeColor.backgroundColor,
       body: SafeArea(
         child: CustomScrollView(
+          physics: const BouncingScrollPhysics(),
           slivers: [
-            // Modern app bar consistent with home screen
             SliverAppBar(
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              floating: true,
-              pinned: false,
-              toolbarHeight: 64,
+              pinned: true,
               automaticallyImplyLeading: false,
-              centerTitle: true,
+              titleSpacing: 20,
               title: Text(
                 'setting'.tr(),
-                style: FontHelper.getHeadingStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
+                style: ThemeColor.headingStyle(
+                  fontSize: 24,
                   context: context,
                 ),
-                overflow: TextOverflow.ellipsis,
               ),
             ),
-
-            // Main content
             SliverPadding(
-              padding: EdgeInsets.all(ThemeColor.mediumSpacing),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate([
-                  // Simplified settings sections
-                  _buildSimplifiedSettingsSection(),
-                  SizedBox(height: ThemeColor.largeSpacing),
-
-                  // Simplified app info
-                  _buildSimplifiedAppInfo(),
-                ]),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Simplified settings section with RepaintBoundary
-  Widget _buildSimplifiedSettingsSection() {
-    return RepaintBoundary(
-      child: LiquidGlassContainer(
-        padding: EdgeInsets.all(ThemeColor.largeSpacing),
-        borderRadius: ThemeColor.largeRadius,
-        blurSigma: 16, // Reduced from 28 to 16 (43% reduction)
-        gradientColors: _primaryGradient, // Use cached gradient
-        borderColor: ThemeColor.primaryColor.withValues(alpha: 0.25),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Security info
-            _buildSecurityInfo(),
-            SizedBox(height: ThemeColor.largeSpacing),
-
-            // Settings options
-            _buildSettingsOptions(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSecurityInfo() {
-    return RepaintBoundary(
-      child: LiquidGlassContainer(
-        padding: EdgeInsets.all(ThemeColor.mediumSpacing),
-        borderRadius: ThemeColor.mediumRadius,
-        blurSigma: 12, // Reduced from 24 to 12 (50% reduction)
-        gradientColors: _successGradient, // Use cached gradient
-        borderColor: ThemeColor.successColor.withValues(alpha: 0.35),
-        child: Row(
-          children: [
-            Container(
-              padding: EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
-              ),
-              child: Icon(
-                Icons.security_rounded,
-                color: Colors.white,
-                size: 24,
-              ),
-            ),
-            SizedBox(width: ThemeColor.mediumSpacing),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+              sliver: SliverList.list(
                 children: [
-                  Text(
-                    'privacy_security'.tr(),
-                    style: FontHelper.getBodyStyle(
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                      context: context,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    'no_logs_policy'.tr(),
-                    style: FontHelper.getCaptionStyle(
-                      color: Colors.white.withValues(alpha: 0.85),
-                      context: context,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  _privacyCard(context),
+                  const SizedBox(height: 24),
+                  _sectionLabel(context, 'setting'.tr()),
+                  const SizedBox(height: 10),
+                  _settingsGroup(context),
+                  const SizedBox(height: 24),
+                  _sectionLabel(context, 'app_information'.tr()),
+                  const SizedBox(height: 10),
+                  _appInfo(context),
                 ],
               ),
             ),
@@ -230,290 +102,261 @@ class _SettingsWidgetState extends State<SettingsWidget> {
     );
   }
 
-  Widget _buildSettingsOptions() {
-    return Column(
-      children: [
-        _buildSettingOption(
-          icon: Icons.radar_rounded,
-          title: 'scan_mode'.tr(),
-          subtitle: 'scan_mode_settings_subtitle'.tr(),
-          color: ThemeColor.successColor,
-          onTap: () {
-            HapticFeedback.lightImpact();
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => const ScanModeScreen(),
-              ),
-            );
-          },
+  Widget _privacyCard(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            ThemeColor.primaryColor.withValues(alpha: 0.16),
+            ThemeColor.cardColor,
+          ],
         ),
-        SizedBox(height: ThemeColor.mediumSpacing),
-        _buildSettingOption(
-          icon: Icons.apps_rounded,
-          title: 'block_application'.tr(),
-          subtitle: 'control_apps_bypass'.tr(),
-          color: ThemeColor.primaryColor,
-          onTap: () {
-            HapticFeedback.lightImpact();
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => BlockedAppsWidgets(),
-              ),
-            );
-          },
+        borderRadius: BorderRadius.circular(ThemeColor.largeRadius),
+        border: Border.all(
+          color: ThemeColor.primaryColor.withValues(alpha: 0.22),
         ),
-        SizedBox(height: ThemeColor.mediumSpacing),
-        _buildSettingOption(
-          icon: Icons.translate_rounded,
-          title: 'language'.tr(),
-          subtitle: _selectedLanguage.isNotEmpty
-              ? _selectedLanguage
-              : 'language_english'.tr(),
-          color: ThemeColor.warningColor,
-          onTap: () async {
-            HapticFeedback.lightImpact();
-            await Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => const LanguageWidget(),
-              ),
-            );
-            // Use async/await pattern for better performance
-            if (mounted) {
-              _loadSelectedLanguage();
-            }
-          },
-        ),
-        SizedBox(height: ThemeColor.mediumSpacing),
-        _buildSettingOption(
-          icon: Icons.text_fields_rounded,
-          title: 'font_accessibility'.tr(),
-          subtitle: 'font_size_settings'.tr(),
-          color: ThemeColor.primaryColor,
-          onTap: () {
-            HapticFeedback.lightImpact();
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => const FontAccessibilityWidget(),
-              ),
-            );
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSettingOption({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    // Select appropriate cached gradient based on color
-    List<Color> gradientColors;
-    if (color == ThemeColor.warningColor) {
-      gradientColors = _warningGradient;
-    } else if (color == ThemeColor.successColor) {
-      gradientColors = _successGradient;
-    } else if (color == ThemeColor.primaryColor) {
-      gradientColors = _primaryGradient;
-    } else {
-      gradientColors =
-          _tintedGlassGradient(color, highlight: 0.22, lowlight: 0.05);
-    }
-
-    return RepaintBoundary(
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(ThemeColor.mediumRadius),
-          child: LiquidGlassContainer(
-            padding: EdgeInsets.all(ThemeColor.mediumSpacing),
-            borderRadius: ThemeColor.mediumRadius,
-            blurSigma: 8, // Reduced from 22 to 8 (64% reduction)
-            showShadow: false,
-            gradientColors: gradientColors, // Use cached or computed gradient
-            borderColor: color.withValues(alpha: 0.3),
-            child: Row(
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: ThemeColor.primaryColor.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: const Icon(
+              Icons.lock_outline_rounded,
+              color: ThemeColor.primaryColor,
+            ),
+          ),
+          const SizedBox(width: 15),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
-                  ),
-                  child: Icon(
-                    icon,
-                    color: Colors.white,
-                    size: 24,
+                Text(
+                  'privacy_security'.tr(),
+                  style: ThemeColor.bodyStyle(
+                    color: ThemeColor.primaryText,
+                    fontWeight: FontWeight.w700,
+                    context: context,
                   ),
                 ),
-                SizedBox(width: ThemeColor.mediumSpacing),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: FontHelper.getBodyStyle(
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                          context: context,
-                        ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        subtitle,
-                        style: FontHelper.getCaptionStyle(
-                          color: Colors.white.withValues(alpha: 0.85),
-                          context: context,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  color: Colors.white,
-                  size: 16,
+                const SizedBox(height: 3),
+                Text(
+                  'no_logs_policy'.tr(),
+                  style: ThemeColor.captionStyle(context: context),
                 ),
               ],
             ),
           ),
-        ),
+          const Icon(
+            Icons.verified_user_rounded,
+            size: 20,
+            color: ThemeColor.primaryColor,
+          ),
+        ],
       ),
     );
   }
 
-  // Simplified app info with RepaintBoundary
-  Widget _buildSimplifiedAppInfo() {
-    return RepaintBoundary(
-      child: LiquidGlassContainer(
-        padding: EdgeInsets.all(ThemeColor.largeSpacing),
-        borderRadius: ThemeColor.largeRadius,
-        blurSigma: 12, // Reduced from 26 to 12 (54% reduction)
-        gradientColors: _neutralGradient, // Use cached gradient
-        borderColor: ThemeColor.primaryColor.withValues(alpha: 0.2),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.info_rounded,
-                  color: ThemeColor.primaryColor,
-                  size: 20,
-                ),
-                SizedBox(width: ThemeColor.smallSpacing),
-                Expanded(
-                  child: Text(
-                    'app_information'.tr(),
-                    style: FontHelper.getBodyStyle(
-                      fontWeight: FontWeight.w600,
-                      color: ThemeColor.primaryText,
-                      context: context,
+  Widget _sectionLabel(BuildContext context, String label) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Text(
+        label.toUpperCase(),
+        style: ThemeColor.captionStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: ThemeColor.mutedText,
+          context: context,
+        ).copyWith(letterSpacing: 1.1),
+      ),
+    );
+  }
+
+  Widget _settingsGroup(BuildContext context) {
+    final items = [
+      _SettingItem(
+        Icons.radar_rounded,
+        'scan_mode'.tr(),
+        'scan_mode_settings_subtitle'.tr(),
+        () => _open(const ScanModeScreen()),
+      ),
+      _SettingItem(
+        Icons.grid_view_rounded,
+        'block_application'.tr(),
+        'control_apps_bypass'.tr(),
+        () => _open(BlockedAppsWidget()),
+      ),
+      _SettingItem(
+        Icons.translate_rounded,
+        'language'.tr(),
+        _selectedLanguage.isEmpty
+            ? 'language_english'.tr()
+            : _selectedLanguage,
+        () => _open(const LanguageWidget(), refreshLanguage: true),
+      ),
+      _SettingItem(
+        Icons.format_size_rounded,
+        'font_accessibility'.tr(),
+        'font_size_settings'.tr(),
+        () => _open(const FontAccessibilityWidget()),
+      ),
+    ];
+
+    return Container(
+      decoration: ThemeColor.cardDecoration(),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: List.generate(items.length, (index) {
+          final item = items[index];
+          return Column(
+            children: [
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: item.onTap,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 15,
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            color: ThemeColor.elevatedSurface,
+                            borderRadius: BorderRadius.circular(13),
+                          ),
+                          child: Icon(
+                            item.icon,
+                            size: 21,
+                            color: ThemeColor.primaryColor,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item.title,
+                                style: ThemeColor.bodyStyle(
+                                  color: ThemeColor.primaryText,
+                                  fontWeight: FontWeight.w600,
+                                  context: context,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                item.subtitle,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style:
+                                    ThemeColor.captionStyle(context: context),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Icon(
+                          Icons.chevron_right_rounded,
+                          color: ThemeColor.mutedText,
+                        ),
+                      ],
                     ),
                   ),
                 ),
-              ],
-            ),
-            SizedBox(height: ThemeColor.mediumSpacing),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildInfoCard(
-                    icon: Icons.update_rounded,
-                    title: 'version'.tr(),
-                    value: _appVersion ?? '—',
-                    color: ThemeColor.primaryColor,
-                  ),
-                ),
-                SizedBox(width: ThemeColor.smallSpacing),
-                Expanded(
-                  child: _buildInfoCard(
-                    icon: Icons.code_rounded,
-                    title: 'license'.tr(),
-                    value: 'mit_license'.tr(),
-                    color: ThemeColor.successColor,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+              ),
+              if (index != items.length - 1)
+                const Divider(height: 1, indent: 72),
+            ],
+          );
+        }),
       ),
     );
   }
 
-  Widget _buildInfoCard({
-    required IconData icon,
-    required String title,
-    required String value,
-    required Color color,
-  }) {
-    // Select appropriate cached gradient based on color
-    List<Color> gradientColors;
-    if (color == ThemeColor.primaryColor) {
-      gradientColors = _primaryGradient;
-    } else if (color == ThemeColor.successColor) {
-      gradientColors = _successGradient;
-    } else {
-      gradientColors =
-          _tintedGlassGradient(color, highlight: 0.2, lowlight: 0.05);
-    }
-
-    return RepaintBoundary(
-      child: LiquidGlassContainer(
-        padding: EdgeInsets.all(ThemeColor.mediumSpacing),
-        borderRadius: ThemeColor.mediumRadius,
-        blurSigma: 6, // Reduced from 20 to 6 (70% reduction)
-        showShadow: false,
-        gradientColors: gradientColors, // Use cached or computed gradient
-        borderColor: color.withValues(alpha: 0.3),
-        child: Column(
-          children: [
-            Icon(icon, color: Colors.white, size: 24),
-            SizedBox(height: ThemeColor.smallSpacing),
-            Text(
-              value,
-              style: FontHelper.getBodyStyle(
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-                fontSize: 16,
-                context: context,
-              ),
+  Widget _appInfo(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+      decoration: ThemeColor.cardDecoration(),
+      child: Row(
+        children: [
+          Expanded(
+            child: _infoValue(
+              context,
+              Icons.layers_outlined,
+              'version'.tr(),
+              _appVersion ?? '—',
             ),
-            Text(
-              title,
-              style: FontHelper.getCaptionStyle(
-                color: Colors.white.withValues(alpha: 0.85),
-                context: context,
-              ),
+          ),
+          const SizedBox(
+            height: 42,
+            child: VerticalDivider(width: 24),
+          ),
+          Expanded(
+            child: _infoValue(
+              context,
+              Icons.code_rounded,
+              'license'.tr(),
+              'mit_license'.tr(),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  List<Color> _tintedGlassGradient(
-    Color tint, {
-    double highlight = 0.22,
-    double lowlight = 0.06,
-  }) {
-    return [
-      tint.withValues(alpha: highlight.clamp(0.0, 1.0)),
-      Colors.white.withValues(alpha: lowlight.clamp(0.0, 1.0)),
-    ];
+  Widget _infoValue(
+    BuildContext context,
+    IconData icon,
+    String label,
+    String value,
+  ) {
+    return Row(
+      children: [
+        Icon(icon, color: ThemeColor.secondaryText, size: 20),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                value,
+                overflow: TextOverflow.ellipsis,
+                style: ThemeColor.bodyStyle(
+                  color: ThemeColor.primaryText,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  context: context,
+                ),
+              ),
+              Text(
+                label,
+                style: ThemeColor.captionStyle(
+                  fontSize: 11,
+                  context: context,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
+}
 
-  List<Color> _neutralGlassGradient({
-    double highlight = 0.16,
-    double lowlight = 0.05,
-  }) {
-    return [
-      Colors.white.withValues(alpha: highlight.clamp(0.0, 1.0)),
-      Colors.white.withValues(alpha: lowlight.clamp(0.0, 1.0)),
-    ];
-  }
+class _SettingItem {
+  const _SettingItem(this.icon, this.title, this.subtitle, this.onTap);
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
 }

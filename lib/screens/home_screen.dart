@@ -29,14 +29,14 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
 
   @override
-  State<HomePage> createState() => _HomePageState();
+  State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomeScreenState extends State<HomeScreen> {
   final FlutterV2rayClientManager _v2rayManager = FlutterV2rayClientManager();
   final AetherClientManager _aetherManager = AetherClientManager();
   StreamSubscription<AetherState>? _aetherStateSub;
@@ -120,6 +120,7 @@ class _HomePageState extends State<HomePage> {
 
   // User IP Information
   String? _userIP;
+  int _ipRequestGeneration = 0;
   String? _userCountryFlag;
   String? _userCountryName;
 
@@ -177,6 +178,7 @@ class _HomePageState extends State<HomePage> {
           } else if (state == AetherState.disconnected) {
             isLoading = false;
             loadingStatus = '';
+            _ipRequestGeneration++;
             _userIP = null;
             _userCountryFlag = null;
             _userCountryName = null;
@@ -324,6 +326,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _fetchUserIP() async {
     if (_isFetchingIP) return;
+    final requestGeneration = ++_ipRequestGeneration;
 
     if (mounted) {
       setState(() {
@@ -334,42 +337,61 @@ class _HomePageState extends State<HomePage> {
     }
 
     try {
-      final dio = OptimizedHttpClient.instance;
-      final response = await dio.get(
-        'https://ipwho.is/',
-        options: Options(responseType: ResponseType.json),
-      );
-
-      if (response.statusCode != null && response.statusCode != 200) {
-        throw DioException(
-          requestOptions: response.requestOptions,
-          response: response,
-          error: 'Status ${response.statusCode}',
-        );
-      }
-
       String? ipAddress;
       String? flagUrl;
       String? countryName;
-      final data = response.data;
-      if (data is Map) {
-        if (data['success'] == true) {
-          ipAddress = data['ip']?.toString();
-          flagUrl = data['flag']?['img']?.toString();
-          countryName = data['country']?.toString();
+      Object? lastError;
+
+      // Use small, independent requests: the shared HTTP client has retry
+      // interceptors intended for server lists and can delay this UI request.
+      const endpoints = <String>[
+        'https://api64.ipify.org?format=json',
+        'https://api.ipify.org?format=json',
+        'https://ifconfig.co/json',
+        'https://ipwho.is/',
+      ];
+      final dio = Dio(
+        BaseOptions(
+          connectTimeout: const Duration(seconds: 5),
+          receiveTimeout: const Duration(seconds: 5),
+          sendTimeout: const Duration(seconds: 5),
+          responseType: ResponseType.json,
+          followRedirects: true,
+          maxRedirects: 2,
+          validateStatus: (status) => status != null && status >= 200 && status < 300,
+          headers: const {'accept': 'application/json,text/plain'},
+        ),
+      );
+
+      for (final endpoint in endpoints) {
+        try {
+          final response = await dio.get(endpoint);
+          final data = response.data;
+          final candidate = data is Map
+              ? (data['ip'] ?? data['ip_addr'] ?? data['address'])?.toString()
+              : data?.toString().trim();
+          if (candidate != null && _looksLikeIp(candidate)) {
+            ipAddress = candidate;
+            if (data is Map) {
+              flagUrl = data['flag'] is Map
+                  ? data['flag']['img']?.toString()
+                  : data['flag']?.toString();
+              countryName =
+                  (data['country'] ?? data['country_name'])?.toString();
+            }
+            break;
+          }
+        } catch (error) {
+          lastError = error;
         }
       }
+      dio.close(force: true);
 
       if (ipAddress == null || ipAddress.isEmpty) {
-        throw Exception('Empty IP response');
+        throw lastError ?? Exception('Empty IP response');
       }
 
-      if (!mounted) {
-        _userIP = ipAddress;
-        _userCountryFlag = flagUrl;
-        _userCountryName = countryName;
-        return;
-      }
+      if (!mounted || requestGeneration != _ipRequestGeneration) return;
 
       setState(() {
         _userIP = ipAddress;
@@ -411,6 +433,15 @@ class _HomePageState extends State<HomePage> {
         _isFetchingIP = false;
       }
     }
+  }
+
+  bool _looksLikeIp(String value) {
+    final normalized = value.trim();
+    final ipv4 = RegExp(
+      r'^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$',
+    );
+    final ipv6 = RegExp(r'^[0-9a-fA-F:]{2,45}$');
+    return ipv4.hasMatch(normalized) || ipv6.hasMatch(normalized);
   }
 
   String _formatReadableError(Object error) {
@@ -512,11 +543,18 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     getVersionName();
     // Attach shared V2ray instance to services BEFORE initializing them
-    _initializeServices();
     _loadServerSelection();
 
-    // Fetch servers once on app startup
-    _fetchAndCacheServersOnStartup();
+    // Defer network/cache work until after the first frame so the initial
+    // screen remains responsive on slower devices.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Future<void>.delayed(const Duration(milliseconds: 250), () {
+        if (!mounted) return;
+        _initializeServices();
+        _fetchAndCacheServersOnStartup();
+      });
+    });
 
     _v2rayManager
         .ensureInitialized(
@@ -538,6 +576,7 @@ class _HomePageState extends State<HomePage> {
         if (isConnected && _userIP == null && !_isFetchingIP) {
           _fetchUserIP();
         } else if (!isConnected && _userIP != null) {
+          _ipRequestGeneration++;
           setState(() {
             _userIP = null;
             _userCountryFlag = null;
@@ -554,9 +593,6 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context);
-    final bool isWideScreen = size.width > 600;
-
     return Scaffold(
       backgroundColor: ThemeColor.backgroundColor,
       body: Stack(
@@ -576,9 +612,10 @@ class _HomePageState extends State<HomePage> {
 
                 final bool isConnected =
                     _useAether ? _isAetherConnected : v2rayConnected;
-                final bool isConnecting = _useAether
-                    ? (_isAetherConnecting || isLoading)
-                    : (isLoading || v2rayConnecting);
+                final bool isConnecting = !isConnected &&
+                    (_useAether
+                        ? (_isAetherConnecting || isLoading)
+                        : (isLoading || v2rayConnecting));
                 final String displayStatus = isConnected
                     ? 'CONNECTED'
                     : (isConnecting
@@ -588,47 +625,82 @@ class _HomePageState extends State<HomePage> {
                             : 'DISCONNECTED'));
 
                 return CustomScrollView(
+                  physics: const BouncingScrollPhysics(),
                   slivers: [
                     SliverAppBar(
-                      backgroundColor: Colors.transparent,
-                      elevation: 0,
-                      floating: true,
-                      pinned: false,
-                      toolbarHeight: 64,
-                      centerTitle: true,
-                      title: Text(
-                        'app_title'.tr(),
-                        style: ThemeColor.headingStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                        ),
-                        overflow: TextOverflow.ellipsis,
+                      pinned: true,
+                      automaticallyImplyLeading: false,
+                      titleSpacing: 20,
+                      title: Row(
+                        children: [
+                          Container(
+                            width: 38,
+                            height: 38,
+                            decoration: BoxDecoration(
+                              gradient: ThemeColor.primaryGradient,
+                              borderRadius: BorderRadius.circular(13),
+                            ),
+                            child: const Icon(
+                              Icons.shield_rounded,
+                              color: ThemeColor.backgroundColor,
+                              size: 21,
+                            ),
+                          ),
+                          const SizedBox(width: 11),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'app_title'.tr(),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: ThemeColor.headingStyle(
+                                    fontSize: 18,
+                                    context: context,
+                                  ),
+                                ),
+                                Text(
+                                  displayStatus == 'CONNECTED'
+                                      ? 'connected'.tr()
+                                      : 'disconnected'.tr(),
+                                  style: ThemeColor.captionStyle(
+                                    fontSize: 11,
+                                    color: isConnected
+                                        ? ThemeColor.successColor
+                                        : ThemeColor.secondaryText,
+                                    context: context,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     SliverPadding(
-                      padding: EdgeInsets.all(ThemeColor.mediumSpacing),
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
                       sliver: SliverList(
                         delegate: SliverChildListDelegate([
                           _buildCoreSelector(),
-                          SizedBox(height: ThemeColor.mediumSpacing),
+                          const SizedBox(height: 16),
                           _buildSimplifiedConnectionSection(
                               status, isConnected, isConnecting, displayStatus),
-                          SizedBox(height: ThemeColor.mediumSpacing),
+                          const SizedBox(height: 16),
                           AdBannerWidget(),
-                          SizedBox(height: ThemeColor.mediumSpacing),
+                          const SizedBox(height: 16),
                           if (_useAether)
                             _buildAetherModeCard()
                           else
                             _buildSimplifiedServerSelection(),
-                          SizedBox(height: ThemeColor.mediumSpacing),
+                          const SizedBox(height: 16),
                           if (isConnected) ...[
                             if (_useAether)
                               _buildAetherConnectedInfo()
                             else
                               _buildSimplifiedStats(status),
-                            SizedBox(height: ThemeColor.mediumSpacing),
+                            const SizedBox(height: 16),
                           ],
-                           SizedBox(height: ThemeColor.largeSpacing),
                         ]),
                       ),
                     ),
@@ -645,47 +717,29 @@ class _HomePageState extends State<HomePage> {
   Widget _buildLiquidBackground() {
     return Container(
       decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF050506),
-            Color(0xFF0F1115),
-          ],
-        ),
+        color: ThemeColor.backgroundColor,
       ),
       child: Stack(
         children: [
           Positioned(
-            top: -140,
-            left: -80,
+            top: -190,
+            right: -130,
             child: _buildGlowBlob(
-              diameter: 260,
+              diameter: 360,
               colors: [
-                ThemeColor.primaryColor.withValues(alpha: 0.28),
-                ThemeColor.primaryColor.withValues(alpha: 0.05),
+                ThemeColor.primaryColor.withValues(alpha: 0.10),
+                ThemeColor.primaryColor.withValues(alpha: 0.0),
               ],
             ),
           ),
           Positioned(
-            bottom: -160,
-            right: -60,
+            bottom: -180,
+            left: -160,
             child: _buildGlowBlob(
-              diameter: 300,
+              diameter: 360,
               colors: [
-                ThemeColor.connectedColor.withValues(alpha: 0.24),
-                ThemeColor.connectedColor.withValues(alpha: 0.04),
-              ],
-            ),
-          ),
-          Positioned(
-            top: 120,
-            right: -120,
-            child: _buildGlowBlob(
-              diameter: 220,
-              colors: [
-                ThemeColor.warningColor.withValues(alpha: 0.18),
-                ThemeColor.warningColor.withValues(alpha: 0.04),
+                ThemeColor.successColor.withValues(alpha: 0.06),
+                ThemeColor.successColor.withValues(alpha: 0.0),
               ],
             ),
           ),
@@ -753,7 +807,8 @@ class _HomePageState extends State<HomePage> {
         children: [
           ConnectionWidget(
             onTap: () => _handleConnectionTap(status),
-            isLoading: isLoading,
+            // A confirmed connection wins over stale asynchronous work.
+            isLoading: isConnecting && !isConnected,
             status: displayStatus,
           ),
           if (isConnected) ...[
@@ -788,33 +843,39 @@ class _HomePageState extends State<HomePage> {
           ? Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _buildSimpleStatItem(
-                  icon: Icons.timer_rounded,
-                  label: 'connection_time'.tr(),
-                  value: status.duration,
-                  color: ThemeColor.successColor,
+                Expanded(
+                  child: _buildSimpleStatItem(
+                    icon: Icons.timer_rounded,
+                    label: 'connection_time'.tr(),
+                    value: status.duration,
+                    color: ThemeColor.successColor,
+                  ),
                 ),
                 Container(
                   width: 1,
                   height: 40,
                   color: ThemeColor.successColor.withValues(alpha: 0.3),
                 ),
-                _buildSimpleStatItem(
-                  icon: Icons.arrow_downward_rounded,
-                  label: 'download'.tr(),
-                  value: _formatSpeed('${status.downloadSpeed} B/s'),
-                  color: ThemeColor.successColor,
+                Expanded(
+                  child: _buildSimpleStatItem(
+                    icon: Icons.arrow_downward_rounded,
+                    label: 'download'.tr(),
+                    value: _formatSpeed('${status.downloadSpeed} B/s'),
+                    color: ThemeColor.successColor,
+                  ),
                 ),
                 Container(
                   width: 1,
                   height: 40,
                   color: ThemeColor.successColor.withValues(alpha: 0.3),
                 ),
-                _buildSimpleStatItem(
-                  icon: Icons.arrow_upward_rounded,
-                  label: 'upload'.tr(),
-                  value: _formatSpeed('${status.uploadSpeed} B/s'),
-                  color: ThemeColor.warningColor,
+                Expanded(
+                  child: _buildSimpleStatItem(
+                    icon: Icons.arrow_upward_rounded,
+                    label: 'upload'.tr(),
+                    value: _formatSpeed('${status.uploadSpeed} B/s'),
+                    color: ThemeColor.warningColor,
+                  ),
                 ),
               ],
             )
@@ -824,11 +885,13 @@ class _HomePageState extends State<HomePage> {
                 ValueListenableBuilder<String>(
                   valueListenable: _aetherManager.durationNotifier,
                   builder: (context, duration, _) {
-                    return _buildSimpleStatItem(
-                      icon: Icons.timer_rounded,
-                      label: 'connection_time'.tr(),
-                      value: duration,
-                      color: ThemeColor.successColor,
+                    return Expanded(
+                      child: _buildSimpleStatItem(
+                        icon: Icons.timer_rounded,
+                        label: 'connection_time'.tr(),
+                        value: duration,
+                        color: ThemeColor.successColor,
+                      ),
                     );
                   },
                 ),
@@ -837,11 +900,13 @@ class _HomePageState extends State<HomePage> {
                   height: 40,
                   color: ThemeColor.successColor.withValues(alpha: 0.3),
                 ),
-                _buildSimpleStatItem(
+                Expanded(
+                  child: _buildSimpleStatItem(
                   icon: Icons.language_rounded,
                   label: 'ip_address'.tr(),
                   value: _userIP ?? '—',
                   color: ThemeColor.primaryColor,
+                  ),
                 ),
               ],
             ),
@@ -855,31 +920,38 @@ class _HomePageState extends State<HomePage> {
     required Color color,
   }) {
     return Column(
-      children: [
-        Container(
-          padding: EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.15),
-            shape: BoxShape.circle,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: color, size: 18),
           ),
-          child: Icon(icon, color: color, size: 18),
-        ),
-        SizedBox(height: 6),
-        Text(
-          value,
-          style: ThemeColor.bodyStyle(
-            fontWeight: FontWeight.w700,
-            color: color,
-            fontSize: 15,
+          const SizedBox(height: 6),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: ThemeColor.bodyStyle(
+              fontWeight: FontWeight.w700,
+              color: color,
+              fontSize: 15,
+            ),
           ),
-        ),
-        Text(
-          label,
-          style: ThemeColor.captionStyle(
-            color: color.withValues(alpha: 0.8),
-            fontSize: 12,
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: ThemeColor.captionStyle(
+              color: color.withValues(alpha: 0.8),
+              fontSize: 12,
+            ),
           ),
-        ),
       ],
     );
   }
@@ -1324,30 +1396,27 @@ class _HomePageState extends State<HomePage> {
 
   // Simplified server selection
   Widget _buildSimplifiedServerSelection() {
-    final borderRadius = ThemeColor.xlRadius;
-
-    return LiquidGlassContainer(
-      borderRadius: ThemeColor.xlRadius,
-      padding: EdgeInsets.zero,
-      blurSigma: 26,
-      enableBlur: false,
-      gradientColors: _neutralGlassGradient(highlight: 0.18, lowlight: 0.05),
+    return Container(
+      decoration: ThemeColor.cardDecoration(
+        color: ThemeColor.cardColor,
+        radius: ThemeColor.largeRadius,
+      ),
       child: Material(
         color: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(borderRadius),
+          borderRadius: BorderRadius.circular(ThemeColor.largeRadius),
         ),
         child: InkWell(
-          borderRadius: BorderRadius.circular(borderRadius),
+          borderRadius: BorderRadius.circular(ThemeColor.largeRadius),
           onTap: () => _showServerSelectionModal(context),
           child: Padding(
-            padding: EdgeInsets.all(ThemeColor.mediumSpacing),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
               children: [
                 Container(
                   padding: EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: ThemeColor.primaryColor.withValues(alpha: 0.18),
+                    color: ThemeColor.primaryColor.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(ThemeColor.smallRadius),
                   ),
                   child: Icon(
@@ -1363,13 +1432,15 @@ class _HomePageState extends State<HomePage> {
                     children: [
                       Text(
                         'server'.tr(),
-                        style: ThemeColor.captionStyle(),
+                      style: ThemeColor.captionStyle(
+                        color: ThemeColor.mutedText,
+                      ),
                       ),
                       SizedBox(height: 4),
                       Text(
                         selectedServer,
                         style: ThemeColor.bodyStyle(
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w700,
                           color: ThemeColor.primaryText,
                         ),
                       ),
@@ -1510,35 +1581,35 @@ class _HomePageState extends State<HomePage> {
 
 
 
+  Future<void> _cancelConnectionAttempt() async {
+    // Stop both engines defensively: the selected engine may have started
+    // while the status notifier is still catching up.
+    try {
+      await _aetherManager.stop();
+    } catch (_) {}
+    try {
+      _v2rayManager.stop();
+    } catch (_) {}
+
+    if (!mounted) return;
+    setState(() {
+      isLoading = false;
+      loadingStatus = '';
+      _aetherState = AetherState.disconnected;
+    });
+  }
+
   void _handleConnectionTap(V2RayStatus value) async {
     // Aether-first path when Aether core is selected and available
     if (_useAether) {
-      if (_isAetherConnected) {
-        setState(() {
-          isLoading = true;
-          loadingStatus = 'disconnecting'.tr();
-        });
-        await _aetherManager.stop();
+      if (_isAetherConnected || _isAetherConnecting || isLoading) {
         if (mounted) {
           setState(() {
-            isLoading = false;
-            loadingStatus = '';
-            _aetherState = AetherState.disconnected;
+            isLoading = true;
+            loadingStatus = 'disconnecting'.tr();
           });
         }
-        return;
-      }
-
-      if (_isAetherConnecting || isLoading) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('connecting_wait'.tr()),
-              behavior: SnackBarBehavior.floating,
-              duration: Duration(seconds: 2),
-            ),
-          );
-        }
+        await _cancelConnectionAttempt();
         return;
       }
 
@@ -1547,23 +1618,12 @@ class _HomePageState extends State<HomePage> {
     }
 
     final current = value.state.toUpperCase();
-    // Robust state handling: connect only when not connected/connecting
-    if (current == 'CONNECTED') {
-      // If already connected, stop connection
-      _v2rayManager.stop();
-      return;
-    }
-
-    if (current == 'CONNECTING') {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('connecting_wait'.tr()),
-            behavior: SnackBarBehavior.floating,
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
+    // The connection CTA is also a cancel action while a handshake is active.
+    if (current == 'CONNECTED' ||
+        current == 'CONNECTING' ||
+        current == 'STARTING' ||
+        isLoading) {
+      await _cancelConnectionAttempt();
       return;
     }
 

@@ -53,6 +53,9 @@ android {
             jniLibs {
                 useLegacyPackaging = true
             }
+            resources {
+                excludes += ['META-INF/INDEX.LIST', 'META-INF/DEPENDENCIES']
+            }
         }
 
     signingConfigs {
@@ -107,7 +110,7 @@ dependencies {
     // Kotlin Coroutines for asynchronous ping operations
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3'
-    
+
     // JSON parsing for method channel communication
     implementation 'org.json:json:20231013'
 }

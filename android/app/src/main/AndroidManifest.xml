@@ -2,6 +2,8 @@
     <!-- Network permissions for TCP and ICMP ping -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     
     <!-- Android 13+ notifications permission (runtime) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" tools:targetApi="33" />

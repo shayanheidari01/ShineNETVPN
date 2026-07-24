@@ -97,27 +97,32 @@ class LiquidGlassContainer extends StatelessWidget {
     );
 
     final panel = Container(
-      padding: padding,
       margin: margin,
-      decoration: decoration,
-      child: child,
+      child: DecoratedBox(
+        decoration: decoration,
+        child: Padding(
+          padding: padding ?? EdgeInsets.zero,
+          child: child,
+        ),
+      ),
     );
 
-    final clippedPanel = ClipRRect(
+    Widget clippedPanel = ClipRRect(
       borderRadius: BorderRadius.circular(borderRadius),
       child: panel,
     );
 
     if (!enableBlur) {
-      return clippedPanel;
+      return RepaintBoundary(child: clippedPanel);
     }
 
-    return ClipRRect(
+    clippedPanel = ClipRRect(
       borderRadius: BorderRadius.circular(borderRadius),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
         child: panel,
       ),
     );
+    return RepaintBoundary(child: clippedPanel);
   }
 }
