@@ -221,6 +221,7 @@ jobs:
           git diff --cached --quiet || \
           git commit -m "Bump version to ${{ steps.new_version.outputs.new_version_name }}+${{ steps.new_version.outputs.new_build_number }} [skip ci]"
 
+          git pull origin main --rebase
           git push origin HEAD:main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
