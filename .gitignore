@@ -16,12 +16,13 @@ build/
 
 # Flutter / Dart caches
 .dart_tool/
+.dart-appdata/
+.dart-localappdata/
 .flutter-plugins
 .flutter-plugins-dependencies
 .packages
 .pub-cache/
 coverage/
-.flutter-plugins-dependencies
 
 # Rust (aether_core)
 **/target/
