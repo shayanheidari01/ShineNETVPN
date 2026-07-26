@@ -132,13 +132,36 @@ jobs:
 
             cd "$BASE_DIR/android/aether_core/aether"
 
-            # Single pass: cargo-ndk handles everything including BoringSSL
+            # The Android build must be a cdylib. Fail early with a clear message
+            # instead of failing later inside cargo-ndk.
+            if [ ! -f "src/lib.rs" ]; then
+              echo "::error file=android/aether_core/aether/src/lib.rs::src/lib.rs is missing. The Android Aether wrapper/library entry point must exist."
+              echo "Current Rust sources:"
+              find src -maxdepth 3 -type f -name '*.rs' -print | sort
+              exit 1
+            fi
+
+            # Validate Cargo targets before the expensive Android build. This also
+            # catches duplicate binary names immediately.
+            echo "Validating Cargo manifest and targets..."
+            cargo metadata --no-deps --format-version 1 > /tmp/aether-cargo-metadata.json
+            python3 -c 'import json; d=json.load(open("/tmp/aether-cargo-metadata.json", encoding="utf-8")); print("Aether Cargo targets:"); [print("  - {}: {} -> {}".format(t["name"], ",".join(t["kind"]), t["src_path"])) for p in d.get("packages", []) if p.get("name") == "aether" for t in p.get("targets", [])]'
+
+            # Single pass: cargo-ndk handles the Rust Android target build.
             cargo ndk -t "$ABI" --platform "$API_LEVEL" build --release --lib
+
+            # Verify the exact shared library before copying it.
+            LIB_PATH="target/$RUST_TARGET/release/libaether.so"
+            if [ ! -f "$LIB_PATH" ]; then
+              echo "::error::Expected shared library was not produced: $LIB_PATH"
+              find "target/$RUST_TARGET/release" -maxdepth 1 -type f -print 2>/dev/null | sort || true
+              exit 1
+            fi
 
             # Copy to jniLibs
             DEST="$BASE_DIR/android/app/src/main/jniLibs/$ABI"
             mkdir -p "$DEST"
-            cp "target/$RUST_TARGET/release/libaether.so" "$DEST/libaether.so"
+            cp "$LIB_PATH" "$DEST/libaether.so"
             echo "Installed: $DEST/libaether.so"
 
             cd "$BASE_DIR"

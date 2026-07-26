@@ -3,6 +3,15 @@ name = "aether"
 version = "1.4.0"
 edition = "2021"
 rust-version = "1.88"
+# This Android crate is built only as a shared library. Disable Cargo's
+# automatic discovery of src/main.rs and src/bin/* to prevent duplicate
+# binary targets named `aether`.
+autobins = false
+
+[lib]
+name = "aether"
+path = "src/lib.rs"
+crate-type = ["cdylib"]
 
 [dependencies]
 quiche = { path = "../quiche/quiche", default-features = false, features = ["boringssl-boring-crate", "qlog"] }
