@@ -82,14 +82,9 @@ pub fn load(path: &str) -> Result<Option<Identity>> {
         return Ok(None);
     }
     let text = std::fs::read_to_string(path)?;
-    match toml::from_str::<PersistedIdentity>(&text) {
-        Ok(persisted) => Ok(Some(persisted.into())),
-        Err(e) => {
-            log::warn!("[+] corrupt config at {path}: {e}; removing and re-provisioning");
-            let _ = std::fs::remove_file(path);
-            Ok(None)
-        }
-    }
+    let persisted: PersistedIdentity =
+        toml::from_str(&text).map_err(|e| AetherError::Other(format!("config parse: {e}")))?;
+    Ok(Some(persisted.into()))
 }
 
 pub fn save(path: &str, identity: &Identity) -> Result<()> {

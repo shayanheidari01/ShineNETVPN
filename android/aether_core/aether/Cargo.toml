@@ -1,16 +1,8 @@
 [package]
 name = "aether"
-version = "1.0.1"
+version = "1.4.0"
 edition = "2021"
 rust-version = "1.88"
-autobins = false
-
-[lib]
-crate-type = ["rlib", "cdylib"]
-
-[[bin]]
-name = "aether"
-path = "src/bin/aether.rs"
 
 [dependencies]
 quiche = { path = "../quiche/quiche", default-features = false, features = ["boringssl-boring-crate", "qlog"] }
