@@ -1,27 +1,4 @@
 #![allow(dead_code)]
-mod account;
-mod cli;
-mod config;
-mod consts;
-mod dns;
-mod error;
-mod fragment;
-mod lastconn;
-mod masque;
-mod masque_h2;
-mod netstack;
-mod noize;
-mod prober;
-mod quic;
-mod socks;
-mod sysprofile;
-mod tls;
-mod aethernoize;
-mod tunnelping;
-mod wireguard;
-mod wg_prober;
-
-
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use crate::error::{AetherError, Result};
@@ -38,8 +15,98 @@ const TUNNEL_MTU: usize = 1280;
 const INNER_MTU: usize = 1200;
 const DEFAULT_CONFIG: &str = "aether.toml";
 
-#[tokio::main]
-async fn main() -> Result<()> {
+#[derive(Debug, Clone)]
+pub struct StartOptions {
+    pub listen: SocketAddr,
+    pub config_path: String,
+    pub wireguard_config_path: Option<String>,
+    pub masque_config_path: Option<String>,
+    pub protocol: Protocol,
+    pub forced_peer: Option<SocketAddr>,
+    pub scan_mode: prober::ScanMode,
+    pub ip_scan: prober::IpScan,
+    pub obfuscation_profile: Option<String>,
+    pub retry_obfuscation_profiles: bool,
+    pub tun_fd: Option<i32>,
+}
+
+#[derive(Debug, Clone)]
+pub struct TunnelAddresses {
+    pub ipv4: String,
+    pub ipv6: String,
+}
+
+impl StartOptions {
+    pub fn new(protocol: Protocol, config_path: impl Into<String>) -> Self {
+        Self {
+            listen: "127.0.0.1:1819".parse().unwrap(),
+            config_path: config_path.into(),
+            wireguard_config_path: None,
+            masque_config_path: None,
+            protocol,
+            forced_peer: None,
+            scan_mode: prober::ScanMode::Balanced,
+            ip_scan: prober::IpScan::V4,
+            obfuscation_profile: None,
+            retry_obfuscation_profiles: true,
+            tun_fd: None,
+        }
+    }
+}
+
+pub use prober::{IpScan, ScanMode};
+
+pub fn initialize() {
+    let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+        .format_timestamp_millis()
+        .try_init();
+}
+
+pub async fn prepare(options: &StartOptions) -> Result<TunnelAddresses> {
+    initialize();
+    let path = match options.protocol {
+        Protocol::Masque => options.masque_config_path.clone().unwrap_or_else(|| masque_config_path(&options.config_path)),
+        _ => options.wireguard_config_path.clone().unwrap_or_else(|| warp_config_path(&options.config_path)),
+    };
+    let identity = match options.protocol {
+        Protocol::Masque => load_or_provision_masque(&path).await?,
+        _ => load_or_provision_warp(&path).await?,
+    };
+    Ok(TunnelAddresses { ipv4: identity.ipv4, ipv6: identity.ipv6 })
+}
+
+pub async fn start(options: StartOptions) -> Result<()> {
+    initialize();
+    if let Some(peer) = options.forced_peer {
+        let key = match options.protocol { Protocol::Masque => "AETHER_PEER", _ => "AETHER_WG_PEER" };
+        std::env::set_var(key, peer.to_string());
+    }
+    if let Some(profile) = options.obfuscation_profile {
+        std::env::set_var("AETHER_NOIZE", profile);
+    }
+    std::env::set_var("AETHER_SCAN", options.scan_mode.label());
+    std::env::set_var("AETHER_IP", options.ip_scan.label());
+    match options.protocol {
+        Protocol::Masque => {
+            let path = options.masque_config_path.unwrap_or_else(|| masque_config_path(&options.config_path));
+            let identity = load_or_provision_masque(&path).await?;
+            run_masque(identity, resolve_ech().await, options.listen, lastconn_path(&path)).await
+        }
+        Protocol::WireGuard => {
+            let path = options.wireguard_config_path.unwrap_or_else(|| warp_config_path(&options.config_path));
+            let identity = load_or_provision_warp(&path).await?;
+            run_wireguard(identity, options.listen, lastconn_path(&path)).await
+        }
+        Protocol::WarpInWarp => {
+            let path = options.wireguard_config_path.unwrap_or_else(|| warp_config_path(&options.config_path));
+            let primary = load_or_provision_warp(&path).await?;
+            let secondary = load_or_provision_warp(&derive_sibling_path(&path, "secondary")).await?;
+            run_gool(primary, secondary, options.listen).await
+        }
+    }
+}
+
+pub async fn run_cli() -> Result<()> {
     cli::parse_and_apply()?;
 
     let level = std::env::var("AETHER_LOG_LEVEL")
@@ -1144,14 +1211,14 @@ async fn select_protocol() -> Protocol {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Protocol {
+pub enum Protocol {
     Masque,
     WireGuard,
     WarpInWarp,
 }
 
 impl Protocol {
-    fn parse(s: &str) -> Protocol {
+    pub fn parse(s: &str) -> Protocol {
         match s.trim().to_lowercase().as_str() {
             "wg" | "wireguard" => Protocol::WireGuard,
             "gool" | "wiw" | "warp-in-warp" | "warpinwarp" => Protocol::WarpInWarp,

@@ -93,6 +93,11 @@ pub fn enabled() -> bool {
     }
 }
 
+/// Enables HTTP/2 transport for native callers that select the TCP fallback.
+pub fn enable_fallback() {
+    std::env::set_var("AETHER_MASQUE_HTTP2", "1");
+}
+
 pub fn h2_peer(quic_peer: SocketAddr) -> SocketAddr {
     if let Ok(v) = std::env::var("AETHER_MASQUE_H2_PEER") {
         if let Ok(addr) = v.trim().parse::<SocketAddr>() {
