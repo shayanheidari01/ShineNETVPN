@@ -1,6 +1,10 @@
 #![allow(dead_code)]
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
+use crate::{
+    account, aethernoize, cli, config, consts, dns, masque, masque_h2, netstack, noize, prober,
+    quic, socks, sysprofile, tls, tunnelping, wg_prober, wireguard,
+};
 use crate::error::{AetherError, Result};
 
 fn parse_local_v4(s: &str) -> Ipv4Addr {
@@ -54,7 +58,7 @@ impl StartOptions {
     }
 }
 
-pub use prober::{IpScan, ScanMode};
+pub use crate::prober::{IpScan, ScanMode};
 
 pub fn initialize() {
     let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
@@ -1084,7 +1088,10 @@ async fn spawn_udp_forwarder(
     let local = sock.local_addr()?;
 
     let udp = outer.open_udp().await?;
-    let (udp_tx, mut udp_rx) = udp.into_split();
+    let (udp_tx, mut udp_rx): (
+        netstack::UdpSender,
+        tokio::sync::mpsc::Receiver<(SocketAddr, Vec<u8>)>,
+    ) = udp.into_split();
 
     let inner_peer: std::sync::Arc<tokio::sync::Mutex<Option<SocketAddr>>> =
         std::sync::Arc::new(tokio::sync::Mutex::new(None));
