@@ -60,7 +60,7 @@ For detailed security information, see our [Security Policy](SECURITY.md).
 
 ### 📥 Download
 
-**Latest Version: v1.3.2**
+**Latest Version: v1.3.3**
 
 [![Download APK](https://img.shields.io/badge/Download-APK-blue?style=for-the-badge&logo=android)](https://github.com/shayanheidari01/ShineNETVPN/releases/latest)
 
@@ -144,7 +144,7 @@ ShineNET VPN از پروتکل‌های رمزنگاری استاندارد صن
 
 ### 📥 دانلود
 
-**آخرین نسخه: v1.3.2**
+**آخرین نسخه: v1.3.3**
 
 [![دانلود APK](https://img.shields.io/badge/دانلود-APK-blue?style=for-the-badge&logo=android)](https://github.com/shayanheidari01/ShineNETVPN/releases/latest)
 
@@ -208,7 +208,7 @@ ShineNET VPN 使用行业标准加密协议：
 
 ### 📥 下载
 
-**最新版本: v1.3.2**
+**最新版本: v1.3.3**
 
 [![下载 APK](https://img.shields.io/badge/下载-APK-blue?style=for-the-badge&logo=android)](https://github.com/shayanheidari01/ShineNETVPN/releases/latest)
 
@@ -259,7 +259,7 @@ ShineNET VPN использует отраслевые стандарты шиф
 
 ### 📥 Скачать
 
-**Последняя версия: v1.3.2**
+**Последняя версия: v1.3.3**
 
 [![Скачать APK](https://img.shields.io/badge/Скачать-APK-blue?style=for-the-badge&logo=android)](https://github.com/shayanheidari01/ShineNETVPN/releases/latest)
 
