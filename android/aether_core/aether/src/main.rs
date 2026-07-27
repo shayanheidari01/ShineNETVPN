@@ -2,8 +2,8 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use crate::{
-    account, aethernoize, cli, config, consts, dns, masque, masque_h2, netstack, noize, prober,
-    quic, socks, sysprofile, tls, tunnelping, wg_prober, wireguard,
+    account, aethernoize, cli, config, consts, dns, lastconn, masque_h2, netstack, noize, prober,
+    quic, socks, sysprofile, tls, wg_prober, wireguard,
 };
 use crate::error::{AetherError, Result};
 
