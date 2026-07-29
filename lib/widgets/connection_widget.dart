@@ -91,10 +91,6 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
     return _connected ? 'connected'.tr() : 'disconnected'.tr();
   }
 
-  String get _hint {
-    return _connected ? '' : 'tap_connect_vpn'.tr();
-  }
-
   @override
   Widget build(BuildContext context) {
     final color = _statusColor;
@@ -176,15 +172,6 @@ class _ConnectionWidgetState extends State<ConnectionWidget>
                 color: ThemeColor.primaryText,
                 context: context,
               ),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            _hint,
-            style: ThemeColor.captionStyle(
-              color: color,
-              fontWeight: FontWeight.w600,
-              context: context,
             ),
           ),
         ],

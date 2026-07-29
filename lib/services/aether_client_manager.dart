@@ -117,7 +117,7 @@ class AetherClientManager {
     String scanMode = 'turbo',
     String ipScan = 'v4',
     String obfuscation = 'firewall',
-    String transport = 'h3',
+    String transport = 'auto',
     int socksPort = 1819,
   }) async {
     if (_currentState == AetherState.connecting) return;

@@ -18,6 +18,7 @@ static LAST_LOG: LazyLock<Mutex<CString>> =
     LazyLock::new(|| Mutex::new(CString::new("").unwrap()));
 static LOGS: LazyLock<Mutex<VecDeque<String>>> =
     LazyLock::new(|| Mutex::new(VecDeque::new()));
+static TOKIO_RUNTIME: OnceLock<Result<tokio::runtime::Runtime, String>> = OnceLock::new();
 static RUNNING: AtomicBool = AtomicBool::new(false);
 static READY: AtomicBool = AtomicBool::new(false);
 static STOP_REQUESTED: AtomicBool = AtomicBool::new(false);
@@ -66,10 +67,21 @@ impl TryFrom<NativeStartOptions> for StartOptions {
             return Err("config_path is required".into());
         }
 
-        if let Some(ref transport) = value.transport {
-            if transport.eq_ignore_ascii_case("h2") {
+        match value.transport.as_deref().map(str::trim).map(str::to_ascii_lowercase).as_deref() {
+            Some("h2") => {
+                std::env::set_var("AETHER_MASQUE_TRANSPORT", "h2");
                 crate::masque_h2::enable_fallback();
             }
+            Some("h3") => {
+                std::env::set_var("AETHER_MASQUE_TRANSPORT", "h3");
+                std::env::remove_var("AETHER_MASQUE_HTTP2");
+            }
+            Some("auto") => {
+                std::env::set_var("AETHER_MASQUE_TRANSPORT", "auto");
+                std::env::remove_var("AETHER_MASQUE_HTTP2");
+            }
+            Some(other) => return Err(format!("unsupported MASQUE transport: {other}")),
+            None => {}
         }
 
         let mut options = StartOptions::new(Protocol::parse(&value.protocol), value.config_path);
@@ -104,17 +116,30 @@ fn clear_logs() {
     *LAST_LOG.lock().unwrap() = CString::new("").unwrap();
 }
 
+fn runtime() -> Result<&'static tokio::runtime::Runtime, String> {
+    match TOKIO_RUNTIME.get_or_init(|| {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .map_err(|error| error.to_string())
+    }) {
+        Ok(runtime) => Ok(runtime),
+        Err(error) => Err(error.clone()),
+    }
+}
+
 pub(crate) fn record_log(message: impl ToString) {
     let text = message.to_string().replace('\0', " ");
-    let snapshot = {
-        let mut logs = LOGS.lock().unwrap();
-        if logs.len() == 400 {
-            logs.pop_front();
-        }
-        logs.push_back(text);
-        logs.iter().cloned().collect::<Vec<_>>().join("\n")
-    };
-    *LAST_LOG.lock().unwrap() = CString::new(snapshot).unwrap();
+    let mut logs = LOGS.lock().unwrap();
+    if logs.len() == 400 {
+        logs.pop_front();
+    }
+    logs.push_back(text);
+}
+
+fn log_snapshot() -> CString {
+    let logs = LOGS.lock().unwrap();
+    CString::new(logs.iter().cloned().collect::<Vec<_>>().join("\n")).unwrap()
 }
 
 fn set_last_result(result: impl ToString) {
@@ -202,10 +227,7 @@ unsafe fn aether_start_json_inner(json: *const c_char, tun_fd: Option<i32>) -> i
         clear_logs();
         record_log("Native tunnel started");
 
-        let runtime = match tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-        {
+        let runtime = match runtime() {
             Ok(runtime) => runtime,
             Err(error) => {
                 set_last_error(error);
@@ -247,10 +269,7 @@ pub unsafe extern "C" fn aether_prepare_json(json: *const c_char) -> i32 {
                 return -1;
             }
         };
-        let runtime = match tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-        {
+        let runtime = match runtime() {
             Ok(runtime) => runtime,
             Err(error) => {
                 set_last_error(error);
@@ -292,7 +311,9 @@ pub extern "C" fn aether_last_result() -> *const c_char {
 
 #[no_mangle]
 pub extern "C" fn aether_last_log() -> *const c_char {
-    LAST_LOG.lock().unwrap().as_ptr()
+    let mut last_log = LAST_LOG.lock().unwrap();
+    *last_log = log_snapshot();
+    last_log.as_ptr()
 }
 
 #[no_mangle]

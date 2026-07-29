@@ -26,7 +26,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:easy_localization/easy_localization.dart';
 import 'package:device_info_plus/device_info_plus.dart';
-import 'package:loading_animation_widget/loading_animation_widget.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -51,7 +50,7 @@ class _HomeScreenState extends State<HomeScreen> {
   AetherState _aetherState = AetherState.disconnected;
   String _aetherProtocol = 'masque';
   String _aetherScanMode = 'turbo';
-  String _aetherTransport = 'h3';
+  String _aetherTransport = 'auto';
 
   static const String _lastSuccessfulServerKey = 'last_successful_server';
   static const String _lastSuccessfulTimestampKey =
@@ -208,7 +207,7 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _aetherProtocol = prefs.getString('selected_aether_protocol') ?? 'masque';
       _aetherScanMode = prefs.getString('selected_aether_scan_mode') ?? 'turbo';
-      _aetherTransport = prefs.getString('selected_aether_transport') ?? 'h3';
+      _aetherTransport = prefs.getString('selected_aether_transport') ?? 'auto';
     });
   }
 
@@ -815,10 +814,6 @@ class _HomeScreenState extends State<HomeScreen> {
             SizedBox(height: ThemeColor.mediumSpacing),
             _buildSimplifiedStatusInfo(status),
           ],
-          if (_shouldShowLoadingStatus()) ...[
-            SizedBox(height: ThemeColor.mediumSpacing),
-            _buildSimplifiedLoadingStatus(),
-          ],
         ],
       ),
     );
@@ -954,10 +949,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
       ],
     );
-  }
-
-  bool _shouldShowLoadingStatus() {
-    return isLoading && loadingStatus.isNotEmpty;
   }
 
   Widget _buildAetherModeCard() {
@@ -1314,40 +1305,6 @@ class _HomeScreenState extends State<HomeScreen> {
               label: 'ip_address'.tr(),
               value: _userIP ?? '—',
               color: ThemeColor.primaryColor,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Simplified loading status
-  Widget _buildSimplifiedLoadingStatus() {
-    return LiquidGlassContainer(
-      padding: EdgeInsets.all(ThemeColor.mediumSpacing),
-      borderRadius: ThemeColor.largeRadius,
-      blurSigma: 22,
-      enableBlur: false,
-      showShadow: false,
-      gradientColors: _tintedGlassGradient(
-        ThemeColor.connectingColor,
-        highlight: 0.22,
-        lowlight: 0.05,
-      ),
-      child: Row(
-        children: [
-          LoadingAnimationWidget.threeArchedCircle(
-            color: ThemeColor.connectingColor,
-            size: 20,
-          ),
-          SizedBox(width: ThemeColor.mediumSpacing),
-          Expanded(
-            child: Text(
-              loadingStatus,
-              style: ThemeColor.bodyStyle(
-                color: ThemeColor.connectingColor,
-                fontWeight: FontWeight.w500,
-              ),
             ),
           ),
         ],
@@ -2172,14 +2129,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   });
 
                   // Start connection without awaiting to allow other operations to continue
-                  _connectToServer(server).then((_) {
-                    if (mounted) {
-                      print('✅ اتصال فوری موفق بود');
-                      setState(() {
-                        loadingStatus = '✅ متصل شد';
-                      });
-                    }
-                  }).catchError((e) {
+                  _connectToServer(server).catchError((e) {
                     print('❌ اتصال فوری ناموفق بود: $e');
                     if (mounted) {
                       setState(() {

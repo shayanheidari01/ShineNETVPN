@@ -171,9 +171,11 @@ class MainActivity: FlutterActivity() {
                     val scanMode = call.argument<String>("scanMode") ?: "turbo"
                     val ipScan = call.argument<String>("ipScan") ?: "v4"
                     val obfuscation = call.argument<String>("obfuscation") ?: "firewall"
-                    // transport is accepted from Flutter for future .so builds, but must NOT be
-                    // serialized into the native JSON: the currently shipped libaether.so uses
-                    // deny_unknown_fields and rejects `transport`.
+                    val transport = call.argument<String>("transport")
+                        ?.trim()
+                        ?.lowercase()
+                        ?.takeIf { it == "auto" || it == "h2" || it == "h3" }
+                        ?: "auto"
                     val socksPort = call.argument<Int>("socksPort") ?: 1819
                     val normalizedProtocol = protocol.trim().lowercase()
 
@@ -196,6 +198,7 @@ class MainActivity: FlutterActivity() {
                             put("ip_scan", ipScan)
                             put("obfuscation_profile", obfuscation)
                             put("retry_obfuscation_profiles", true)
+                            put("transport", transport)
                         }.toString()
 
                         startForegroundService(Intent(this, AetherVpnService::class.java)

@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('arm64-v8a')]
+    [ValidateSet('arm64-v8a', 'armeabi-v7a', 'x86_64')]
     [string]$Abi = 'arm64-v8a',
     [int]$Api = 24
 )
@@ -9,22 +9,44 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 $crate = Join-Path $PSScriptRoot 'aether'
 $sdk = Join-Path $env:LOCALAPPDATA 'Android\Sdk'
-$ndk = Join-Path $sdk 'ndk\28.2.13676358'
-$bin = Join-Path $ndk 'toolchains\llvm\prebuilt\windows-x86_64\bin'
-$cmake = Join-Path $sdk 'cmake\3.22.1\bin\cmake.exe'
+$ndk = Join-Path $sdk 'ndk\30.0.14904198'
+$binNative = Join-Path $ndk 'toolchains\llvm\prebuilt\windows-x86_64\bin'
+$cmakeNative = Join-Path $sdk 'cmake\3.22.1\bin\cmake.exe'
+$bundledLlvmBin = Join-Path $sdk 'ndk\30.0.14904198\toolchains\llvm\prebuilt\windows-x86_64\bin'
+$llvmBinNative = if ($env:AETHER_LLVM_BIN) {
+    $env:AETHER_LLVM_BIN
+} elseif (Test-Path -LiteralPath (Join-Path $bundledLlvmBin 'libclang.dll')) {
+    $bundledLlvmBin
+} else {
+    $binNative
+}
 
-foreach ($path in @($ndk, $bin, $cmake)) {
+$target = switch ($Abi) {
+    'arm64-v8a' { 'aarch64-linux-android' }
+    'armeabi-v7a' { 'armv7-linux-androideabi' }
+    'x86_64' { 'x86_64-linux-android' }
+}
+$clangTriple = switch ($Abi) {
+    'arm64-v8a' { 'aarch64-linux-android' }
+    'armeabi-v7a' { 'armv7a-linux-androideabi' }
+    'x86_64' { 'x86_64-linux-android' }
+}
+$envSuffix = $target.Replace('-', '_')
+$clangTarget = "$clangTriple$Api"
+
+foreach ($path in @($ndk, $binNative, $cmakeNative, $llvmBinNative, (Join-Path $llvmBinNative 'libclang.dll'))) {
     if (-not (Test-Path -LiteralPath $path)) {
         throw "Android build requirement missing: $path"
     }
 }
 
-$env:ANDROID_NDK_HOME = $ndk
-$env:ANDROID_NDK_ROOT = $ndk
-$env:LIBCLANG_PATH = 'C:\Program Files\LLVM\bin'
-$env:CMAKE = $cmake
+$ndkSlash = $ndk.Replace('\', '/')
+$env:ANDROID_NDK_HOME = $ndkSlash
+$env:ANDROID_NDK_ROOT = $ndkSlash
+$env:LIBCLANG_PATH = $llvmBinNative.Replace('\', '/')
+$env:CMAKE = $cmakeNative.Replace('\', '/')
 $env:CMAKE_GENERATOR = 'Ninja'
-$env:PATH = "$(Split-Path $cmake -Parent);$env:PATH"
+$env:PATH = "$(Split-Path $cmakeNative -Parent);$env:PATH"
 
 # boring-sys builds BoringSSL before its known Windows second-configure failure.
 Push-Location $crate
@@ -40,7 +62,7 @@ try {
 finally {
     Pop-Location
 }
-$bsslOut = Get-ChildItem -LiteralPath (Join-Path $crate 'target\aarch64-linux-android\release\build') -Directory -Filter 'boring-sys-*' |
+$bsslOut = Get-ChildItem -LiteralPath (Join-Path $crate "target\$target\release\build") -Directory -Filter 'boring-sys-*' |
     ForEach-Object { Join-Path $_.FullName 'out' } |
     Where-Object { Test-Path -LiteralPath (Join-Path $_ 'build\libssl.a') } |
     Select-Object -Last 1
@@ -53,23 +75,34 @@ $sysroot = (Join-Path $ndk 'toolchains\llvm\prebuilt\windows-x86_64\sysroot').Re
 $env:BORING_BSSL_PATH = Join-Path $bsslOut 'build'
 $env:BORING_BSSL_INCLUDE_PATH = Join-Path $bsslOut 'boringssl\src\include'
 $env:BORING_BSSL_ASSUME_PATCHED = '1'
-$env:CLANG_PATH = Join-Path $bin 'clang.exe'
-$env:CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER = Join-Path $bin 'aarch64-linux-android24-clang.cmd'
-$env:CARGO_TARGET_AARCH64_LINUX_ANDROID_AR = Join-Path $bin 'llvm-ar.exe'
-$env:AR_aarch64_linux_android = $env:CARGO_TARGET_AARCH64_LINUX_ANDROID_AR
-$env:CC_aarch64_linux_android = Join-Path $bin 'clang.exe'
-$env:CXX_aarch64_linux_android = Join-Path $bin 'clang++.exe'
-$env:CFLAGS_aarch64_linux_android = '--target=aarch64-linux-android24'
-$env:CXXFLAGS_aarch64_linux_android = '--target=aarch64-linux-android24'
-$env:BINDGEN_EXTRA_CLANG_ARGS_aarch64_linux_android = "--target=aarch64-linux-android24 --sysroot=$sysroot -I$sysroot/usr/include/aarch64-linux-android"
+$bin = $binNative.Replace('\', '/')
+$env:CLANG_PATH = "$bin/clang.exe"
+$linker = "$bin/$clangTarget-clang.cmd"
+$ar = "$bin/llvm-ar.exe"
+Set-Item -Path "Env:CARGO_TARGET_${envSuffix}_LINKER" -Value $linker
+Set-Item -Path "Env:CARGO_TARGET_${envSuffix}_AR" -Value $ar
+Set-Item -Path "Env:AR_${envSuffix}" -Value $ar
+Set-Item -Path "Env:CC_${envSuffix}" -Value "$bin/clang.exe"
+Set-Item -Path "Env:CXX_${envSuffix}" -Value "$bin/clang++.exe"
+# cargo-ndk/boring-sys also consult the hyphenated target variables. Keep
+# those paths slash-normalized so CMake does not parse Windows `\U` escapes.
+Set-Item -Path "Env:CC_$target" -Value "$bin/clang.exe"
+Set-Item -Path "Env:CXX_$target" -Value "$bin/clang++.exe"
+Set-Item -Path "Env:CFLAGS_$envSuffix" -Value "--target=$clangTarget"
+Set-Item -Path "Env:CXXFLAGS_$envSuffix" -Value "--target=$clangTarget"
+Set-Item -Path "Env:BINDGEN_EXTRA_CLANG_ARGS_$envSuffix" -Value "--target=$clangTarget --sysroot=$sysroot -I$sysroot/usr/include/$target"
 $env:RUSTFLAGS = "$env:RUSTFLAGS -C link-arg=-Wl,-soname,libaether.so -C link-arg=-Wl,-z,max-page-size=16384 -C link-arg=-Wl,-z,common-page-size=16384".Trim()
 
 Push-Location $crate
 try {
-    cargo build --release --lib --target aarch64-linux-android
-    $destination = Join-Path $root "core\android-libs\$Abi"
+    cargo build --release --lib --target $target
+    $destination = Join-Path $PSScriptRoot "android-libs\$Abi"
     New-Item -ItemType Directory -Path $destination -Force | Out-Null
-    Copy-Item -LiteralPath '.\target\aarch64-linux-android\release\libaether.so' -Destination (Join-Path $destination 'libaether.so') -Force
+    Copy-Item -LiteralPath ".\target\$target\release\libaether.so" -Destination (Join-Path $destination 'libaether.so') -Force
+
+    $jniDestination = Join-Path $root "app\src\main\jniLibs\$Abi"
+    New-Item -ItemType Directory -Path $jniDestination -Force | Out-Null
+    Copy-Item -LiteralPath ".\target\$target\release\libaether.so" -Destination (Join-Path $jniDestination 'libaether.so') -Force
 }
 finally {
     Pop-Location

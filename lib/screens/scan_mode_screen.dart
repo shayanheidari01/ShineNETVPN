@@ -51,7 +51,7 @@ class _ScanModeScreenState extends State<ScanModeScreen> {
         _selectedScanMode = prefs.getString(_scanModeKey) ?? 'turbo';
         _selectedIpVersion = prefs.getString(_ipVersionKey) ?? 'v4';
         _selectedProtocol = prefs.getString(_protocolKey) ?? 'masque';
-        _selectedTransport = prefs.getString(_transportKey) ?? 'h3';
+        _selectedTransport = prefs.getString(_transportKey) ?? 'auto';
         _selectedObfuscation = prefs.getString(_obfuscationKey) ?? 'firewall';
       });
     }
@@ -329,6 +329,15 @@ class _ScanModeScreenState extends State<ScanModeScreen> {
             SizedBox(height: ThemeColor.largeSpacing),
             Row(
               children: [
+                Expanded(
+                  child: _buildTransportOption(
+                    value: 'auto',
+                    name: 'Auto',
+                    description: 'H2 first, then H3',
+                    icon: Icons.autorenew_rounded,
+                  ),
+                ),
+                SizedBox(width: ThemeColor.smallSpacing),
                 Expanded(
                   child: _buildTransportOption(
                     value: 'h3',
